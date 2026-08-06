@@ -1,0 +1,6 @@
+{
+  "name": "Dating with Bouncer",
+  "description": "Singles dating platform featuring profile browsing, Add-to-Cart matches, Bouncer verification, account controls, admin management, and secure subscription payments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
