@@ -13,7 +13,7 @@ import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, Sub
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
 
@@ -26,7 +26,7 @@ async function startServer() {
 
   // API ROUTE 1: Health Check
   app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), port: PORT });
   });
 
   // API ROUTE 2: Auth Endpoints
@@ -35,8 +35,11 @@ async function startServer() {
   });
 
   app.post('/api/auth/login', (req, res) => {
-    const { email, role } = req.body;
+    const { email, role, adminKey } = req.body;
     if (role === 'admin' || email === 'admin@bouncer.date') {
+      if (adminKey && !['admin123', 'bouncer2025', 'admin', 'pass'].includes(adminKey.toLowerCase())) {
+        return res.status(401).json({ error: 'Invalid Admin Passcode.' });
+      }
       currentUser = MOCK_ADMIN_USER;
       return res.json({ success: true, user: currentUser, token: 'admin_session_token' });
     }
@@ -51,7 +54,7 @@ async function startServer() {
   });
 
   app.post('/api/auth/register', (req, res) => {
-    const { email, name, age, location, gender, seeking, bio, occupation } = req.body;
+    const { email, name, age, city, subLocation, location, gender, childrenCount, intent, bio } = req.body;
     if (!email || !name) {
       return res.status(400).json({ error: 'Name and email are required.' });
     }
@@ -61,15 +64,17 @@ async function startServer() {
       email,
       name,
       age: Number(age) || 25,
-      location: location || 'New York, NY',
+      city: city || 'Harare',
+      subLocation: subLocation || 'Borrowdale',
+      location: location || `${city || 'Harare'} (${subLocation || 'Borrowdale'}), Zimbabwe`,
+      childrenCount: Number(childrenCount) || 0,
+      intent: intent || 'Marriage',
       role: 'user',
       subscriptionPlan: 'free',
       subscriptionStatus: 'active',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
       bio: bio || 'New single on Dating with Bouncer!',
-      occupation: occupation || 'Professional',
       gender: gender || 'female',
-      seeking: seeking || 'male',
       interests: ['Dating', 'Coffee', 'Music'],
       bouncerVerified: false,
       createdAt: new Date().toISOString()
@@ -78,29 +83,34 @@ async function startServer() {
     users.push(newUser);
     currentUser = newUser;
 
-    // Also auto-create a SingleProfile so the user displays in the Singles directory!
+    // Auto-create SingleProfile so user displays in directory
     const newProfile: SingleProfile = {
       id: `p_${Date.now()}`,
       name: newUser.name,
       age: newUser.age,
+      city: newUser.city,
+      subLocation: newUser.subLocation,
       location: newUser.location,
+      childrenCount: newUser.childrenCount,
+      intent: newUser.intent,
+      seeking: 'male',
       bio: newUser.bio || 'Recently joined single seeking genuine connections.',
-      occupation: newUser.occupation || 'Professional',
+      occupation: 'Professional',
       photos: [newUser.avatar],
       interests: newUser.interests || ['Dating'],
       gender: newUser.gender || 'female',
-      seeking: newUser.seeking || 'male',
       bouncerStatus: 'pending_check',
       bouncerNotes: 'Awaiting Bouncer identity and photo review.',
-      compatibilityScore: 90,
+      compatibilityScore: 92,
       height: "5'7\"",
-      relationshipGoal: 'Long-term relationship',
+      relationshipGoal: 'Marriage / Long-term',
+      reviews: [],
+      averageRating: 5.0,
       createdAt: new Date().toISOString()
     };
 
     profiles.unshift(newProfile);
-
-    res.json({ success: true, user: newUser, profile: newProfile });
+    res.json({ success: true, user: currentUser, profile: newProfile });
   });
 
   app.put('/api/auth/profile', (req, res) => {
@@ -148,7 +158,11 @@ async function startServer() {
         id: `p_${Date.now()}`,
         name: currentUser.name,
         age: currentUser.age,
+        city: currentUser.city || 'Harare',
+        subLocation: currentUser.subLocation || 'Borrowdale',
         location: currentUser.location,
+        childrenCount: currentUser.childrenCount || 0,
+        intent: currentUser.intent || 'Marriage',
         bio: currentUser.bio || 'Single looking for love.',
         occupation: currentUser.occupation || 'Professional',
         photos: [currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'],
@@ -160,6 +174,8 @@ async function startServer() {
         compatibilityScore: 92,
         height: "5'8\"",
         relationshipGoal: 'Meaningful connections',
+        reviews: [],
+        averageRating: 5.0,
         createdAt: new Date().toISOString()
       };
       profiles.unshift(newProf);
@@ -168,16 +184,18 @@ async function startServer() {
     res.json({ success: true, user: currentUser });
   });
 
-  // API ROUTE 3: Profiles Endpoint (Name, Age, Location, Bouncer Filters)
+  // API ROUTE 3: Profiles Endpoint (Name, Age, Location, Intent, Children, Bouncer Filters)
   app.get('/api/profiles', (req, res) => {
     let result = [...profiles];
-    const { search, gender, bouncerStatus, location } = req.query;
+    const { search, gender, bouncerStatus, location, city, subLocation, minAge, maxAge, childrenCount, intent } = req.query;
 
     if (search) {
       const q = (search as string).toLowerCase();
       result = result.filter(
         p => p.name.toLowerCase().includes(q) ||
              p.location.toLowerCase().includes(q) ||
+             (p.city && p.city.toLowerCase().includes(q)) ||
+             (p.subLocation && p.subLocation.toLowerCase().includes(q)) ||
              p.occupation.toLowerCase().includes(q) ||
              p.bio.toLowerCase().includes(q)
       );
@@ -191,9 +209,40 @@ async function startServer() {
       result = result.filter(p => p.bouncerStatus === bouncerStatus);
     }
 
+    if (city && city !== 'all') {
+      result = result.filter(p => p.city?.toLowerCase() === (city as string).toLowerCase());
+    }
+
+    if (subLocation && subLocation !== 'all') {
+      result = result.filter(p => p.subLocation?.toLowerCase() === (subLocation as string).toLowerCase());
+    }
+
     if (location && location !== 'all') {
       const locQ = (location as string).toLowerCase();
       result = result.filter(p => p.location.toLowerCase().includes(locQ));
+    }
+
+    if (minAge) {
+      const min = Number(minAge);
+      if (!isNaN(min)) result = result.filter(p => p.age >= min);
+    }
+
+    if (maxAge) {
+      const max = Number(maxAge);
+      if (!isNaN(max)) result = result.filter(p => p.age <= max);
+    }
+
+    if (childrenCount && childrenCount !== 'all') {
+      if (childrenCount === '3+') {
+        result = result.filter(p => (p.childrenCount ?? 0) >= 3);
+      } else {
+        const count = Number(childrenCount);
+        if (!isNaN(count)) result = result.filter(p => (p.childrenCount ?? 0) === count);
+      }
+    }
+
+    if (intent && intent !== 'all') {
+      result = result.filter(p => p.intent === intent);
     }
 
     res.json(result);
@@ -207,9 +256,35 @@ async function startServer() {
     res.json(profile);
   });
 
+  // Post a review on a single profile
+  app.post('/api/profiles/:id/reviews', (req, res) => {
+    const { reviewerName, rating, comment } = req.body;
+    const idx = profiles.findIndex(p => p.id === req.params.id);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    const newRev = {
+      id: `rev_${Date.now()}`,
+      reviewerName: reviewerName || (currentUser ? currentUser.name : 'Single Member'),
+      rating: Number(rating) || 5,
+      comment: comment || 'Wonderful date experience with Bouncer clearance!',
+      createdAt: new Date().toISOString()
+    };
+
+    const currentRevs = profiles[idx].reviews || [];
+    const updatedRevs = [newRev, ...currentRevs];
+    const avg = updatedRevs.reduce((acc, r) => acc + r.rating, 0) / updatedRevs.length;
+
+    profiles[idx].reviews = updatedRevs;
+    profiles[idx].averageRating = parseFloat(avg.toFixed(1));
+
+    res.json({ success: true, profile: profiles[idx], review: newRev });
+  });
+
   // Admin / User Add Profile
   app.post('/api/profiles', (req, res) => {
-    const { name, age, location, bio, occupation, photos, interests, gender, seeking, height, relationshipGoal, bouncerStatus, bouncerNotes } = req.body;
+    const { name, age, location, city, subLocation, childrenCount, intent, bio, occupation, photos, interests, gender, seeking, height, relationshipGoal, bouncerStatus, bouncerNotes } = req.body;
     if (!name || !age || !location) {
       return res.status(400).json({ error: 'Name, Age, and Location are required.' });
     }
@@ -219,6 +294,12 @@ async function startServer() {
       name,
       age: Number(age),
       location,
+      city: city || 'Harare',
+      subLocation: subLocation || 'Avondale',
+      childrenCount: childrenCount !== undefined ? Number(childrenCount) : 0,
+      intent: intent || 'Marriage',
+      reviews: [],
+      averageRating: 5.0,
       bio: bio || 'Fresh profile on Dating with Bouncer.',
       occupation: occupation || 'Creative Professional',
       photos: Array.isArray(photos) && photos.length > 0 ? photos : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'],

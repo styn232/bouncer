@@ -1,21 +1,37 @@
 export type BouncerStatus = 'verified' | 'vip_approved' | 'pending_check' | 'bounced';
 
+export type DatingIntent = 'Marriage' | 'Funny' | 'Casual';
+
+export interface ProfileReview {
+  id: string;
+  reviewerName: string;
+  rating: number; // 1 to 5
+  comment: string;
+  createdAt: string;
+}
+
 export interface SingleProfile {
   id: string;
   name: string;
   age: number;
-  location: string;
+  location: string; // full display location string e.g. "Harare (Borrowdale), Zimbabwe"
+  city?: string; // e.g. "Harare"
+  subLocation?: string; // e.g. "Borrowdale"
   bio: string;
   occupation: string;
   photos: string[];
   interests: string[];
   gender: 'female' | 'male' | 'non-binary';
   seeking: 'female' | 'male' | 'everyone';
+  childrenCount: number; // 0 for none, 1, 2, 3+
+  intent: DatingIntent; // "Marriage" or "Funny"
+  reviews: ProfileReview[];
+  averageRating: number; // calculated rating e.g. 4.8
   bouncerStatus: BouncerStatus;
   bouncerNotes: string;
   compatibilityScore: number; // e.g. 98
   height: string;
-  relationshipGoal: string; // e.g. "Long-term relationship", "VIP Lounge dates", etc.
+  relationshipGoal: string; // e.g. "Marriage", "VIP Lounge dates", etc.
   isFeatured?: boolean;
   createdAt: string;
 }
@@ -28,6 +44,8 @@ export interface User {
   name: string;
   age: number;
   location: string;
+  city?: string;
+  subLocation?: string;
   role: 'user' | 'admin';
   subscriptionPlan: SubscriptionPlanId;
   subscriptionStatus: 'active' | 'canceled' | 'none';
@@ -37,6 +55,8 @@ export interface User {
   occupation?: string;
   gender?: 'female' | 'male' | 'non-binary';
   seeking?: 'female' | 'male' | 'everyone';
+  childrenCount?: number;
+  intent?: DatingIntent;
   interests?: string[];
   bouncerVerified: boolean;
   createdAt: string;

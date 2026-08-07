@@ -136,12 +136,39 @@ export const SingleCard: React.FC<SingleCardProps> = ({
             </h3>
           </div>
 
-          {/* Prominent Location */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-300 mb-3 font-medium">
-            <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-            <span>{profile.location}</span>
-            <span className="text-slate-600">•</span>
-            <span className="text-slate-400 truncate">{profile.occupation}</span>
+          {/* Prominent Location & Attributes */}
+          <div className="flex flex-col gap-1 text-xs text-slate-300 mb-3 font-medium">
+            <div className="flex items-center gap-1.5 text-slate-300">
+              <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              <span>{profile.location}</span>
+              <span className="text-slate-600">•</span>
+              <span className="text-slate-400 truncate">{profile.occupation}</span>
+            </div>
+
+            {/* Children Count, Intent & Rating Row */}
+            <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px]">
+              {/* Children Count */}
+              <span className="bg-slate-950 border border-slate-800 text-slate-300 px-2 py-0.5 rounded-md font-semibold">
+                👶 {profile.childrenCount === 0 ? 'No children' : `${profile.childrenCount} child${profile.childrenCount > 1 ? 'ren' : ''}`}
+              </span>
+
+              {/* Dating Intent */}
+              <span className={`px-2 py-0.5 rounded-md font-extrabold uppercase text-[10px] border ${
+                profile.intent === 'Marriage'
+                  ? 'bg-amber-500/10 border-amber-500/40 text-amber-300'
+                  : 'bg-rose-500/10 border-rose-500/40 text-rose-300'
+              }`}>
+                {profile.intent === 'Marriage' ? '💍 Marriage' : '😂 Funny & Good Vibe'}
+              </span>
+
+              {/* Review Rating */}
+              <span className="bg-slate-950 border border-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                ★ {profile.averageRating ? profile.averageRating.toFixed(1) : '5.0'}
+                {profile.reviews && profile.reviews.length > 0 && (
+                  <span className="text-slate-500 font-normal">({profile.reviews.length})</span>
+                )}
+              </span>
+            </div>
           </div>
 
           {/* Bio Snippet */}

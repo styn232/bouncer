@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User as UserIcon, ShieldCheck, Camera, Sparkles, X, Check, Heart, MapPin, Briefcase } from 'lucide-react';
-import { User } from '../types';
+import { User as UserIcon, ShieldCheck, Camera, Sparkles, X, Check, Heart, MapPin, Briefcase, Baby } from 'lucide-react';
+import { User, DatingIntent } from '../types';
+import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 
 interface UserProfileEditorModalProps {
   isOpen: boolean;
@@ -22,7 +23,10 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
 
   const [name, setName] = useState(currentUser.name || '');
   const [age, setAge] = useState(currentUser.age || 25);
-  const [location, setLocation] = useState(currentUser.location || '');
+  const [city, setCity] = useState(currentUser.city || 'Harare');
+  const [subLocation, setSubLocation] = useState(currentUser.subLocation || 'Borrowdale');
+  const [childrenCount, setChildrenCount] = useState<number>(currentUser.childrenCount ?? 0);
+  const [intent, setIntent] = useState<DatingIntent>(currentUser.intent || 'Marriage');
   const [bio, setBio] = useState(currentUser.bio || '');
   const [occupation, setOccupation] = useState(currentUser.occupation || '');
   const [gender, setGender] = useState(currentUser.gender || 'female');
@@ -32,13 +36,22 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
 
   const [isSaved, setIsSaved] = useState(false);
 
+  // Available sub-locations for chosen city
+  const activeCityData = ZIMBABWE_LOCATIONS.find(l => l.city.toLowerCase() === city.toLowerCase());
+  const availableSubLocations = activeCityData ? activeCityData.subLocations : ['CBD'];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const interests = interestsText.split(',').map(i => i.trim()).filter(Boolean);
+    const fullLocation = `${city} (${subLocation}), Zimbabwe`;
     onSaveProfile({
       name,
       age: Number(age),
-      location,
+      city,
+      subLocation,
+      location: fullLocation,
+      childrenCount: Number(childrenCount),
+      intent,
       bio,
       occupation,
       gender: gender as any,
@@ -70,7 +83,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden z-10 my-8 p-6 sm:p-8"
+          className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden z-10 my-8 p-6 sm:p-8 max-h-[90vh] overflow-y-auto"
         >
           <button
             onClick={onClose}
@@ -91,7 +104,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 Manage My Dating Profile
               </h2>
               <p className="text-xs text-slate-400">
-                Update your Name, Age, Location, and features visible to other singles.
+                Update your Age, Gender, Number of Children, Zimbabwe Location & Intent.
               </p>
             </div>
           </div>
@@ -108,8 +121,8 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 </div>
                 <div className="text-[11px] text-slate-400">
                   {currentUser.bouncerVerified
-                    ? '✅ Your profile is Bouncer Verified! You enjoy 100% higher match responses.'
-                    : '⏳ Unverified single. Request Bouncer clearance to unlock Gold Badge status.'}
+                    ? '✅ Your profile is Bouncer Verified! Gold Badge active.'
+                    : '⏳ Unverified single. Request Bouncer clearance for Gold Badge status.'}
                 </div>
               </div>
             </div>
@@ -158,39 +171,10 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 />
               </div>
 
-              {/* Location */}
+              {/* Gender Choice */}
               <div>
                 <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Location (City, State)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={location}
-                  onChange={e => setLocation(e.target.value)}
-                  placeholder="New York, NY"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              {/* Occupation */}
-              <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Occupation
-                </label>
-                <input
-                  type="text"
-                  value={occupation}
-                  onChange={e => setOccupation(e.target.value)}
-                  placeholder="Architect / Designer"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              {/* Gender */}
-              <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  My Gender
+                  Choose Gender
                 </label>
                 <select
                   value={gender}
@@ -203,28 +187,101 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 </select>
               </div>
 
-              {/* Seeking */}
+              {/* Number of Children */}
               <div>
                 <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Seeking
+                  👶 Number of Children
                 </label>
                 <select
-                  value={seeking}
-                  onChange={e => setSeeking(e.target.value as any)}
+                  value={childrenCount}
+                  onChange={e => setChildrenCount(Number(e.target.value))}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
                 >
-                  <option value="female">Female Singles</option>
-                  <option value="male">Male Singles</option>
-                  <option value="everyone">Everyone</option>
+                  <option value={0}>0 (No children)</option>
+                  <option value={1}>1 Child</option>
+                  <option value={2}>2 Children</option>
+                  <option value={3}>3+ Children</option>
                 </select>
+              </div>
+
+              {/* Zimbabwe City */}
+              <div>
+                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  📍 Zimbabwe City
+                </label>
+                <select
+                  value={city}
+                  onChange={e => {
+                    const nextCity = e.target.value;
+                    setCity(nextCity);
+                    const nextData = ZIMBABWE_LOCATIONS.find(l => l.city === nextCity);
+                    if (nextData && nextData.subLocations.length > 0) {
+                      setSubLocation(nextData.subLocations[0]);
+                    }
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
+                >
+                  {ZIMBABWE_LOCATIONS.map(loc => (
+                    <option key={loc.city} value={loc.city}>
+                      {loc.city}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sub-location / Suburb */}
+              <div>
+                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  🏘️ Sub-location / Suburb
+                </label>
+                <select
+                  value={subLocation}
+                  onChange={e => setSubLocation(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
+                >
+                  {availableSubLocations.map(sub => (
+                    <option key={sub} value={sub}>
+                      {sub}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Dating Intent: Marriage or Funny */}
+              <div>
+                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  💍 Dating Intent
+                </label>
+                <select
+                  value={intent}
+                  onChange={e => setIntent(e.target.value as DatingIntent)}
+                  className="w-full bg-slate-950 border border-amber-500/40 text-amber-300 font-bold rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="Marriage">💍 Seeking Marriage</option>
+                  <option value="Funny">😂 Funny & Good Vibe</option>
+                </select>
+              </div>
+
+              {/* Occupation */}
+              <div>
+                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Occupation
+                </label>
+                <input
+                  type="text"
+                  value={occupation}
+                  onChange={e => setOccupation(e.target.value)}
+                  placeholder="Architect / Accountant / Entrepreneur"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
+                />
               </div>
 
             </div>
 
-            {/* Profile Photo URL */}
+            {/* Avatar URL */}
             <div>
               <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                Avatar Image URL (CDN / Unsplash)
+                Avatar Image URL
               </label>
               <input
                 type="text"
@@ -244,7 +301,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 rows={3}
                 value={bio}
                 onChange={e => setBio(e.target.value)}
-                placeholder="Share your interests, favorite date spots, and what you are looking for..."
+                placeholder="Share your hobbies, what you appreciate in a partner..."
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:outline-none focus:border-amber-500"
               />
             </div>
@@ -258,7 +315,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 type="text"
                 value={interestsText}
                 onChange={e => setInterestsText(e.target.value)}
-                placeholder="Art, Sailing, Mixology, Travel, Pilates"
+                placeholder="Coffee, Safari, Music, Cooking"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
               />
             </div>

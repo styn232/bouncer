@@ -22,6 +22,47 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
 
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
 
+  // Reviews state
+  const [localReviews, setLocalReviews] = useState<any[]>(profile?.reviews || []);
+  const [showAddReview, setShowAddReview] = useState(false);
+  const [newRating, setNewRating] = useState(5);
+  const [newReviewerName, setNewReviewerName] = useState('');
+  const [newComment, setNewComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  React.useEffect(() => {
+    if (profile) {
+      setLocalReviews(profile.reviews || []);
+    }
+  }, [profile]);
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile) return;
+    setIsSubmittingReview(true);
+    try {
+      const res = await fetch(`/api/profiles/${profile.id}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rating: newRating,
+          reviewerName: newReviewerName || 'Single Member',
+          comment: newComment
+        })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setLocalReviews(updated.reviews);
+        setNewComment('');
+        setShowAddReview(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
@@ -124,16 +165,28 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                 <div className="flex items-center gap-2 text-xs">
                   <Award className="w-4 h-4 text-amber-400 shrink-0" />
                   <div>
-                    <div className="text-[10px] text-slate-500 uppercase">Height</div>
-                    <div className="font-semibold text-slate-200">{profile.height}</div>
+                    <div className="text-[10px] text-slate-500 uppercase">Gender</div>
+                    <div className="font-semibold text-slate-200 capitalize">{profile.gender}</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs col-span-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <Award className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase">Children</div>
+                    <div className="font-semibold text-slate-200">
+                      👶 {profile.childrenCount === 0 ? 'No children' : `${profile.childrenCount} child${profile.childrenCount > 1 ? 'ren' : ''}`}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
                   <Heart className="w-4 h-4 text-rose-400 shrink-0" />
                   <div>
-                    <div className="text-[10px] text-slate-500 uppercase">Dating Goal</div>
-                    <div className="font-semibold text-slate-200">{profile.relationshipGoal}</div>
+                    <div className="text-[10px] text-slate-500 uppercase">Dating Intent</div>
+                    <div className="font-semibold text-amber-300">
+                      {profile.intent === 'Marriage' ? '💍 Marriage' : '😂 Funny & Casual'}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -144,6 +197,97 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                 <p className="text-sm text-slate-200 leading-relaxed bg-slate-950/50 p-4 rounded-2xl border border-slate-800/80">
                   {profile.bio}
                 </p>
+              </div>
+
+              {/* Reviews & Star Rating Section */}
+              <div className="mb-6 bg-slate-950/80 border border-slate-800 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                    <span>★ Member Reviews & Vibe Check</span>
+                  </h4>
+                  <span className="text-xs font-bold text-slate-300 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                    ★ {profile.averageRating ? profile.averageRating.toFixed(1) : '5.0'} / 5.0 ({localReviews.length} reviews)
+                  </span>
+                </div>
+
+                {/* Existing Reviews List */}
+                <div className="space-y-2 mb-3 max-h-40 overflow-y-auto pr-1">
+                  {localReviews.length > 0 ? (
+                    localReviews.map((rev) => (
+                      <div key={rev.id} className="p-2.5 bg-slate-900 rounded-xl border border-slate-800 text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-slate-200">{rev.reviewerName}</span>
+                          <span className="text-amber-400 font-bold">{'★'.repeat(rev.rating)}</span>
+                        </div>
+                        <p className="text-slate-300 italic">"{rev.comment}"</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-500 italic">No reviews written yet. Be the first to leave a vibe check!</p>
+                  )}
+                </div>
+
+                {/* Write a Review Toggle Form */}
+                <div className="pt-2 border-t border-slate-800">
+                  {!showAddReview ? (
+                    <button
+                      onClick={() => setShowAddReview(true)}
+                      className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
+                    >
+                      + Write a Review & Vibe Check for {profile.name.split(' ')[0]}
+                    </button>
+                  ) : (
+                    <form onSubmit={handleSubmitReview} className="space-y-2 text-xs mt-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] text-slate-400 uppercase font-bold">Rating:</label>
+                        <select
+                          value={newRating}
+                          onChange={(e) => setNewRating(Number(e.target.value))}
+                          className="bg-slate-900 border border-slate-700 text-amber-400 font-bold rounded-lg px-2 py-1 focus:outline-none"
+                        >
+                          <option value={5}>★★★★★ (5 - Excellent Vibe)</option>
+                          <option value={4}>★★★★☆ (4 - Great Date)</option>
+                          <option value={3}>★★★☆☆ (3 - Good)</option>
+                        </select>
+                      </div>
+
+                      <input
+                        type="text"
+                        placeholder="Your Name (e.g. Tendai M.)"
+                        required
+                        value={newReviewerName}
+                        onChange={(e) => setNewReviewerName(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500"
+                      />
+
+                      <textarea
+                        placeholder="Write a quick comment about meeting or dating this profile..."
+                        required
+                        rows={2}
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500"
+                      />
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="submit"
+                          disabled={isSubmittingReview}
+                          className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg"
+                        >
+                          {isSubmittingReview ? 'Submitting...' : 'Post Review'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddReview(false)}
+                          className="px-3 py-1.5 bg-slate-800 text-slate-400 hover:text-white rounded-lg"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
               </div>
 
               {/* Interests */}

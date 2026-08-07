@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search } from 'lucide-react';
+import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter } from 'lucide-react';
 import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats } from './types';
 import { Navbar } from './components/Navbar';
 import { SinglesFilterBar } from './components/SinglesFilterBar';
@@ -10,11 +10,19 @@ import { CartDrawer } from './components/CartDrawer';
 import { PaymentModal } from './components/PaymentModal';
 import { UserProfileEditorModal } from './components/UserProfileEditorModal';
 import { AdminPanel } from './components/AdminPanel';
+import { AuthModal } from './components/AuthModal';
 import { ToastNotification, Toast } from './components/ToastNotification';
 
 export default function App() {
   // Navigation & Tabs state
   const [activeTab, setActiveTab] = useState<'browse' | 'cart' | 'vip' | 'profile' | 'admin'>('browse');
+
+  // Check URL pathname for /admin
+  useEffect(() => {
+    if (window.location.pathname === '/admin' || window.location.search.includes('admin=true')) {
+      setActiveTab('admin');
+    }
+  }, []);
 
   // Data states
   const [profiles, setProfiles] = useState<SingleProfile[]>([]);
@@ -22,22 +30,31 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User>({
     id: 'usr_demo',
     email: 'single@bouncer.date',
-    name: 'Alex Mercer',
-    age: 28,
-    location: 'New York, NY',
+    name: 'Tendai Moyo',
+    age: 27,
+    city: 'Harare',
+    subLocation: 'Borrowdale',
+    location: 'Harare (Borrowdale), Zimbabwe',
+    childrenCount: 0,
+    intent: 'Marriage',
     role: 'user',
     subscriptionPlan: 'vip_monthly',
     subscriptionStatus: 'active',
-    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=200',
-    bio: 'Verified VIP Single on Dating with Bouncer.',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+    bio: 'Verified VIP Single on Dating with Bouncer seeking genuine connection.',
     bouncerVerified: true,
     createdAt: new Date().toISOString()
   });
 
-  // Filter States
+  // Comprehensive Filter States
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState('all');
+  const [selectedCity, setSelectedCity] = useState('all');
+  const [selectedSubLocation, setSelectedSubLocation] = useState('all');
+  const [minAge, setMinAge] = useState(18);
+  const [maxAge, setMaxAge] = useState(70);
   const [selectedGender, setSelectedGender] = useState('all');
+  const [selectedChildren, setSelectedChildren] = useState('all');
+  const [selectedIntent, setSelectedIntent] = useState('all');
   const [selectedBouncerStatus, setSelectedBouncerStatus] = useState('all');
 
   // Cart State
@@ -47,6 +64,8 @@ export default function App() {
   const [selectedProfileModal, setSelectedProfileModal] = useState<SingleProfile | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalInitialMode, setAuthModalInitialMode] = useState<'user' | 'admin'>('user');
 
   // Admin Data states
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
@@ -77,14 +96,19 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Fetch Profiles from Backend
+  // Fetch Profiles from Backend with rich filter parameters
   const fetchProfiles = async () => {
     try {
       setIsLoadingProfiles(true);
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
-      if (selectedLocation !== 'all') params.append('location', selectedLocation);
+      if (selectedCity !== 'all') params.append('city', selectedCity);
+      if (selectedSubLocation !== 'all') params.append('subLocation', selectedSubLocation);
+      if (minAge > 18) params.append('minAge', minAge.toString());
+      if (maxAge < 70) params.append('maxAge', maxAge.toString());
       if (selectedGender !== 'all') params.append('gender', selectedGender);
+      if (selectedChildren !== 'all') params.append('childrenCount', selectedChildren);
+      if (selectedIntent !== 'all') params.append('intent', selectedIntent);
       if (selectedBouncerStatus !== 'all') params.append('bouncerStatus', selectedBouncerStatus);
 
       const res = await fetch(`/api/profiles?${params.toString()}`);
@@ -148,7 +172,27 @@ export default function App() {
 
   useEffect(() => {
     fetchProfiles();
-  }, [searchTerm, selectedLocation, selectedGender, selectedBouncerStatus]);
+  }, [
+    searchTerm,
+    selectedCity,
+    selectedSubLocation,
+    minAge,
+    maxAge,
+    selectedGender,
+    selectedChildren,
+    selectedIntent,
+    selectedBouncerStatus
+  ]);
+
+  // Handle Tab Selection with Admin Auth Gate
+  const handleSelectTab = (tab: 'browse' | 'cart' | 'vip' | 'profile' | 'admin') => {
+    if (tab === 'admin' && currentUser.role !== 'admin') {
+      setAuthModalInitialMode('admin');
+      setIsAuthModalOpen(true);
+      return;
+    }
+    setActiveTab(tab);
+  };
 
   // Cart Handlers
   const handleAddToCart = (profile: SingleProfile) => {
@@ -301,6 +345,18 @@ export default function App() {
   // Locations list derived from profiles
   const locationsList = Array.from(new Set(profiles.map((p) => p.location))).sort();
 
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setSelectedCity('all');
+    setSelectedSubLocation('all');
+    setMinAge(18);
+    setMaxAge(70);
+    setSelectedGender('all');
+    setSelectedChildren('all');
+    setSelectedIntent('all');
+    setSelectedBouncerStatus('all');
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
       
@@ -310,28 +366,39 @@ export default function App() {
       {/* Header Navbar */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleSelectTab}
         cartCount={cartItems.length}
         currentUser={currentUser}
-        onOpenAuth={() => setIsUserModalOpen(true)}
+        onOpenAuth={() => {
+          setAuthModalInitialMode('user');
+          setIsAuthModalOpen(true);
+        }}
         onOpenPayment={() => setIsPaymentModalOpen(true)}
       />
 
       {/* Main Body View Switching */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         
-        {/* Role Quick Toggle Bar for easy testing */}
+        {/* Admin Session Security Status Link */}
         <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800 rounded-2xl px-4 py-2.5 mb-6 text-xs text-slate-400">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>Active Session: <strong className="text-slate-200">{currentUser.name}</strong> ({currentUser.role === 'admin' ? '🛡️ Admin' : '👤 User'})</span>
+            <span>Active Session: <strong className="text-slate-200">{currentUser.name}</strong> ({currentUser.role === 'admin' ? '🛡️ Admin' : '👤 Single User'})</span>
           </div>
 
           <button
-            onClick={handleToggleAdminRole}
-            className="text-amber-400 hover:text-amber-300 font-bold underline"
+            onClick={() => {
+              if (currentUser.role === 'admin') {
+                setActiveTab('admin');
+              } else {
+                setAuthModalInitialMode('admin');
+                setIsAuthModalOpen(true);
+              }
+            }}
+            className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 hover:underline"
           >
-            Switch to {currentUser.role === 'admin' ? 'Standard User View' : 'Bouncer Admin Dashboard'}
+            <ShieldCheck className="w-3.5 h-3.5" />
+            {currentUser.role === 'admin' ? 'Open Bouncer Admin Panel' : 'Admin Login (URL: /admin)'}
           </button>
         </div>
 
@@ -340,36 +407,36 @@ export default function App() {
           <div>
             
             {/* Hero Section */}
-            <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-amber-500/20 p-8 sm:p-12 mb-8 shadow-2xl">
+            <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-amber-500/20 p-6 sm:p-10 mb-8 shadow-2xl">
               <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full filter blur-3xl pointer-events-none" />
               <div className="absolute bottom-0 left-0 w-80 h-80 bg-rose-500/10 rounded-full filter blur-3xl pointer-events-none" />
 
               <div className="relative z-10 max-w-3xl">
                 <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-500/40 px-3.5 py-1 rounded-full text-amber-300 text-xs font-bold uppercase tracking-wider mb-4">
                   <ShieldCheck className="w-4 h-4 text-amber-400" />
-                  Velvet Rope Guarantee • 100% Verified Singles
+                  Velvet Rope Guarantee • 100% Vetted Zimbabwe Singles
                 </div>
 
-                <h1 className="text-3xl sm:text-5xl font-extrabold text-white font-serif tracking-tight leading-tight mb-4">
+                <h1 className="text-3xl sm:text-5xl font-extrabold text-white font-serif tracking-tight leading-tight mb-3">
                   Dating With Bouncer
                 </h1>
 
-                <p className="text-sm sm:text-base text-slate-300 leading-relaxed mb-6 font-normal">
-                  Browse vetted singles displaying <strong className="text-amber-400">Name, Age, and Location</strong>. Find someone you like? Simply click <strong className="text-rose-400">Add to Cart</strong> to configure your date and send match requests!
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6 font-normal">
+                  Browse singles displaying <strong className="text-amber-400">Name, Age, Location, Gender, Children & Intent (Marriage or Funny)</strong>. Find someone interested? Add to cart to schedule your date!
                 </p>
 
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     onClick={() => setIsPaymentModalOpen(true)}
-                    className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-xl flex items-center gap-2 transition-transform active:scale-95"
+                    className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-xl flex items-center gap-2 transition-transform active:scale-95"
                   >
                     <Crown className="w-4 h-4 fill-slate-950" />
-                    Get VIP Bouncer Pass
+                    Get VIP Bouncer Membership
                   </button>
 
                   <button
                     onClick={() => setIsUserModalOpen(true)}
-                    className="px-6 py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-colors"
+                    className="px-5 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-colors"
                   >
                     Fill My Profile Features
                   </button>
@@ -377,64 +444,70 @@ export default function App() {
               </div>
             </div>
 
-            {/* Filter Controls Bar */}
-            <SinglesFilterBar
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              selectedLocation={selectedLocation}
-              setSelectedLocation={setSelectedLocation}
-              selectedGender={selectedGender}
-              setSelectedGender={setSelectedGender}
-              selectedBouncerStatus={selectedBouncerStatus}
-              setSelectedBouncerStatus={setSelectedBouncerStatus}
-              locationsList={locationsList}
-              onReset={() => {
-                setSearchTerm('');
-                setSelectedLocation('all');
-                setSelectedGender('all');
-                setSelectedBouncerStatus('all');
-              }}
-              totalResults={profiles.length}
-            />
+            {/* RESPONSIVE LAYOUT: Side Bar Filter on PC (Desktop) & Top Filter Bar on Mobile */}
+            <div className="flex flex-col lg:flex-row items-start gap-8">
+              
+              {/* Filter Sidebar / Top Bar Component */}
+              <SinglesFilterBar
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                selectedCity={selectedCity}
+                setSelectedCity={setSelectedCity}
+                selectedSubLocation={selectedSubLocation}
+                setSelectedSubLocation={setSelectedSubLocation}
+                minAge={minAge}
+                setMinAge={setMinAge}
+                maxAge={maxAge}
+                setMaxAge={setMaxAge}
+                selectedGender={selectedGender}
+                setSelectedGender={setSelectedGender}
+                selectedChildren={selectedChildren}
+                setSelectedChildren={setSelectedChildren}
+                selectedIntent={selectedIntent}
+                setSelectedIntent={setSelectedIntent}
+                selectedBouncerStatus={selectedBouncerStatus}
+                setSelectedBouncerStatus={setSelectedBouncerStatus}
+                onReset={handleResetFilters}
+                totalResults={profiles.length}
+              />
 
-            {/* Singles Grid */}
-            {isLoadingProfiles ? (
-              <div className="text-center py-20">
-                <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-xs text-slate-400">Loading Bouncer-vetted singles...</p>
+              {/* Main Content Singles Grid */}
+              <div className="flex-1 w-full">
+                {isLoadingProfiles ? (
+                  <div className="text-center py-20 bg-slate-900/40 rounded-3xl border border-slate-800">
+                    <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-xs text-slate-400">Loading Bouncer-vetted singles...</p>
+                  </div>
+                ) : profiles.length === 0 ? (
+                  <div className="text-center py-20 bg-slate-900/50 border border-slate-800 rounded-3xl p-8">
+                    <Search className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                    <h3 className="text-lg font-bold text-white mb-1">No Singles Match Selected Criteria</h3>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
+                      Try resetting city, age range, children count, or intent filters to view more singles.
+                    </p>
+                    <button
+                      onClick={handleResetFilters}
+                      className="px-4 py-2 bg-amber-500 text-slate-950 rounded-xl text-xs font-bold"
+                    >
+                      Clear All Filters
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {profiles.map((profile) => (
+                      <SingleCard
+                        key={profile.id}
+                        profile={profile}
+                        isInCart={cartItems.some((item) => item.profileId === profile.id)}
+                        onAddToCart={handleAddToCart}
+                        onViewDetails={(p) => setSelectedProfileModal(p)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : profiles.length === 0 ? (
-              <div className="text-center py-20 bg-slate-900/50 border border-slate-800 rounded-3xl p-8">
-                <Search className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-white mb-1">No Singles Match Your Search</h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
-                  Try adjusting your location, age, or Bouncer verification status filter.
-                </p>
-                <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedLocation('all');
-                    setSelectedGender('all');
-                    setSelectedBouncerStatus('all');
-                  }}
-                  className="px-4 py-2 bg-amber-500 text-slate-950 rounded-xl text-xs font-bold"
-                >
-                  Clear All Filters
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {profiles.map((profile) => (
-                  <SingleCard
-                    key={profile.id}
-                    profile={profile}
-                    isInCart={cartItems.some((item) => item.profileId === profile.id)}
-                    onAddToCart={handleAddToCart}
-                    onViewDetails={(p) => setSelectedProfileModal(p)}
-                  />
-                ))}
-              </div>
-            )}
+
+            </div>
 
           </div>
         )}
@@ -551,28 +624,36 @@ export default function App() {
               </div>
 
               <div className="space-y-4 text-xs">
-                <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
-                  <div className="font-bold text-slate-400 uppercase mb-1">My Bio & Vibe</div>
-                  <p className="text-slate-200">{currentUser.bio || 'No bio entered yet.'}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold block">Gender</span>
+                    <span className="font-semibold text-white capitalize">{currentUser.gender || 'female'}</span>
+                  </div>
+                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold block">Children</span>
+                    <span className="font-semibold text-white">👶 {currentUser.childrenCount || 0} children</span>
+                  </div>
+                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold block">City & Suburb</span>
+                    <span className="font-semibold text-white">{currentUser.city || 'Harare'} ({currentUser.subLocation || 'Borrowdale'})</span>
+                  </div>
+                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold block">Dating Intent</span>
+                    <span className="font-bold text-amber-300">{currentUser.intent === 'Marriage' ? '💍 Seeking Marriage' : '😂 Funny & Casual'}</span>
+                  </div>
                 </div>
 
                 <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800">
-                  <div className="font-bold text-slate-400 uppercase mb-2">Interests</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(currentUser.interests || ['Dating', 'Coffee']).map((interest, i) => (
-                      <span key={i} className="bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg">
-                        {interest}
-                      </span>
-                    ))}
-                  </div>
+                  <div className="font-bold text-slate-400 uppercase mb-1">My Bio & Vibe</div>
+                  <p className="text-slate-200">{currentUser.bio || 'No bio entered yet.'}</p>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* VIEW 5: BOUNCER ADMIN DASHBOARD */}
-        {activeTab === 'admin' && (
+        {/* VIEW 5: BOUNCER ADMIN DASHBOARD (Protected - Only shown after admin login) */}
+        {activeTab === 'admin' && currentUser.role === 'admin' && (
           <AdminPanel
             profiles={profiles}
             stats={adminStats}
@@ -619,13 +700,30 @@ export default function App() {
         onApplyBouncerBadge={handleApplyBouncerBadge}
       />
 
+      {/* Auth Modal for User / Admin Login */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        initialMode={authModalInitialMode}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          if (user.role === 'admin') {
+            setActiveTab('admin');
+            addToast('Welcome Admin 🛡️', 'Authenticated to Bouncer Admin Backend.', 'bouncer');
+          } else {
+            addToast('Welcome Back! 👋', `Logged in as ${user.name}`, 'success');
+          }
+          fetchInitialData();
+        }}
+      />
+
       {/* Global Footer */}
       <footer className="bg-slate-950 border-t border-slate-900 py-8 text-xs text-slate-500 mt-12">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-amber-500" />
             <span className="font-bold text-slate-300 font-serif">DATING WITH BOUNCER</span>
-            <span>• Strictly Vetted Singles Platform</span>
+            <span>• Vetted Zimbabwe Singles Platform</span>
           </div>
 
           <div className="flex items-center gap-4 text-[11px]">
@@ -633,7 +731,15 @@ export default function App() {
             <span>•</span>
             <span>Add to Cart Checkout</span>
             <span>•</span>
-            <span>256-Bit SSL Payment Gateway</span>
+            <button
+              onClick={() => {
+                setAuthModalInitialMode('admin');
+                setIsAuthModalOpen(true);
+              }}
+              className="text-amber-400 font-bold hover:underline"
+            >
+              Admin Portal
+            </button>
           </div>
         </div>
       </footer>

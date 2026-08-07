@@ -3,182 +3,262 @@ import { SingleProfile, SubscriptionPlan, User, PaymentTransaction, MatchOrder }
 export const INITIAL_PROFILES: SingleProfile[] = [
   {
     id: 'p1',
-    name: 'Sophia Vance',
-    age: 26,
-    location: 'New York, NY',
-    bio: 'Art director by day, cocktail connoisseur by night. Looking for someone who enjoys gallery openings and spontaneous weekend trips.',
-    occupation: 'Senior Art Director',
+    name: 'Chiedza Moyo',
+    age: 27,
+    city: 'Harare',
+    subLocation: 'Borrowdale',
+    location: 'Harare (Borrowdale), Zimbabwe',
+    bio: 'Software engineer & tea enthusiast. Ready for a committed partner who values family, deep chats, and laughter.',
+    occupation: 'Senior Software Engineer',
     photos: [
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=800'
+      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=800'
     ],
-    interests: ['Contemporary Art', 'Mixology', 'Indie Cinema', 'Pilates', 'Architecture'],
+    interests: ['Technology', 'Traditional Cooking', 'Hiking In Nyanga', 'Gospel & Jazz'],
     gender: 'female',
     seeking: 'male',
+    childrenCount: 0,
+    intent: 'Marriage',
+    reviews: [
+      {
+        id: 'rev_1',
+        reviewerName: 'Tinashe M.',
+        rating: 5,
+        comment: 'Super polite, cheerful, and genuinely looking for something meaningful!',
+        createdAt: '2026-08-01T10:00:00Z'
+      },
+      {
+        id: 'rev_2',
+        reviewerName: 'Kudzai C.',
+        rating: 5,
+        comment: 'Chiedza is as bright and smart as her name suggests. Great conversation.',
+        createdAt: '2026-08-03T12:00:00Z'
+      }
+    ],
+    averageRating: 5.0,
     bouncerStatus: 'vip_approved',
-    bouncerNotes: 'Bouncer Verified 100%. Identity & employment confirmed by Bouncer Max. Zero red flags.',
+    bouncerNotes: 'Bouncer Verified 100%. Passport & National ID matched.',
     compatibilityScore: 98,
-    height: "5'8\"",
-    relationshipGoal: 'VIP Lounge dates & Long-term',
+    height: "5'7\"",
+    relationshipGoal: 'Marriage & Family',
     isFeatured: true,
     createdAt: '2026-08-01T10:00:00Z'
   },
   {
     id: 'p2',
-    name: 'Marcus Sterling',
-    age: 29,
-    location: 'Los Angeles, CA',
-    bio: 'Tech entrepreneur & marathon runner. I bake sourdough on Sundays and love rooftop Jazz bars. Bouncer cleared.',
-    occupation: 'AI Startup Founder',
+    name: 'Tarisai Ndlovu',
+    age: 30,
+    city: 'Bulawayo',
+    subLocation: 'Kumalo',
+    location: 'Bulawayo (Kumalo), Zimbabwe',
+    bio: 'Civil engineer and weekend stand-up comedy fan! Life is too short not to laugh every single day. Let us make jokes together!',
+    occupation: 'Civil Engineer',
     photos: [
       'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=800'
+      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=800'
     ],
-    interests: ['Startups', 'Marathon', 'Rooftop Lounges', 'Sourdough', 'Jazz'],
+    interests: ['Stand-up Comedy', 'Barbecue / Braai', 'Live Bands', 'Biking'],
     gender: 'male',
     seeking: 'female',
+    childrenCount: 1,
+    intent: 'Funny',
+    reviews: [
+      {
+        id: 'rev_3',
+        reviewerName: 'Sipho N.',
+        rating: 5,
+        comment: 'Funniest guy in Kumalo hands down! Made me laugh throughout our coffee chat.',
+        createdAt: '2026-08-02T15:00:00Z'
+      }
+    ],
+    averageRating: 5.0,
     bouncerStatus: 'verified',
-    bouncerNotes: 'Passport & social profile verified. Clean background check on record.',
+    bouncerNotes: 'Passport & employment verified by Bouncer.',
     compatibilityScore: 95,
-    height: "6'2\"",
-    relationshipGoal: 'Long-term relationship',
+    height: "6'1\"",
+    relationshipGoal: 'Fun dates & good times',
     isFeatured: true,
     createdAt: '2026-08-02T11:30:00Z'
   },
   {
     id: 'p3',
-    name: 'Elena Rostova',
-    age: 27,
-    location: 'Miami, FL',
-    bio: 'Architect with a passion for tropical modernism, ocean sailing, and espresso martinis. Let us meet in the VIP section.',
-    occupation: 'Architectural Designer',
+    name: 'Rudo Mpofu',
+    age: 28,
+    city: 'Victoria Falls',
+    subLocation: 'Elephant Hills Suburbs',
+    location: 'Victoria Falls, Zimbabwe',
+    bio: 'Safari lodge manager & wildlife lover. Seeking a genuine life partner ready to settle down and start a family.',
+    occupation: 'Lodge Manager',
     photos: [
       'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=800',
       'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800'
     ],
-    interests: ['Sailing', 'Interior Design', 'Deep House', 'Latin Dancing', 'Fine Dining'],
+    interests: ['Wildlife Safaris', 'Sunset Cruises', 'Photography', 'Organic Gardening'],
     gender: 'female',
-    seeking: 'everyone',
+    seeking: 'male',
+    childrenCount: 0,
+    intent: 'Marriage',
+    reviews: [
+      {
+        id: 'rev_4',
+        reviewerName: 'Farai K.',
+        rating: 5,
+        comment: 'Warm-hearted, respectful, and very passionate about nature.',
+        createdAt: '2026-08-04T09:00:00Z'
+      }
+    ],
+    averageRating: 5.0,
     bouncerStatus: 'vip_approved',
-    bouncerNotes: 'VIP Bouncer Pass verified. High response rate & VIP Lounge clearance.',
+    bouncerNotes: 'VIP Bouncer Verified. Clean background check.',
     compatibilityScore: 96,
-    height: "5'9\"",
-    relationshipGoal: 'VIP Lounge dates',
+    height: "5'8\"",
+    relationshipGoal: 'Marriage',
     isFeatured: true,
     createdAt: '2026-08-03T14:15:00Z'
   },
   {
     id: 'p4',
-    name: 'Julian Thorne',
-    age: 31,
-    location: 'Chicago, IL',
-    bio: 'Architectural engineer & vinyl record collector. Looking for a witty partner who loves speakeasies and live blues.',
-    occupation: 'Structural Engineer',
+    name: 'Farai Chiweshe',
+    age: 32,
+    city: 'Harare',
+    subLocation: 'Avondale',
+    location: 'Harare (Avondale), Zimbabwe',
+    bio: 'Chartered accountant, proud father of 2, and amateur chef. Looking for a serious partner to build a happy home with.',
+    occupation: 'Chartered Accountant',
     photos: [
       'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=800',
       'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=800'
     ],
-    interests: ['Blues & Jazz', 'Vinyl Records', 'Speakeasies', 'Bouldering', 'Coffee Roasting'],
+    interests: ['Cooking', 'Chess', 'Financial Planning', 'Road Trips'],
     gender: 'male',
     seeking: 'female',
+    childrenCount: 2,
+    intent: 'Marriage',
+    reviews: [
+      {
+        id: 'rev_5',
+        reviewerName: 'Nyasha Z.',
+        rating: 5,
+        comment: 'Very mature, responsible dad, and an absolute gentleman.',
+        createdAt: '2026-08-05T11:00:00Z'
+      }
+    ],
+    averageRating: 5.0,
     bouncerStatus: 'verified',
-    bouncerNotes: 'Bouncer ID Check Passed. Verified genuine singleton.',
-    compatibilityScore: 92,
+    bouncerNotes: 'Bouncer ID Check Passed. Verified genuine singleton father.',
+    compatibilityScore: 93,
     height: "6'0\"",
-    relationshipGoal: 'Serious relationship',
+    relationshipGoal: 'Marriage & Family',
     isFeatured: false,
     createdAt: '2026-08-04T09:00:00Z'
   },
   {
     id: 'p5',
-    name: 'Chloe Bennett',
+    name: 'Nyasha Sibanda',
     age: 25,
-    location: 'Austin, TX',
-    bio: 'Product designer and indie music fan. Big fan of food trucks, dog parks, and deep late-night conversations.',
-    occupation: 'UX Designer',
+    city: 'Mutare',
+    subLocation: 'Murambi',
+    location: 'Mutare (Murambi), Zimbabwe',
+    bio: 'Fashion entrepreneur & meme queen! I love funny banters, rooftop dinners, and spontaneous dance offs!',
+    occupation: 'Fashion Boutique Owner',
     photos: [
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&q=80&w=800',
       'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=800'
     ],
-    interests: ['Live Music', 'UX Design', 'Food Trucks', 'Golden Retrievers', 'Paddleboarding'],
+    interests: ['Fashion', 'Memes & Humor', 'Afrobeats', 'Coffee Shops'],
     gender: 'female',
     seeking: 'male',
+    childrenCount: 0,
+    intent: 'Funny',
+    reviews: [
+      {
+        id: 'rev_6',
+        reviewerName: 'Blessing T.',
+        rating: 4.8,
+        comment: 'High energy, hilarious, and super stylish!',
+        createdAt: '2026-08-05T14:00:00Z'
+      }
+    ],
+    averageRating: 4.8,
     bouncerStatus: 'verified',
-    bouncerNotes: 'Verified via LinkedIn & Live Selfie Match. Bouncer approved.',
+    bouncerNotes: 'Selfie matched & National ID approved.',
     compatibilityScore: 94,
     height: "5'6\"",
-    relationshipGoal: 'Casual to serious dating',
+    relationshipGoal: 'Fun dates & good energy',
     isFeatured: false,
     createdAt: '2026-08-04T16:20:00Z'
   },
   {
     id: 'p6',
-    name: 'David Chen',
-    age: 28,
-    location: 'San Francisco, CA',
-    bio: 'Venture analyst, culinary enthusiast, and amateur photographer. Let us discover the best hidden ramen spots.',
-    occupation: 'Venture Capital Analyst',
+    name: 'Tinashe Dube',
+    age: 29,
+    city: 'Gweru',
+    subLocation: 'Lundi Park',
+    location: 'Gweru (Lundi Park), Zimbabwe',
+    bio: 'Lecturer at Midlands State University. Passionate about literature, history, and funny pub quizzes!',
+    occupation: 'University Lecturer',
     photos: [
       'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=800'
+      'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?auto=format&fit=crop&q=80&w=800'
     ],
-    interests: ['Ramen', 'Photography', 'Skiing', 'Venture Capital', 'Wine Tasting'],
+    interests: ['Books', 'Pub Quizzes', 'History', 'Acoustic Guitar'],
     gender: 'male',
     seeking: 'female',
-    bouncerStatus: 'pending_check',
-    bouncerNotes: 'Profile submitted, awaiting final facial recognition review by Bouncer.',
-    compatibilityScore: 89,
+    childrenCount: 0,
+    intent: 'Marriage',
+    reviews: [
+      {
+        id: 'rev_7',
+        reviewerName: 'Melody M.',
+        rating: 5,
+        comment: 'Incredibly cultured and hilarious conversation partner.',
+        createdAt: '2026-08-05T16:00:00Z'
+      }
+    ],
+    averageRating: 5.0,
+    bouncerStatus: 'verified',
+    bouncerNotes: 'Bouncer Staff Approved.',
+    compatibilityScore: 91,
     height: "5'11\"",
-    relationshipGoal: 'Long-term partner',
+    relationshipGoal: 'Long-term / Marriage',
     isFeatured: false,
     createdAt: '2026-08-05T08:45:00Z'
   },
   {
     id: 'p7',
-    name: 'Aaliyah Washington',
-    age: 28,
-    location: 'New York, NY',
-    bio: 'Fashion buyer & former ballerina. Always down for rooftop cocktail hours and Broadway shows.',
-    occupation: 'Fashion Luxury Buyer',
+    name: 'Tarisiro Bvumbe',
+    age: 26,
+    city: 'Chitungwiza',
+    subLocation: 'Seke',
+    location: 'Chitungwiza (Seke), Zimbabwe',
+    bio: 'Graphic designer & podcaster. Mother to 1 adorable girl. Looking for a funny, loving partner who appreciates humor and hard work.',
+    occupation: 'Digital Designer',
     photos: [
-      'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&q=80&w=800'
+      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'
     ],
-    interests: ['High Fashion', 'Ballet', 'Broadway', 'Cocktails', 'Travel'],
+    interests: ['Podcasting', 'Graphic Art', 'Family Outings', 'Amapiano'],
     gender: 'female',
     seeking: 'male',
-    bouncerStatus: 'vip_approved',
-    bouncerNotes: 'Bouncer Gold Status Granted. Background checked & verified active account.',
-    compatibilityScore: 97,
-    height: "5'10\"",
-    relationshipGoal: 'VIP Dating & Romance',
-    isFeatured: true,
-    createdAt: '2026-08-05T12:00:00Z'
-  },
-  {
-    id: 'p8',
-    name: 'Mateo Morales',
-    age: 30,
-    location: 'Los Angeles, CA',
-    bio: 'Film producer with a passion for vintage cars, espresso, and surfing Malibu at sunrise.',
-    occupation: 'Film Producer',
-    photos: [
-      'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=800'
+    childrenCount: 1,
+    intent: 'Marriage',
+    reviews: [
+      {
+        id: 'rev_8',
+        reviewerName: 'Simba K.',
+        rating: 4.9,
+        comment: 'Super kind mother with a great sense of humor!',
+        createdAt: '2026-08-06T09:00:00Z'
+      }
     ],
-    interests: ['Surfing', 'Filmmaking', 'Vintage Cars', 'Espresso', 'Vinyl'],
-    gender: 'male',
-    seeking: 'female',
+    averageRating: 4.9,
     bouncerStatus: 'verified',
-    bouncerNotes: 'Identified & Verified by Bouncer Staff.',
-    compatibilityScore: 91,
-    height: "6'1\"",
-    relationshipGoal: 'Meaningful connection',
+    bouncerNotes: 'Verified Single Mom on Bouncer platform.',
+    compatibilityScore: 92,
+    height: "5'5\"",
+    relationshipGoal: 'Marriage',
     isFeatured: false,
-    createdAt: '2026-08-05T18:10:00Z'
+    createdAt: '2026-08-05T12:00:00Z'
   }
 ];
 
@@ -192,7 +272,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     badge: 'FREE',
     features: [
       'Browse all Singles Profiles',
-      'Name, Age, and Location visibility',
+      'Name, Age, Children & Location visibility',
       '1 Add to Cart match request / week',
       'Basic Bouncer Badge Verification'
     ]
@@ -208,7 +288,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'Fast-track Bouncer Profile Clearance (Under 1 hour)',
       '10 Singles Add-to-Cart matches / month',
       'See who viewed your profile',
-      'Filter singles by precise compatibility score',
+      'Filter singles by Zimbabwe Sub-location & Marriage Intent',
       'Priority Bouncer Support'
     ]
   },
@@ -224,7 +304,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       'UNLIMITED Add-to-Cart Singles Checkout',
       'VIP Approved Profile Gold Badge',
       'Direct Icebreaker Messaging & Custom Date Types',
-      'Exclusive Access to Top-Rated Singles Profiles',
+      'Access to Verified Reviews & Ratings',
       'Bouncer Guarantee: Zero fake profiles or bots',
       'Monthly Singles Cart Token Roll-over'
     ]
@@ -252,7 +332,8 @@ export const MOCK_ADMIN_USER: User = {
   email: 'admin@bouncer.date',
   name: 'Bouncer Chief Admin',
   age: 35,
-  location: 'Global HQ',
+  location: 'Harare HQ, Zimbabwe',
+  city: 'Harare',
   role: 'admin',
   subscriptionPlan: 'ultimate_access',
   subscriptionStatus: 'active',
@@ -265,16 +346,20 @@ export const MOCK_ADMIN_USER: User = {
 export const MOCK_DEMO_USER: User = {
   id: 'usr_demo',
   email: 'single@bouncer.date',
-  name: 'Alex Mercer',
+  name: 'Kudzai Mugo',
   age: 28,
-  location: 'New York, NY',
+  location: 'Harare (Borrowdale), Zimbabwe',
+  city: 'Harare',
+  subLocation: 'Borrowdale',
   role: 'user',
+  childrenCount: 0,
+  intent: 'Marriage',
   subscriptionPlan: 'vip_monthly',
   subscriptionStatus: 'active',
   subscriptionExpiresAt: '2026-09-06T12:00:00Z',
   avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=200',
-  bio: 'Lover of art, espresso, and good conversation. Verified VIP Single!',
-  occupation: 'Digital Marketer',
+  bio: 'Lover of art, espresso, and good conversation. Verified VIP Single seeking marriage!',
+  occupation: 'Financial Analyst',
   gender: 'male',
   seeking: 'female',
   interests: ['Coffee', 'Art', 'Fitness', 'Travel'],
@@ -286,7 +371,7 @@ export const MOCK_TRANSACTIONS: PaymentTransaction[] = [
   {
     id: 'tx_101',
     userId: 'usr_demo',
-    userName: 'Alex Mercer',
+    userName: 'Kudzai Mugo',
     userEmail: 'single@bouncer.date',
     amount: 29.99,
     planId: 'vip_monthly',
@@ -308,19 +393,6 @@ export const MOCK_TRANSACTIONS: PaymentTransaction[] = [
     cardBrand: 'Mastercard',
     status: 'succeeded',
     date: '2026-08-03T09:12:00Z'
-  },
-  {
-    id: 'tx_103',
-    userId: 'usr_904',
-    userName: 'Michael Jordan',
-    userEmail: 'mjordan@techcorp.io',
-    amount: 49.99,
-    planId: 'ultimate_access',
-    planName: 'Ultimate Bouncer Club',
-    cardLast4: '1234',
-    cardBrand: 'Amex',
-    status: 'succeeded',
-    date: '2026-08-05T16:45:00Z'
   }
 ];
 
@@ -328,18 +400,18 @@ export const MOCK_MATCH_ORDERS: MatchOrder[] = [
   {
     id: 'ord_501',
     userId: 'usr_demo',
-    userName: 'Alex Mercer',
+    userName: 'Kudzai Mugo',
     items: [
       {
         profileId: 'p1',
         profile: INITIAL_PROFILES[0],
         dateType: 'vip_lounge',
-        icebreakerMessage: 'Hey Sophia, I saw you love art galleries and mixology! Would love to get a drink at the Nines rooftop.',
-        preferredTime: 'This Friday at 8:00 PM',
+        icebreakerMessage: 'Hey Chiedza! Would love to meet for drinks in Borrowdale.',
+        preferredTime: 'This Friday at 7:30 PM',
         addedAt: '2026-08-05T20:00:00Z'
       }
     ],
-    totalAmount: 0, // Included in VIP plan
+    totalAmount: 0,
     paymentMethod: 'VIP Membership Token',
     status: 'pending_bouncer_approval',
     createdAt: '2026-08-05T20:05:00Z'
