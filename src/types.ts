@@ -18,7 +18,8 @@ export interface SingleProfile {
   city?: string; // e.g. "Harare"
   subLocation?: string; // e.g. "Borrowdale"
   bio: string;
-  occupation: string;
+  occupation?: string; // Optional field, omitted from card displays
+  whatsappNumber?: string; // e.g. "+263 77 123 4567" - ONLY displayed after payment!
   photos: string[];
   interests: string[];
   gender: 'female' | 'male' | 'non-binary';
@@ -36,7 +37,13 @@ export interface SingleProfile {
   createdAt: string;
 }
 
-export type SubscriptionPlanId = 'free' | 'bouncer_pass' | 'vip_monthly' | 'ultimate_access';
+export type SubscriptionPlanId = 'free' | 'starter_3_or_4' | 'vip_15_singles';
+
+export interface SiteSettings {
+  siteName: string;
+  logoUrl: string;
+  iconUrl: string;
+}
 
 export interface User {
   id: string;
@@ -52,12 +59,14 @@ export interface User {
   subscriptionExpiresAt?: string;
   avatar: string;
   bio?: string;
+  whatsappNumber?: string;
   occupation?: string;
   gender?: 'female' | 'male' | 'non-binary';
   seeking?: 'female' | 'male' | 'everyone';
   childrenCount?: number;
   intent?: DatingIntent;
   interests?: string[];
+  purchasedProfileIds?: string[]; // IDs of profile WhatsApp numbers unlocked after payment
   bouncerVerified: boolean;
   createdAt: string;
 }

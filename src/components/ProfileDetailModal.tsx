@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, UserCheck, Calendar, Briefcase, Award } from 'lucide-react';
-import { SingleProfile } from '../types';
+import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle } from 'lucide-react';
+import { SingleProfile, User } from '../types';
 
 interface ProfileDetailModalProps {
   profile: SingleProfile | null;
@@ -9,6 +9,7 @@ interface ProfileDetailModalProps {
   onClose: () => void;
   isInCart: boolean;
   onAddToCart: (profile: SingleProfile) => void;
+  currentUser?: User;
 }
 
 export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
@@ -16,11 +17,19 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
   isOpen,
   onClose,
   isInCart,
-  onAddToCart
+  onAddToCart,
+  currentUser
 }) => {
   if (!isOpen || !profile) return null;
 
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
+
+  // Unlocked check
+  const isUnlocked =
+    currentUser?.role === 'admin' ||
+    currentUser?.purchasedProfileIds?.includes(profile.id) ||
+    currentUser?.subscriptionPlan === 'vip_15_singles' ||
+    currentUser?.subscriptionPlan === 'starter_3_or_4';
 
   // Reviews state
   const [localReviews, setLocalReviews] = useState<any[]>(profile?.reviews || []);
@@ -153,15 +162,7 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
               </div>
 
               {/* Specs Grid */}
-              <div className="grid grid-cols-2 gap-3 mb-6 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
-                <div className="flex items-center gap-2 text-xs">
-                  <Briefcase className="w-4 h-4 text-amber-400 shrink-0" />
-                  <div>
-                    <div className="text-[10px] text-slate-500 uppercase">Occupation</div>
-                    <div className="font-semibold text-slate-200">{profile.occupation}</div>
-                  </div>
-                </div>
-
+              <div className="grid grid-cols-3 gap-3 mb-6 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
                 <div className="flex items-center gap-2 text-xs">
                   <Award className="w-4 h-4 text-amber-400 shrink-0" />
                   <div>
@@ -185,11 +186,63 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                   <div>
                     <div className="text-[10px] text-slate-500 uppercase">Dating Intent</div>
                     <div className="font-semibold text-amber-300">
-                      {profile.intent === 'Marriage' ? '💍 Marriage' : '😂 Funny & Casual'}
+                      {profile.intent === 'Marriage' ? '💍 Marriage' : '😂 Funny'}
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* WhatsApp Number Unlocked / Paywalled Box */}
+              {isUnlocked ? (
+                <div className="p-4 bg-emerald-950/40 border border-emerald-500/40 rounded-2xl mb-6 flex flex-col gap-2 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Direct WhatsApp Access Unlocked
+                    </span>
+                    <span className="text-[10px] font-extrabold bg-emerald-500 text-slate-950 px-2 py-0.5 rounded-full">PAID MEMBER</span>
+                  </div>
+                  <p className="text-xs text-slate-200">
+                    Direct Contact Number:{' '}
+                    <strong className="text-emerald-300 font-mono text-sm tracking-wider">
+                      {profile.whatsappNumber || '+263 77 123 4567'}
+                    </strong>
+                  </p>
+                  <a
+                    href={`https://wa.me/${(profile.whatsappNumber || '263771234567').replace(/[^0-9]/g, '')}?text=Hi%20${encodeURIComponent(profile.name.split(' ')[0])},%20I%20found%20your%20profile%20on%20Dating%20With%20Bouncer!`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Click to Chat on WhatsApp with {profile.name.split(' ')[0]}
+                  </a>
+                </div>
+              ) : (
+                <div className="p-4 bg-slate-950 border border-amber-500/30 rounded-2xl mb-6 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-amber-400" /> Direct WhatsApp Number
+                    </span>
+                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">🔒 Unlocks After Payment</span>
+                  </div>
+                  <div className="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-xl border border-slate-800 my-1">
+                    <span className="text-xs text-slate-400 font-mono">
+                      {profile.whatsappNumber ? `${profile.whatsappNumber.slice(0, 7)} *** ****` : '+263 77 *** ****'}
+                    </span>
+                    <span className="text-[11px] text-amber-400 font-bold">Hidden</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Pay <strong className="text-white">$6 for 3-4 Singles</strong> or <strong className="text-amber-400">$10 for 15 Singles</strong> to unlock direct WhatsApp chat & contact numbers!
+                  </p>
+                  <button
+                    onClick={() => onAddToCart(profile)}
+                    className="mt-1 w-full py-2.5 bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    {isInCart ? 'In Cart - Click Checkout' : `Add ${profile.name.split(' ')[0]} to Cart to Unlock WhatsApp`}
+                  </button>
+                </div>
+              )}
 
               {/* Bio Section */}
               <div className="mb-6">

@@ -28,7 +28,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   const [childrenCount, setChildrenCount] = useState<number>(currentUser.childrenCount ?? 0);
   const [intent, setIntent] = useState<DatingIntent>(currentUser.intent || 'Marriage');
   const [bio, setBio] = useState(currentUser.bio || '');
-  const [occupation, setOccupation] = useState(currentUser.occupation || '');
+  const [whatsappNumber, setWhatsappNumber] = useState(currentUser.whatsappNumber || '+263 77 123 4567');
   const [gender, setGender] = useState(currentUser.gender || 'female');
   const [seeking, setSeeking] = useState(currentUser.seeking || 'male');
   const [avatar, setAvatar] = useState(currentUser.avatar || '');
@@ -53,7 +53,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
       childrenCount: Number(childrenCount),
       intent,
       bio,
-      occupation,
+      whatsappNumber,
       gender: gender as any,
       seeking: seeking as any,
       avatar,
@@ -262,18 +262,22 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 </select>
               </div>
 
-              {/* Occupation */}
+              {/* WhatsApp Contact Number */}
               <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Occupation
+                <label className="block font-bold text-amber-400 uppercase tracking-wider mb-1">
+                  📱 WhatsApp Contact Number
                 </label>
                 <input
                   type="text"
-                  value={occupation}
-                  onChange={e => setOccupation(e.target.value)}
-                  placeholder="Architect / Accountant / Entrepreneur"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
+                  required
+                  value={whatsappNumber}
+                  onChange={e => setWhatsappNumber(e.target.value)}
+                  placeholder="+263 77 123 4567"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-none focus:border-amber-500"
                 />
+                <span className="text-[10px] text-slate-500 italic mt-0.5 block">
+                  Displayed to matches ONLY after they complete payment.
+                </span>
               </div>
 
             </div>

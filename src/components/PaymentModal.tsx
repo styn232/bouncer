@@ -20,7 +20,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>('vip_monthly');
+  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>('starter_3_or_4');
   const [cardHolderName, setCardHolderName] = useState(currentUser.name || '');
   const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242');
   const [expDate, setExpDate] = useState('08/28');
@@ -31,7 +31,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [receiptData, setReceiptData] = useState<any | null>(null);
 
-  const selectedPlan = plans.find(p => p.id === selectedPlanId) || plans[2];
+  const selectedPlan = plans.find(p => p.id === selectedPlanId) || plans[1] || plans[0];
 
   // Auto-format card number
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,7 +184,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
 
               {/* Plan Choice Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
                 {plans.map((plan) => (
                   <button
                     key={plan.id}

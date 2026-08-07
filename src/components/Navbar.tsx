@@ -1,12 +1,13 @@
 import React from 'react';
 import { ShieldCheck, ShoppingBag, Crown, User as UserIcon, Shield, Sparkles } from 'lucide-react';
-import { User } from '../types';
+import { User, SiteSettings } from '../types';
 
 interface NavbarProps {
   activeTab: 'browse' | 'cart' | 'vip' | 'profile' | 'admin';
   setActiveTab: (tab: 'browse' | 'cart' | 'vip' | 'profile' | 'admin') => void;
   cartCount: number;
   currentUser: User;
+  siteSettings?: SiteSettings;
   onOpenAuth: () => void;
   onOpenPayment: () => void;
 }
@@ -16,9 +17,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   cartCount,
   currentUser,
+  siteSettings,
   onOpenAuth,
   onOpenPayment
 }) => {
+  const displaySiteName = siteSettings?.siteName || 'DATING WITH BOUNCER';
+  const logoUrl = siteSettings?.logoUrl;
+  const iconUrl = siteSettings?.iconUrl;
+
   return (
     <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-amber-500/20 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -28,15 +34,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => setActiveTab('browse')}
           className="flex items-center gap-3 cursor-pointer group"
         >
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-amber-600 via-rose-600 to-amber-400 p-0.5 shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform">
-            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-              <Shield className="w-6 h-6 text-amber-400 fill-amber-400/20" />
+          {logoUrl ? (
+            <img 
+              src={logoUrl} 
+              alt={displaySiteName} 
+              referrerPolicy="no-referrer"
+              className="h-11 max-w-[160px] object-contain rounded-xl ring-1 ring-amber-500/30"
+            />
+          ) : (
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-amber-600 via-rose-600 to-amber-400 p-0.5 shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform overflow-hidden">
+              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+                {iconUrl ? (
+                  <img src={iconUrl} alt="Icon" referrerPolicy="no-referrer" className="w-6 h-6 object-contain" />
+                ) : (
+                  <Shield className="w-6 h-6 text-amber-400 fill-amber-400/20" />
+                )}
+              </div>
             </div>
-          </div>
+          )}
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-lg sm:text-xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-rose-200 to-amber-400 font-serif">
-                DATING WITH BOUNCER
+                {displaySiteName}
               </span>
               <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full">
                 Vetted Singles

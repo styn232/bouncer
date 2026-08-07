@@ -1,4 +1,10 @@
-import { SingleProfile, SubscriptionPlan, User, PaymentTransaction, MatchOrder } from '../types';
+import { SingleProfile, SubscriptionPlan, User, PaymentTransaction, MatchOrder, SiteSettings } from '../types';
+
+export const INITIAL_SITE_SETTINGS: SiteSettings = {
+  siteName: 'DATING WITH BOUNCER',
+  logoUrl: '',
+  iconUrl: ''
+};
 
 export const INITIAL_PROFILES: SingleProfile[] = [
   {
@@ -9,7 +15,7 @@ export const INITIAL_PROFILES: SingleProfile[] = [
     subLocation: 'Borrowdale',
     location: 'Harare (Borrowdale), Zimbabwe',
     bio: 'Software engineer & tea enthusiast. Ready for a committed partner who values family, deep chats, and laughter.',
-    occupation: 'Senior Software Engineer',
+    whatsappNumber: '+263 77 123 4567',
     photos: [
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800',
       'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=800'
@@ -52,7 +58,7 @@ export const INITIAL_PROFILES: SingleProfile[] = [
     subLocation: 'Kumalo',
     location: 'Bulawayo (Kumalo), Zimbabwe',
     bio: 'Civil engineer and weekend stand-up comedy fan! Life is too short not to laugh every single day. Let us make jokes together!',
-    occupation: 'Civil Engineer',
+    whatsappNumber: '+263 78 987 6543',
     photos: [
       'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=800',
       'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=800'
@@ -88,7 +94,7 @@ export const INITIAL_PROFILES: SingleProfile[] = [
     subLocation: 'Elephant Hills Suburbs',
     location: 'Victoria Falls, Zimbabwe',
     bio: 'Safari lodge manager & wildlife lover. Seeking a genuine life partner ready to settle down and start a family.',
-    occupation: 'Lodge Manager',
+    whatsappNumber: '+263 71 222 3333',
     photos: [
       'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&q=80&w=800',
       'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800'
@@ -124,7 +130,7 @@ export const INITIAL_PROFILES: SingleProfile[] = [
     subLocation: 'Avondale',
     location: 'Harare (Avondale), Zimbabwe',
     bio: 'Chartered accountant, proud father of 2, and amateur chef. Looking for a serious partner to build a happy home with.',
-    occupation: 'Chartered Accountant',
+    whatsappNumber: '+263 77 444 5555',
     photos: [
       'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=800',
       'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=800'
@@ -160,7 +166,7 @@ export const INITIAL_PROFILES: SingleProfile[] = [
     subLocation: 'Murambi',
     location: 'Mutare (Murambi), Zimbabwe',
     bio: 'Fashion entrepreneur & meme queen! I love funny banters, rooftop dinners, and spontaneous dance offs!',
-    occupation: 'Fashion Boutique Owner',
+    whatsappNumber: '+263 73 555 6666',
     photos: [
       'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&q=80&w=800',
       'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=800'
@@ -196,7 +202,7 @@ export const INITIAL_PROFILES: SingleProfile[] = [
     subLocation: 'Lundi Park',
     location: 'Gweru (Lundi Park), Zimbabwe',
     bio: 'Lecturer at Midlands State University. Passionate about literature, history, and funny pub quizzes!',
-    occupation: 'University Lecturer',
+    whatsappNumber: '+263 77 666 7777',
     photos: [
       'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=800',
       'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?auto=format&fit=crop&q=80&w=800'
@@ -232,7 +238,7 @@ export const INITIAL_PROFILES: SingleProfile[] = [
     subLocation: 'Seke',
     location: 'Chitungwiza (Seke), Zimbabwe',
     bio: 'Graphic designer & podcaster. Mother to 1 adorable girl. Looking for a funny, loving partner who appreciates humor and hard work.',
-    occupation: 'Digital Designer',
+    whatsappNumber: '+263 78 777 8888',
     photos: [
       'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=800',
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'
@@ -265,64 +271,45 @@ export const INITIAL_PROFILES: SingleProfile[] = [
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'free',
-    name: 'Basic Bouncer Pass',
+    name: 'Free Single Pass',
     price: 0,
     billingPeriod: 'monthly',
-    tagline: 'Standard entry with limited cart matches',
+    tagline: 'Browse singles profiles and preview matches',
     badge: 'FREE',
     features: [
-      'Browse all Singles Profiles',
-      'Name, Age, Children & Location visibility',
-      '1 Add to Cart match request / week',
-      'Basic Bouncer Badge Verification'
+      'Browse all Verified Singles',
+      'Name, Age, Location & Children info',
+      'Preview profiles with Bouncer badges'
     ]
   },
   {
-    id: 'bouncer_pass',
-    name: 'Bouncer Fast-Pass',
-    price: 14.99,
+    id: 'starter_3_or_4',
+    name: '4 Singles Unlock Pass',
+    price: 6,
     billingPeriod: 'monthly',
-    tagline: 'Skip the line with priority profile clearance',
-    badge: 'FAST-PASS',
-    features: [
-      'Fast-track Bouncer Profile Clearance (Under 1 hour)',
-      '10 Singles Add-to-Cart matches / month',
-      'See who viewed your profile',
-      'Filter singles by Zimbabwe Sub-location & Marriage Intent',
-      'Priority Bouncer Support'
-    ]
-  },
-  {
-    id: 'vip_monthly',
-    name: 'VIP Lounge Monthly',
-    price: 29.99,
-    billingPeriod: 'monthly',
-    tagline: 'Full velvet-rope privileges & unlimited date cart',
-    badge: 'MOST POPULAR',
+    tagline: 'Unlock direct WhatsApp contact details & matches for 3 to 4 Singles',
+    badge: '$6 STARTER',
     popular: true,
     features: [
-      'UNLIMITED Add-to-Cart Singles Checkout',
-      'VIP Approved Profile Gold Badge',
-      'Direct Icebreaker Messaging & Custom Date Types',
-      'Access to Verified Reviews & Ratings',
-      'Bouncer Guarantee: Zero fake profiles or bots',
-      'Monthly Singles Cart Token Roll-over'
+      'Unlock WhatsApp Number for 4 Singles',
+      'Direct Click-to-Chat WhatsApp Access',
+      'Fast Bouncer Identity Verification',
+      'Add-to-Cart Date Requests'
     ]
   },
   {
-    id: 'ultimate_access',
-    name: 'Ultimate Bouncer Club',
-    price: 49.99,
+    id: 'vip_15_singles',
+    name: '15 Singles VIP Bundle',
+    price: 10,
     billingPeriod: 'monthly',
-    tagline: 'Red-carpet matchmaking & personal Bouncer concierge',
-    badge: 'VIP EXECUTIVE',
+    tagline: 'Unlock direct WhatsApp numbers for 15 Singles — Best Value!',
+    badge: 'BEST VALUE',
     features: [
-      'All VIP Lounge Features included',
-      'Personal Matchmaking Concierge (Bouncer Assisted)',
-      'Guaranteed weekly 1-on-1 VIP Date setups',
-      'Background-checked match reports for every single in cart',
-      'Unlimited Cart items & instant date lock-in',
-      '24/7 Dedicated Bouncer VIP Helpline'
+      'Unlock WhatsApp Numbers for 15 Singles',
+      'Unlimited Direct WhatsApp Click-to-Chat',
+      'VIP Gold Profile Badge',
+      'Priority Bouncer Clearance & Zero Wait',
+      'Full Bouncer Verification Guarantee'
     ]
   }
 ];

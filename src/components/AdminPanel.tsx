@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter } from 'lucide-react';
-import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId } from '../types';
+import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image, Upload, Settings } from 'lucide-react';
+import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings } from '../types';
 
 interface AdminPanelProps {
   profiles: SingleProfile[];
@@ -9,10 +9,12 @@ interface AdminPanelProps {
   transactions: PaymentTransaction[];
   userSubscriptions: any[];
   matchOrders: any[];
+  siteSettings?: SiteSettings;
   onAddProfile: (newProfData: Partial<SingleProfile>) => void;
   onEditProfile: (id: string, updatedData: Partial<SingleProfile>) => void;
   onDeleteProfile: (id: string) => void;
   onUpdateBouncerStatus: (id: string, status: BouncerStatus, notes?: string) => void;
+  onUpdateSiteSettings?: (updated: Partial<SiteSettings>) => void;
   onRefreshData: () => void;
 }
 
@@ -22,14 +24,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   transactions,
   userSubscriptions,
   matchOrders,
+  siteSettings,
   onAddProfile,
   onEditProfile,
   onDeleteProfile,
   onUpdateBouncerStatus,
+  onUpdateSiteSettings,
   onRefreshData
 }) => {
-  const [activeTab, setActiveTab] = useState<'profiles' | 'queue' | 'subscriptions' | 'audit' | 'orders'>('profiles');
+  const [activeTab, setActiveTab] = useState<'profiles' | 'queue' | 'subscriptions' | 'audit' | 'orders' | 'branding'>('profiles');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Branding state
+  const [siteName, setSiteName] = useState(siteSettings?.siteName || 'DATING WITH BOUNCER');
+  const [logoUrl, setLogoUrl] = useState(siteSettings?.logoUrl || '');
+  const [iconUrl, setIconUrl] = useState(siteSettings?.iconUrl || '');
+  const [brandingSaved, setBrandingSaved] = useState(false);
   
   // New Profile Form Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -203,6 +213,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         >
           <ShoppingBag className="w-4 h-4" />
           Cart Match Orders ({matchOrders.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('branding')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all flex items-center gap-2 ${
+            activeTab === 'branding'
+              ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
+              : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
+          Brand & Logo Settings
         </button>
       </div>
 
@@ -473,6 +495,193 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* TAB 6: BRANDING & LOGO SETTINGS */}
+      {activeTab === 'branding' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-800">
+            <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30">
+              <Image className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-extrabold text-white font-serif">
+                Brand Logo & Site Icon Settings
+              </h2>
+              <p className="text-xs text-slate-400">
+                Upload custom logo image and site icon for DATING WITH BOUNCER.
+              </p>
+            </div>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (onUpdateSiteSettings) {
+                onUpdateSiteSettings({ siteName, logoUrl, iconUrl });
+              }
+              setBrandingSaved(true);
+              setTimeout(() => setBrandingSaved(false), 2500);
+            }}
+            className="space-y-6 max-w-2xl text-xs"
+          >
+            {/* Site Name */}
+            <div>
+              <label className="block font-bold text-slate-300 uppercase tracking-wider mb-2">
+                Site Name
+              </label>
+              <input
+                type="text"
+                required
+                value={siteName}
+                onChange={e => setSiteName(e.target.value)}
+                placeholder="DATING WITH BOUNCER"
+                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            {/* Header Logo Image Upload / URL */}
+            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block font-bold text-amber-400 uppercase tracking-wider">
+                    Header Logo Image
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Upload an image file or paste an image URL to display as the primary header logo.
+                  </p>
+                </div>
+                {logoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setLogoUrl('')}
+                    className="text-[11px] text-rose-400 hover:underline font-bold"
+                  >
+                    Reset Logo
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 items-center">
+                <label className="cursor-pointer px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-2 border border-slate-700 shrink-0">
+                  <Upload className="w-4 h-4 text-amber-400" />
+                  Upload Logo File
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setLogoUrl(reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                </label>
+
+                <div className="text-slate-500 text-[11px] font-bold uppercase">or</div>
+
+                <input
+                  type="text"
+                  value={logoUrl}
+                  onChange={e => setLogoUrl(e.target.value)}
+                  placeholder="Paste Logo Image URL (https://...)"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-mono text-[11px] focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Logo Preview */}
+              {logoUrl ? (
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-4">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase">Preview:</div>
+                  <img src={logoUrl} alt="Logo Preview" referrerPolicy="no-referrer" className="h-10 max-w-[180px] object-contain rounded-lg border border-slate-800 p-1 bg-slate-950" />
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-500 italic">No custom logo set. Using default brand typography.</div>
+              )}
+            </div>
+
+            {/* Site Icon Upload / URL */}
+            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block font-bold text-amber-400 uppercase tracking-wider">
+                    Site Icon / Favicon
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Upload an icon file or paste an image URL to replace the Bouncer shield icon.
+                  </p>
+                </div>
+                {iconUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setIconUrl('')}
+                    className="text-[11px] text-rose-400 hover:underline font-bold"
+                  >
+                    Reset Icon
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 items-center">
+                <label className="cursor-pointer px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-2 border border-slate-700 shrink-0">
+                  <Upload className="w-4 h-4 text-amber-400" />
+                  Upload Icon File
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setIconUrl(reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                </label>
+
+                <div className="text-slate-500 text-[11px] font-bold uppercase">or</div>
+
+                <input
+                  type="text"
+                  value={iconUrl}
+                  onChange={e => setIconUrl(e.target.value)}
+                  placeholder="Paste Icon Image URL (https://...)"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-mono text-[11px] focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Icon Preview */}
+              {iconUrl ? (
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-4">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase">Preview:</div>
+                  <img src={iconUrl} alt="Icon Preview" referrerPolicy="no-referrer" className="w-8 h-8 object-contain rounded-lg border border-slate-800 p-1 bg-slate-950" />
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-500 italic">No custom icon set. Using default Bouncer Shield icon.</div>
+              )}
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                className="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                {brandingSaved ? 'Brand Settings Saved!' : 'Save Branding Changes'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 {
-  "name": "Dating with Bouncer",
-  "description": "Singles dating platform featuring profile browsing, Add-to-Cart matches, Bouncer verification, account controls, admin management, and secure subscription payments.",
+  "name": "DATING WITH BOUNCER",
+  "description": "Vetted Zimbabwe singles dating platform featuring Add-to-Cart matches, Bouncer verification, WhatsApp unlocks after payment, opposite-gender matching, and admin branding controls.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -141,12 +141,24 @@ export const SingleCard: React.FC<SingleCardProps> = ({
             <div className="flex items-center gap-1.5 text-slate-300">
               <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
               <span>{profile.location}</span>
-              <span className="text-slate-600">•</span>
-              <span className="text-slate-400 truncate">{profile.occupation}</span>
+            </div>
+
+            {/* WhatsApp Contact Lock Indicator */}
+            <div className="mt-1">
+              {profile.whatsappNumber ? (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                  <span>📱 WhatsApp Contact Available</span>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold uppercase">Locked</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                  <span>🔒 WhatsApp Number Unlocks After Checkout</span>
+                </div>
+              )}
             </div>
 
             {/* Children Count, Intent & Rating Row */}
-            <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px]">
+            <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[11px]">
               {/* Children Count */}
               <span className="bg-slate-950 border border-slate-800 text-slate-300 px-2 py-0.5 rounded-md font-semibold">
                 👶 {profile.childrenCount === 0 ? 'No children' : `${profile.childrenCount} child${profile.childrenCount > 1 ? 'ren' : ''}`}

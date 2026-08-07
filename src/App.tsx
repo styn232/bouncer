@@ -24,6 +24,21 @@ export default function App() {
     }
   }, []);
 
+  // Site Settings state (Admin can upload logo and site icon)
+  const [siteSettings, setSiteSettings] = useState<{ siteName: string; logoUrl: string; iconUrl: string }>({
+    siteName: 'DATING WITH BOUNCER',
+    logoUrl: '',
+    iconUrl: ''
+  });
+
+  const handleUpdateSiteSettings = (updated: Partial<{ siteName: string; logoUrl: string; iconUrl: string }>) => {
+    setSiteSettings(prev => ({ ...prev, ...updated }));
+    if (updated.siteName) {
+      document.title = updated.siteName;
+    }
+    addToast('Brand Settings Updated 🎨', 'Logo and site details updated successfully!', 'success');
+  };
+
   // Data states
   const [profiles, setProfiles] = useState<SingleProfile[]>([]);
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
@@ -357,6 +372,21 @@ export default function App() {
     setSelectedBouncerStatus('all');
   };
 
+  // Gender-based matching rule:
+  // "If user is female display men; If user is male display females"
+  const displayedProfiles = profiles.filter((p) => {
+    if (selectedGender !== 'all') {
+      return p.gender === selectedGender;
+    }
+    if (currentUser.gender === 'female') {
+      return p.gender === 'male';
+    }
+    if (currentUser.gender === 'male') {
+      return p.gender === 'female';
+    }
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
       
@@ -369,6 +399,7 @@ export default function App() {
         setActiveTab={handleSelectTab}
         cartCount={cartItems.length}
         currentUser={currentUser}
+        siteSettings={siteSettings}
         onOpenAuth={() => {
           setAuthModalInitialMode('user');
           setIsAuthModalOpen(true);
@@ -468,7 +499,7 @@ export default function App() {
                 selectedBouncerStatus={selectedBouncerStatus}
                 setSelectedBouncerStatus={setSelectedBouncerStatus}
                 onReset={handleResetFilters}
-                totalResults={profiles.length}
+                totalResults={displayedProfiles.length}
               />
 
               {/* Main Content Singles Grid */}
@@ -478,12 +509,12 @@ export default function App() {
                     <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-xs text-slate-400">Loading Bouncer-vetted singles...</p>
                   </div>
-                ) : profiles.length === 0 ? (
+                ) : displayedProfiles.length === 0 ? (
                   <div className="text-center py-20 bg-slate-900/50 border border-slate-800 rounded-3xl p-8">
                     <Search className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                     <h3 className="text-lg font-bold text-white mb-1">No Singles Match Selected Criteria</h3>
                     <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
-                      Try resetting city, age range, children count, or intent filters to view more singles.
+                      Try resetting city, age range, children count, gender, or intent filters to view more singles.
                     </p>
                     <button
                       onClick={handleResetFilters}
@@ -494,7 +525,7 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {profiles.map((profile) => (
+                    {displayedProfiles.map((profile) => (
                       <SingleCard
                         key={profile.id}
                         profile={profile}
@@ -660,10 +691,12 @@ export default function App() {
             transactions={transactions}
             userSubscriptions={userSubscriptions}
             matchOrders={matchOrders}
+            siteSettings={siteSettings}
             onAddProfile={handleAdminAddProfile}
             onEditProfile={(id, data) => fetchProfiles()}
             onDeleteProfile={handleAdminDeleteProfile}
             onUpdateBouncerStatus={handleAdminUpdateBouncerStatus}
+            onUpdateSiteSettings={handleUpdateSiteSettings}
             onRefreshData={fetchInitialData}
           />
         )}
@@ -674,6 +707,7 @@ export default function App() {
       <ProfileDetailModal
         profile={selectedProfileModal}
         isOpen={!!selectedProfileModal}
+        currentUser={currentUser}
         onClose={() => setSelectedProfileModal(null)}
         isInCart={selectedProfileModal ? cartItems.some((item) => item.profileId === selectedProfileModal.id) : false}
         onAddToCart={handleAddToCart}
