@@ -159,16 +159,24 @@ async function startServer() {
   });
 
   app.put('/api/auth/profile', (req, res) => {
-    const { name, age, location, bio, occupation, gender, seeking, interests, avatar } = req.body;
+    const { name, email, whatsappNumber, age, city, subLocation, childrenCount, intent, location, bio, occupation, gender, seeking, interests, avatar } = req.body;
     if (!currentUser) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
+    const fullLocation = location || (city && subLocation ? `${city} (${subLocation}), Zimbabwe` : currentUser.location);
+
     currentUser = {
       ...currentUser,
       ...(name && { name }),
+      ...(email && { email }),
+      ...(whatsappNumber && { whatsappNumber }),
       ...(age && { age: Number(age) }),
-      ...(location && { location }),
+      ...(city && { city }),
+      ...(subLocation && { subLocation }),
+      ...(childrenCount !== undefined && { childrenCount: Number(childrenCount) }),
+      ...(intent && { intent }),
+      location: fullLocation,
       ...(bio && { bio }),
       ...(occupation && { occupation }),
       ...(gender && { gender }),
@@ -184,13 +192,18 @@ async function startServer() {
     }
 
     // Sync user's associated SingleProfile if exists or create if missing
-    let pIdx = profiles.findIndex(p => p.name.toLowerCase() === currentUser.name.toLowerCase());
+    let pIdx = profiles.findIndex(p => p.id === currentUser.id || p.name.toLowerCase() === currentUser.name.toLowerCase());
     if (pIdx !== -1) {
       profiles[pIdx] = {
         ...profiles[pIdx],
         name: currentUser.name,
         age: currentUser.age,
+        city: currentUser.city || profiles[pIdx].city,
+        subLocation: currentUser.subLocation || profiles[pIdx].subLocation,
         location: currentUser.location,
+        childrenCount: currentUser.childrenCount ?? profiles[pIdx].childrenCount,
+        intent: currentUser.intent || profiles[pIdx].intent,
+        whatsappNumber: currentUser.whatsappNumber || profiles[pIdx].whatsappNumber,
         bio: currentUser.bio || profiles[pIdx].bio,
         occupation: currentUser.occupation || profiles[pIdx].occupation,
         gender: currentUser.gender || profiles[pIdx].gender,

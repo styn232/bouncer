@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User as UserIcon, ShieldCheck, Camera, Sparkles, X, Check, Heart, MapPin, Briefcase, Baby } from 'lucide-react';
+import { User as UserIcon, ShieldCheck, Camera, Sparkles, X, Check, Heart, MapPin, Briefcase, Baby, Upload, Mail, Phone } from 'lucide-react';
 import { User, DatingIntent } from '../types';
 import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 
@@ -22,6 +22,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   if (!isOpen) return null;
 
   const [name, setName] = useState(currentUser.name || '');
+  const [email, setEmail] = useState(currentUser.email || '');
   const [age, setAge] = useState(currentUser.age || 25);
   const [city, setCity] = useState(currentUser.city || 'Harare');
   const [subLocation, setSubLocation] = useState(currentUser.subLocation || 'Borrowdale');
@@ -40,12 +41,26 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   const activeCityData = ZIMBABWE_LOCATIONS.find(l => l.city.toLowerCase() === city.toLowerCase());
   const availableSubLocations = activeCityData ? activeCityData.subLocations : ['CBD'];
 
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setAvatar(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const interests = interestsText.split(',').map(i => i.trim()).filter(Boolean);
     const fullLocation = `${city} (${subLocation}), Zimbabwe`;
     onSaveProfile({
       name,
+      email,
       age: Number(age),
       city,
       subLocation,
@@ -101,10 +116,10 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
             />
             <div>
               <h2 className="text-2xl font-bold text-white font-serif">
-                Manage My Dating Profile
+                Edit My Profile
               </h2>
               <p className="text-xs text-slate-400">
-                Update your Age, Gender, Number of Children, Zimbabwe Location & Intent.
+                Update your Name, Email, Phone Number, Profile Picture, and Dating Details.
               </p>
             </div>
           </div>
@@ -139,9 +154,43 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             
+            {/* Upload Picture from Files */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <label className="block font-bold text-amber-400 uppercase tracking-wider text-[11px]">
+                📸 Upload Profile Picture from Device
+              </label>
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <img
+                  src={avatar || currentUser.avatar}
+                  alt="Profile Avatar Preview"
+                  referrerPolicy="no-referrer"
+                  className="w-20 h-20 rounded-2xl object-cover ring-2 ring-amber-500/50 shadow-md shrink-0"
+                />
+                <div className="flex-1 w-full space-y-2">
+                  <label
+                    htmlFor="user-avatar-upload"
+                    className="cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition-colors w-full"
+                  >
+                    <Upload className="w-4 h-4 text-amber-400" />
+                    Upload Image File (Device Gallery / Files)
+                  </label>
+                  <input
+                    id="user-avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageFileUpload}
+                    className="hidden"
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    Select a photo from your computer or mobile device (JPG, PNG, WEBP).
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               
-              {/* Name */}
+              {/* Full Name */}
               <div>
                 <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Full Name
@@ -153,6 +202,44 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                   onChange={e => setName(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
                 />
+              </div>
+
+              {/* Email Address */}
+              <div>
+                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* WhatsApp / Phone Contact Number */}
+              <div>
+                <label className="block font-bold text-amber-400 uppercase tracking-wider mb-1">
+                  📱 WhatsApp / Phone Number
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    required
+                    value={whatsappNumber}
+                    onChange={e => setWhatsappNumber(e.target.value)}
+                    placeholder="+263 77 123 4567"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2.5 text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-500 italic mt-0.5 block">
+                  Shared with matches after payment confirmation.
+                </span>
               </div>
 
               {/* Age */}
@@ -171,7 +258,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 />
               </div>
 
-              {/* Gender Choice */}
+              {/* Choose Gender */}
               <div>
                 <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
                   Choose Gender
@@ -262,38 +349,6 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 </select>
               </div>
 
-              {/* WhatsApp Contact Number */}
-              <div>
-                <label className="block font-bold text-amber-400 uppercase tracking-wider mb-1">
-                  📱 WhatsApp Contact Number
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={whatsappNumber}
-                  onChange={e => setWhatsappNumber(e.target.value)}
-                  placeholder="+263 77 123 4567"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-none focus:border-amber-500"
-                />
-                <span className="text-[10px] text-slate-500 italic mt-0.5 block">
-                  Displayed to matches ONLY after they complete payment.
-                </span>
-              </div>
-
-            </div>
-
-            {/* Avatar URL */}
-            <div>
-              <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                Avatar Image URL
-              </label>
-              <input
-                type="text"
-                value={avatar}
-                onChange={e => setAvatar(e.target.value)}
-                placeholder="https://images.unsplash.com/photo-..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500 font-mono text-[11px]"
-              />
             </div>
 
             {/* Bio */}
