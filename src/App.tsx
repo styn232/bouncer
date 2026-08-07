@@ -294,7 +294,14 @@ export default function App() {
         body: JSON.stringify(newProfData)
       });
       if (res.ok) {
-        addToast('New Single Profile Added', 'Added profile to Singles directory.', 'success');
+        const addedData = await res.json();
+        const profName = addedData.profile?.name || newProfData.name || 'A new single';
+        const profCity = addedData.profile?.city || newProfData.city || 'Zimbabwe';
+        addToast(
+          '🎉 New Single Added Notification!',
+          `📢 ${profName} from ${profCity} (${newProfData.age || 25} yrs) just joined Dating With Bouncer!`,
+          'bouncer'
+        );
         fetchProfiles();
         fetchInitialData();
       }

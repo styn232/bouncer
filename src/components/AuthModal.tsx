@@ -19,7 +19,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const [mode, setMode] = useState<'user_login' | 'user_register' | 'admin_login'>(
+  const [mode, setMode] = useState<'user_login' | 'user_register' | 'admin_login' | 'admin_register'>(
     initialMode === 'admin' ? 'admin_login' : 'user_login'
   );
 
@@ -33,6 +33,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [city, setCity] = useState('Harare');
   const [subLocation, setSubLocation] = useState('Borrowdale');
   const [intent, setIntent] = useState<DatingIntent>('Marriage');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
 
   // Admin form state
   const [adminKey, setAdminKey] = useState('');
@@ -50,13 +51,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      if (mode === 'admin_login') {
+      if (mode === 'admin_register') {
+        // Create Admin Account
+        const res = await fetch('/api/auth/admin/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            email,
+            adminKey
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          onLoginSuccess(data.user);
+          onClose();
+        } else {
+          const data = await res.json();
+          setErrorMsg(data.error || 'Failed to create Admin account. Check Security Passcode.');
+        }
+      } else if (mode === 'admin_login') {
         // Admin authentication
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email: email || 'admin@bouncer.date',
+            email,
             role: 'admin',
             adminKey
           })
@@ -67,7 +88,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           onLoginSuccess(data.user);
           onClose();
         } else {
-          setErrorMsg('Invalid Admin Credentials or Security Key.');
+          const data = await res.json();
+          setErrorMsg(data.error || 'Invalid Admin Credentials or Security Passcode.');
         }
       } else if (mode === 'user_login') {
         // Standard User Login
@@ -82,7 +104,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           onLoginSuccess(data.user);
           onClose();
         } else {
-          setErrorMsg('Failed to log in. Please check your email.');
+          const data = await res.json();
+          setErrorMsg(data.error || 'Account not found. Please click "Create Account" to sign up first.');
         }
       } else {
         // User Register
@@ -99,7 +122,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             city,
             subLocation,
             location: fullLocation,
-            intent
+            intent,
+            whatsappNumber
           })
         });
 
@@ -108,7 +132,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           onLoginSuccess(data.user);
           onClose();
         } else {
-          setErrorMsg('Registration failed. Email may already be in use.');
+          const data = await res.json();
+          setErrorMsg(data.error || 'Registration failed. Email may already be in use.');
         }
       }
     } catch (err) {
@@ -157,7 +182,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              User Login
+              User Sign In
             </button>
             <button
               onClick={() => {
@@ -170,7 +195,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Create Account
+              Sign Up
             </button>
             <button
               onClick={() => {
@@ -178,7 +203,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 setErrorMsg('');
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${
-                mode === 'admin_login'
+                mode === 'admin_login' || mode === 'admin_register'
                   ? 'bg-rose-600 text-white shadow-md'
                   : 'text-rose-400 hover:bg-rose-950/30'
               }`}
@@ -192,16 +217,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="text-center mb-6">
             <h2 className="text-2xl font-extrabold text-white font-serif">
               {mode === 'admin_login'
-                ? '🛡️ Bouncer Admin Security Login'
+                ? '🛡️ Admin Sign In'
+                : mode === 'admin_register'
+                ? '🛡️ Create Admin Account'
                 : mode === 'user_login'
                 ? 'Welcome Back to Dating With Bouncer'
-                : 'Join Dating With Bouncer'}
+                : 'Sign Up to Dating With Bouncer'}
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              {mode === 'admin_login'
-                ? 'Restricted access for managing singles profiles & subscriptions.'
-                : 'Sign in or register to configure your profile and add singles to cart.'}
+              {mode === 'admin_login' || mode === 'admin_register'
+                ? 'Restricted access for managing singles profiles & user subscriptions.'
+                : 'Sign up or sign in to browse vetted singles and unlock contacts.'}
             </p>
+
+            {/* Sub-toggle for Admin mode */}
+            {(mode === 'admin_login' || mode === 'admin_register') && (
+              <div className="flex justify-center gap-4 mt-3 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setMode('admin_login')}
+                  className={`font-bold hover:underline ${mode === 'admin_login' ? 'text-amber-400 underline' : 'text-slate-400'}`}
+                >
+                  Admin Login
+                </button>
+                <span className="text-slate-600">•</span>
+                <button
+                  type="button"
+                  onClick={() => setMode('admin_register')}
+                  className={`font-bold hover:underline ${mode === 'admin_register' ? 'text-amber-400 underline' : 'text-slate-400'}`}
+                >
+                  Create New Admin Account
+                </button>
+              </div>
+            )}
           </div>
 
           {errorMsg && (
@@ -211,6 +259,59 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            {/* CREATE ADMIN ACCOUNT FIELDS */}
+            {mode === 'admin_register' && (
+              <>
+                <div>
+                  <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Admin Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Chief Bouncer Admin"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Admin Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="admin.email@example.com"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white focus:outline-none focus:border-rose-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Security Passcode
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="password"
+                      required
+                      value={adminKey}
+                      onChange={(e) => setAdminKey(e.target.value)}
+                      placeholder="Enter admin passcode"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white focus:outline-none focus:border-rose-500 font-mono"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* ADMIN LOGIN FIELDS */}
             {mode === 'admin_login' && (
               <>
@@ -223,9 +324,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <input
                       type="email"
                       required
-                      value={email || 'admin@bouncer.date'}
+                      value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@bouncer.date"
+                      placeholder="admin@example.com"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white focus:outline-none focus:border-rose-500"
                     />
                   </div>
@@ -233,7 +334,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                 <div>
                   <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Admin Password / Passcode
+                    Admin Passcode
                   </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -242,13 +343,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       required
                       value={adminKey}
                       onChange={(e) => setAdminKey(e.target.value)}
-                      placeholder="Enter admin password (e.g. bouncer2025)"
+                      placeholder="Enter admin passcode"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white focus:outline-none focus:border-rose-500 font-mono"
                     />
                   </div>
-                  <span className="text-[10px] text-slate-500 mt-1 block">
-                    Default demo password: <code className="text-amber-300 font-mono">admin123</code> or <code className="text-amber-300 font-mono">bouncer2025</code>
-                  </span>
                 </div>
               </>
             )}
@@ -337,6 +435,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tendai@example.com"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-amber-400 uppercase tracking-wider mb-1">
+                    📱 WhatsApp Number
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={whatsappNumber}
+                    onChange={(e) => setWhatsappNumber(e.target.value)}
+                    placeholder="+263 77 123 4567"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
                   />
                 </div>
 
@@ -436,22 +548,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               type="submit"
               disabled={isSubmitting}
               className={`w-full py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 ${
-                mode === 'admin_login'
+                mode === 'admin_login' || mode === 'admin_register'
                   ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/50'
                   : 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950'
               }`}
             >
               {isSubmitting ? (
-                <span>Authenticating...</span>
+                <span>Processing...</span>
+              ) : mode === 'admin_register' ? (
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  Create Admin Account
+                </>
               ) : mode === 'admin_login' ? (
                 <>
                   <ShieldCheck className="w-4 h-4" />
-                  Access Admin Backend
+                  Sign In to Admin Portal
                 </>
               ) : mode === 'user_login' ? (
                 <>
                   <UserIcon className="w-4 h-4" />
-                  Sign In to Dating With Bouncer
+                  Sign In
                 </>
               ) : (
                 <>

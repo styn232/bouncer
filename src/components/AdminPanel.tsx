@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image, Upload, Settings } from 'lucide-react';
-import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings } from '../types';
+import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image, Upload, Settings, Phone, UserPlus } from 'lucide-react';
+import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings, DatingIntent } from '../types';
+import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 
 interface AdminPanelProps {
   profiles: SingleProfile[];
@@ -44,30 +45,102 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // New Profile Form Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [newAge, setNewAge] = useState(25);
-  const [newLocation, setNewLocation] = useState('New York, NY');
-  const [newOccupation, setNewOccupation] = useState('Designer');
+  const [newWhatsapp, setNewWhatsapp] = useState('');
+  const [newCity, setNewCity] = useState('Harare');
+  const [newSubLocation, setNewSubLocation] = useState('Borrowdale');
+  const [newGender, setNewGender] = useState<'female' | 'male'>('female');
+  const [newChildrenCount, setNewChildrenCount] = useState(0);
+  const [newIntent, setNewIntent] = useState<DatingIntent>('Marriage');
+  const [newOccupation, setNewOccupation] = useState('Professional');
   const [newBio, setNewBio] = useState('');
   const [newPhoto, setNewPhoto] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
   const [newBouncerStatus, setNewBouncerStatus] = useState<BouncerStatus>('verified');
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  // Upgrade state dictionary for subscription table dropdowns
+  const [upgradePlanState, setUpgradePlanState] = useState<Record<string, SubscriptionPlanId>>({});
+
+  // Active City Sub-locations
+  const activeCityData = ZIMBABWE_LOCATIONS.find((l) => l.city.toLowerCase() === newCity.toLowerCase());
+  const availableSubLocations = activeCityData ? activeCityData.subLocations : ['CBD'];
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName || !newAge || !newLocation) return;
+    if (!newName || !newAge) return;
+
+    const fullLocation = `${newCity} (${newSubLocation}), Zimbabwe`;
+
     onAddProfile({
       name: newName,
       age: Number(newAge),
-      location: newLocation,
+      city: newCity,
+      subLocation: newSubLocation,
+      location: fullLocation,
+      childrenCount: Number(newChildrenCount),
+      intent: newIntent,
+      whatsappNumber: newWhatsapp || '+263 77 123 4567',
+      gender: newGender,
       occupation: newOccupation,
-      bio: newBio || 'Newly added single.',
+      bio: newBio || 'Newly added single on Dating With Bouncer.',
       photos: [newPhoto],
-      interests: ['Dating', 'Travel', 'Cocktails'],
+      interests: ['Dating', 'Travel', 'Music'],
       bouncerStatus: newBouncerStatus,
       bouncerNotes: 'Added & Verified by Admin Bouncer.'
     });
+
     setIsAddModalOpen(false);
     setNewName('');
+    setNewEmail('');
     setNewBio('');
+    setNewWhatsapp('');
+  };
+
+  const handleUpgradeUser = async (userId: string, targetPlan: SubscriptionPlanId) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/upgrade`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId: targetPlan, bouncerVerified: true })
+      });
+      if (res.ok) {
+        onRefreshData();
+      } else {
+        alert('Failed to upgrade user subscription.');
+      }
+    } catch (err) {
+      alert('Error connecting to server.');
+    }
+  };
+
+  const handleRemoveUser = async (userId: string, userName: string) => {
+    if (!window.confirm(`Are you sure you want to remove user "${userName}" and their profile?`)) return;
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        onDeleteProfile(userId);
+        onRefreshData();
+      } else {
+        alert('Failed to delete user.');
+      }
+    } catch (err) {
+      alert('Error removing user.');
+    }
+  };
+
+  const handleBrandingSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onUpdateSiteSettings) {
+      onUpdateSiteSettings({
+        siteName,
+        logoUrl,
+        iconUrl
+      });
+      setBrandingSaved(true);
+      setTimeout(() => setBrandingSaved(false), 3000);
+    }
   };
 
   const filteredProfiles = profiles.filter(
@@ -77,6 +150,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   );
 
   const pendingQueue = profiles.filter(p => p.bouncerStatus === 'pending_check');
+  const paidTransactions = transactions.filter(t => t.amount > 0);
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6">
@@ -375,44 +449,102 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 3: SUBSCRIPTIONS */}
+      {/* TAB 3: SUBSCRIPTIONS & USER MANAGEMENT */}
       {activeTab === 'subscriptions' && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
-          <h3 className="text-xl font-extrabold text-white font-serif mb-4 flex items-center gap-2">
-            <Crown className="w-5 h-5 text-amber-400" />
-            User Membership Subscriptions
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-extrabold text-white font-serif flex items-center gap-2">
+              <Crown className="w-5 h-5 text-amber-400" />
+              Manage Registered Users & Membership Upgrades
+            </h3>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5"
+            >
+              <UserPlus className="w-4 h-4" />
+              Add User
+            </button>
+          </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
                 <tr>
-                  <th className="p-3">User</th>
-                  <th className="p-3">Plan Tier</th>
-                  <th className="p-3">Status</th>
+                  <th className="p-3">User & Contact</th>
+                  <th className="p-3">Current Plan</th>
                   <th className="p-3">Bouncer Verified</th>
+                  <th className="p-3">Upgrade Membership</th>
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80">
-                {userSubscriptions.map((u, idx) => (
-                  <tr key={idx} className="hover:bg-slate-800/40">
-                    <td className="p-3 font-semibold text-white">
-                      <div>{u.name}</div>
-                      <div className="text-[10px] text-slate-400 font-normal">{u.email}</div>
-                    </td>
-                    <td className="p-3 uppercase font-bold text-amber-400">
-                      {u.plan.replace('_', ' ')}
-                    </td>
-                    <td className="p-3">
-                      <span className="bg-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full font-bold text-[10px] capitalize">
-                        {u.status}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      {u.bouncerVerified ? '✅ Yes' : '❌ Pending'}
-                    </td>
-                  </tr>
-                ))}
+                {userSubscriptions.map((u, idx) => {
+                  const currentSelectedPlan = upgradePlanState[u.id] || u.plan || 'starter_3_or_4';
+                  return (
+                    <tr key={u.id || idx} className="hover:bg-slate-800/40">
+                      <td className="p-3 font-semibold text-white">
+                        <div className="text-sm">{u.name}</div>
+                        <div className="text-[10px] text-slate-400 font-normal">{u.email}</div>
+                        {u.whatsappNumber && (
+                          <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3" /> {u.whatsappNumber}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] uppercase ${
+                          u.plan === 'vip_15_singles' || u.plan === 'vip_monthly'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            : u.plan === 'starter_3_or_4'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {u.plan ? u.plan.replace(/_/g, ' ') : 'Free Pass'}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        {u.bouncerVerified ? (
+                          <span className="text-emerald-400 font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+                          </span>
+                        ) : (
+                          <span className="text-amber-400 font-bold flex items-center gap-1">
+                            ⏳ Pending
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={currentSelectedPlan}
+                            onChange={(e) => setUpgradePlanState({ ...upgradePlanState, [u.id]: e.target.value as SubscriptionPlanId })}
+                            className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                          >
+                            <option value="free">Free Pass ($0)</option>
+                            <option value="starter_3_or_4">$6 Starter (4 Singles)</option>
+                            <option value="vip_15_singles">$10 VIP Bundle (15 Singles)</option>
+                          </select>
+
+                          <button
+                            onClick={() => handleUpgradeUser(u.id, currentSelectedPlan)}
+                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black text-[11px] uppercase tracking-wider shrink-0"
+                          >
+                            Upgrade
+                          </button>
+                        </div>
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => handleRemoveUser(u.id, u.name)}
+                          className="p-2 text-rose-400 hover:bg-rose-500/20 rounded-xl transition-colors"
+                          title="Remove User & Single Profile"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -687,56 +819,142 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* Add New Single Profile Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-xl font-extrabold text-white font-serif mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-extrabold text-white font-serif mb-4 flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-amber-400" />
               Add New Single Profile
             </h3>
             <form onSubmit={handleCreateSubmit} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-400 font-bold mb-1">Name</label>
-                <input
-                  type="text"
-                  required
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  placeholder="e.g. Maya Lin"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                />
-              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    placeholder="e.g. Maya Lin"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
 
-              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-slate-400 font-bold mb-1">Age</label>
                   <input
                     type="number"
+                    min={18}
+                    max={99}
                     required
                     value={newAge}
                     onChange={e => setNewAge(Number(e.target.value))}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                   />
                 </div>
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Location</label>
-                  <input
-                    type="text"
-                    required
-                    value={newLocation}
-                    onChange={e => setNewLocation(e.target.value)}
-                    placeholder="Miami, FL"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                  />
-                </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 font-bold mb-1">Occupation</label>
+                <label className="block text-amber-400 font-bold mb-1">📱 WhatsApp Number</label>
                 <input
                   type="text"
-                  value={newOccupation}
-                  onChange={e => setNewOccupation(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  required
+                  value={newWhatsapp}
+                  onChange={e => setNewWhatsapp(e.target.value)}
+                  placeholder="+263 77 123 4567"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Gender</label>
+                  <select
+                    value={newGender}
+                    onChange={e => setNewGender(e.target.value as 'female' | 'male')}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  >
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">👶 Number of Children</label>
+                  <select
+                    value={newChildrenCount}
+                    onChange={e => setNewChildrenCount(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  >
+                    <option value={0}>0 (No children)</option>
+                    <option value={1}>1 Child</option>
+                    <option value={2}>2 Children</option>
+                    <option value={3}>3+ Children</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">📍 Zimbabwe City</label>
+                  <select
+                    value={newCity}
+                    onChange={e => {
+                      const nextCity = e.target.value;
+                      setNewCity(nextCity);
+                      const nextData = ZIMBABWE_LOCATIONS.find((l) => l.city === nextCity);
+                      if (nextData && nextData.subLocations.length > 0) {
+                        setNewSubLocation(nextData.subLocations[0]);
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  >
+                    {ZIMBABWE_LOCATIONS.map((loc) => (
+                      <option key={loc.city} value={loc.city}>
+                        {loc.city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">🏘️ Sub-location</label>
+                  <select
+                    value={newSubLocation}
+                    onChange={e => setNewSubLocation(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  >
+                    {availableSubLocations.map((sub) => (
+                      <option key={sub} value={sub}>
+                        {sub}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">💍 Dating Intent</label>
+                  <select
+                    value={newIntent}
+                    onChange={e => setNewIntent(e.target.value as DatingIntent)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-bold"
+                  >
+                    <option value="Marriage">💍 Seeking Marriage</option>
+                    <option value="Funny">😂 Funny & Good Vibe</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Occupation</label>
+                  <input
+                    type="text"
+                    value={newOccupation}
+                    onChange={e => setNewOccupation(e.target.value)}
+                    placeholder="e.g. Business Executive"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
               </div>
 
               <div>
@@ -755,6 +973,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   rows={2}
                   value={newBio}
                   onChange={e => setNewBio(e.target.value)}
+                  placeholder="Describe personality & dating goals..."
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white"
                 />
               </div>
@@ -769,9 +988,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black uppercase"
                 >
-                  Create Single
+                  Create Single Profile
                 </button>
               </div>
             </form>

@@ -15,11 +15,9 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
-  cartCount,
   currentUser,
   siteSettings,
-  onOpenAuth,
-  onOpenPayment
+  onOpenAuth
 }) => {
   const displaySiteName = siteSettings?.siteName || 'DATING WITH BOUNCER';
   const logoUrl = siteSettings?.logoUrl;
@@ -62,16 +60,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-slate-400 hidden sm:block">
-              Velvet Rope Access • Add Singles to Cart
+              Velvet Rope Access • Verified Singles
             </p>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <nav className="hidden md:flex items-center gap-1 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800">
+        <nav className="hidden md:flex items-center gap-1.5 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800">
           <button
             onClick={() => setActiveTab('browse')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
+            className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
               activeTab === 'browse'
                 ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-md shadow-amber-500/20'
                 : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -82,37 +80,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('cart')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 relative ${
-              activeTab === 'cart'
-                ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-md shadow-amber-500/20'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <ShoppingBag className="w-4 h-4 text-rose-300" />
-            Singles Cart
-            {cartCount > 0 && (
-              <span className="bg-rose-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center animate-pulse border border-slate-900">
-                {cartCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('vip')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-              activeTab === 'vip'
-                ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-md shadow-amber-500/20'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <Crown className="w-4 h-4 text-amber-300" />
-            VIP & Payment
-          </button>
-
-          <button
             onClick={() => setActiveTab('profile')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
+            className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
               activeTab === 'profile'
                 ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-md shadow-amber-500/20'
                 : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -125,9 +94,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           {currentUser.role === 'admin' && (
             <button
               onClick={() => setActiveTab('admin')}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
+              className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-2 ${
                 activeTab === 'admin'
-                  ? 'bg-amber-400 text-slate-950 font-bold shadow-lg shadow-amber-400/20'
+                  ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-400/20'
                   : 'text-amber-400 hover:bg-amber-500/10'
               }`}
             >
@@ -139,19 +108,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* User Right Action Panel */}
         <div className="flex items-center gap-3">
-          {/* Cart Icon Quick Action for Mobile */}
-          <button
-            onClick={() => setActiveTab('cart')}
-            className="md:hidden relative p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200"
-          >
-            <ShoppingBag className="w-5 h-5 text-rose-400" />
-            {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center">
-                {cartCount}
-              </span>
-            )}
-          </button>
-
           {/* User Status / Account Button */}
           <div className="flex items-center gap-2">
             <button
@@ -172,18 +128,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   )}
                 </div>
                 <div className="text-[10px] text-amber-400 capitalize font-medium">
-                  {currentUser.subscriptionPlan.replace('_', ' ')}
+                  {currentUser.role === 'admin' ? 'Bouncer Admin' : currentUser.subscriptionPlan.replace('_', ' ')}
                 </div>
               </div>
-            </button>
-
-            {/* Quick Membership Upgrade CTA */}
-            <button
-              onClick={onOpenPayment}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-500/40 hover:border-amber-400 text-amber-300 text-xs font-bold transition-all"
-            >
-              <Crown className="w-3.5 h-3.5" />
-              Upgrade
             </button>
           </div>
         </div>
@@ -198,25 +145,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           }`}
         >
           <Sparkles className="w-4 h-4" />
-          Singles
-        </button>
-        <button
-          onClick={() => setActiveTab('cart')}
-          className={`flex flex-col items-center gap-1 text-[11px] font-medium relative ${
-            activeTab === 'cart' ? 'text-amber-400 font-bold' : 'text-slate-400'
-          }`}
-        >
-          <ShoppingBag className="w-4 h-4" />
-          Cart {cartCount > 0 && `(${cartCount})`}
-        </button>
-        <button
-          onClick={() => setActiveTab('vip')}
-          className={`flex flex-col items-center gap-1 text-[11px] font-medium ${
-            activeTab === 'vip' ? 'text-amber-400 font-bold' : 'text-slate-400'
-          }`}
-        >
-          <Crown className="w-4 h-4" />
-          VIP
+          Browse Singles
         </button>
         <button
           onClick={() => setActiveTab('profile')}
@@ -225,7 +154,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           }`}
         >
           <UserIcon className="w-4 h-4" />
-          Account
+          My Account
         </button>
         {currentUser.role === 'admin' && (
           <button

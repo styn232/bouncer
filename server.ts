@@ -34,27 +34,70 @@ async function startServer() {
     res.json({ user: currentUser });
   });
 
+  // Admin Account Registration
+  app.post('/api/auth/admin/register', (req, res) => {
+    const { name, email, adminKey } = req.body;
+    if (!email || !name) {
+      return res.status(400).json({ error: 'Name and email are required for Admin account.' });
+    }
+    if (adminKey && !['admin123', 'bouncer2025', 'admin', 'pass'].includes(adminKey.toLowerCase())) {
+      return res.status(401).json({ error: 'Invalid Security Passcode for Admin registration.' });
+    }
+
+    const newAdmin: User = {
+      id: `usr_admin_${Date.now()}`,
+      email,
+      name,
+      role: 'admin',
+      subscriptionPlan: 'vip_15_singles',
+      subscriptionStatus: 'active',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
+      bouncerVerified: true,
+      city: 'Harare',
+      subLocation: 'HQ',
+      location: 'Harare HQ, Zimbabwe',
+      childrenCount: 0,
+      intent: 'Marriage',
+      createdAt: new Date().toISOString()
+    };
+
+    users.push(newAdmin);
+    currentUser = newAdmin;
+    res.json({ success: true, user: currentUser, token: 'admin_session_token' });
+  });
+
   app.post('/api/auth/login', (req, res) => {
     const { email, role, adminKey } = req.body;
-    if (role === 'admin' || email === 'admin@bouncer.date') {
+    
+    // Admin login path
+    if (role === 'admin' || (email && email.toLowerCase().includes('admin'))) {
       if (adminKey && !['admin123', 'bouncer2025', 'admin', 'pass'].includes(adminKey.toLowerCase())) {
         return res.status(401).json({ error: 'Invalid Admin Passcode.' });
       }
-      currentUser = MOCK_ADMIN_USER;
+      const existingAdmin = users.find(u => u.role === 'admin' && u.email.toLowerCase() === (email || '').toLowerCase()) || MOCK_ADMIN_USER;
+      currentUser = existingAdmin;
       return res.json({ success: true, user: currentUser, token: 'admin_session_token' });
     }
-    const found = users.find(u => u.email.toLowerCase() === (email || '').toLowerCase());
+
+    // Standard User login path
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required to log in.' });
+    }
+
+    const found = users.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (found) {
       currentUser = found;
       return res.json({ success: true, user: currentUser, token: 'user_session_token' });
     }
-    // Default to demo user if not found or guest login
-    currentUser = MOCK_DEMO_USER;
-    res.json({ success: true, user: currentUser, token: 'user_demo_token' });
+
+    // Strict non-demo behavior when email is not found
+    return res.status(404).json({
+      error: 'No account found with this email. Please click "Create Account" to sign up first!'
+    });
   });
 
   app.post('/api/auth/register', (req, res) => {
-    const { email, name, age, city, subLocation, location, gender, childrenCount, intent, bio } = req.body;
+    const { email, name, age, city, subLocation, location, gender, childrenCount, intent, bio, whatsappNumber } = req.body;
     if (!email || !name) {
       return res.status(400).json({ error: 'Name and email are required.' });
     }
@@ -74,6 +117,7 @@ async function startServer() {
       subscriptionStatus: 'active',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
       bio: bio || 'New single on Dating with Bouncer!',
+      whatsappNumber: whatsappNumber || '+263 77 123 4567',
       gender: gender || 'female',
       interests: ['Dating', 'Coffee', 'Music'],
       bouncerVerified: false,
@@ -93,9 +137,10 @@ async function startServer() {
       location: newUser.location,
       childrenCount: newUser.childrenCount,
       intent: newUser.intent,
-      seeking: 'male',
+      seeking: newUser.gender === 'male' ? 'female' : 'male',
       bio: newUser.bio || 'Recently joined single seeking genuine connections.',
       occupation: 'Professional',
+      whatsappNumber: newUser.whatsappNumber,
       photos: [newUser.avatar],
       interests: newUser.interests || ['Dating'],
       gender: newUser.gender || 'female',
@@ -346,6 +391,55 @@ async function startServer() {
     }
 
     res.json({ success: true, profile: profiles[idx] });
+  });
+
+  // Admin: List all Users
+  app.get('/api/admin/users', (_req, res) => {
+    res.json(users);
+  });
+
+  // Admin: Upgrade User Subscription & Bouncer Status
+  app.put('/api/admin/users/:id/upgrade', (req, res) => {
+    const { planId, bouncerVerified } = req.body;
+    const userId = req.params.id;
+    
+    const uIdx = users.findIndex(u => u.id === userId || u.email.toLowerCase() === userId.toLowerCase());
+    if (uIdx === -1) {
+      return res.status(404).json({ error: 'User account not found' });
+    }
+
+    users[uIdx].subscriptionPlan = (planId as SubscriptionPlanId) || 'starter_3_or_4';
+    users[uIdx].subscriptionStatus = 'active';
+    users[uIdx].subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    if (bouncerVerified !== undefined) {
+      users[uIdx].bouncerVerified = !!bouncerVerified;
+    } else {
+      users[uIdx].bouncerVerified = true;
+    }
+
+    // Also update current logged in user if it's the same user
+    if (currentUser && currentUser.id === users[uIdx].id) {
+      currentUser = users[uIdx];
+    }
+
+    res.json({ success: true, user: users[uIdx], message: `Successfully upgraded user ${users[uIdx].name} to ${users[uIdx].subscriptionPlan}` });
+  });
+
+  // Admin: Delete/Remove User Account & Profile
+  app.delete('/api/admin/users/:id', (req, res) => {
+    const targetId = req.params.id;
+    
+    // Find user to get name/email
+    const userTarget = users.find(u => u.id === targetId || u.email.toLowerCase() === targetId.toLowerCase());
+    const targetName = userTarget?.name || '';
+
+    // Filter out user from users array
+    users = users.filter(u => u.id !== targetId && u.email.toLowerCase() !== targetId.toLowerCase());
+    
+    // Filter out profile by profile id or matching name
+    profiles = profiles.filter(p => p.id !== targetId && p.name.toLowerCase() !== targetName.toLowerCase());
+
+    res.json({ success: true, message: 'User and single profile deleted successfully from Bouncer system.' });
   });
 
   // API ROUTE 4: Subscriptions & Payment Gateway Processing
