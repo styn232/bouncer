@@ -182,7 +182,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              User Sign In
+              Log In
             </button>
             <button
               onClick={() => {
@@ -204,12 +204,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               }}
               className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${
                 mode === 'admin_login' || mode === 'admin_register'
-                  ? 'bg-rose-600 text-white shadow-md'
-                  : 'text-rose-400 hover:bg-rose-950/30'
+                  ? 'bg-slate-800 text-amber-300 shadow-md'
+                  : 'text-slate-500 hover:text-slate-300'
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              Admin Portal
+              Staff
             </button>
           </div>
 
@@ -217,17 +217,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="text-center mb-6">
             <h2 className="text-2xl font-extrabold text-white font-serif">
               {mode === 'admin_login'
-                ? '🛡️ Admin Sign In'
+                ? 'Staff Portal Sign In'
                 : mode === 'admin_register'
-                ? '🛡️ Create Admin Account'
+                ? 'Create Staff Account'
                 : mode === 'user_login'
-                ? 'Welcome Back to Dating With Bouncer'
+                ? 'Log In to Dating With Bouncer'
                 : 'Sign Up to Dating With Bouncer'}
             </h2>
             <p className="text-xs text-slate-400 mt-1">
               {mode === 'admin_login' || mode === 'admin_register'
-                ? 'Restricted access for managing singles profiles & user subscriptions.'
-                : 'Sign up or sign in to browse vetted singles and unlock contacts.'}
+                ? 'Restricted access for platform management.'
+                : 'Sign up or log in to browse vetted singles and unlock contacts.'}
             </p>
 
             {/* Sub-toggle for Admin mode */}

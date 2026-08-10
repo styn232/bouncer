@@ -37,7 +37,7 @@ export interface SingleProfile {
   createdAt: string;
 }
 
-export type SubscriptionPlanId = 'free' | 'starter_3_or_4' | 'vip_15_singles';
+export type SubscriptionPlanId = 'free' | 'starter_3_or_4' | 'vip_15_singles' | 'vip_monthly' | 'ultimate_access' | 'bouncer_pass' | string;
 
 export interface SiteSettings {
   siteName: string;

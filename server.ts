@@ -48,6 +48,7 @@ async function startServer() {
       id: `usr_admin_${Date.now()}`,
       email,
       name,
+      age: 30,
       role: 'admin',
       subscriptionPlan: 'vip_15_singles',
       subscriptionStatus: 'active',

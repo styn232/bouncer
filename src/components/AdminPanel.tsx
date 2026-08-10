@@ -58,6 +58,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newPhoto, setNewPhoto] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
   const [newBouncerStatus, setNewBouncerStatus] = useState<BouncerStatus>('verified');
 
+  // Search state for registered users in admin panel
+  const [adminUserSearch, setAdminUserSearch] = useState('');
+
   // Upgrade state dictionary for subscription table dropdowns
   const [upgradePlanState, setUpgradePlanState] = useState<Record<string, SubscriptionPlanId>>({});
 
@@ -451,24 +454,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* TAB 3: SUBSCRIPTIONS & USER MANAGEMENT */}
       {activeTab === 'subscriptions' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-extrabold text-white font-serif flex items-center gap-2">
-              <Crown className="w-5 h-5 text-amber-400" />
-              Manage Registered Users & Membership Upgrades
-            </h3>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5"
-            >
-              <UserPlus className="w-4 h-4" />
-              Add User
-            </button>
+        <div className="bg-white border border-emerald-200 rounded-3xl p-6 shadow-md">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-xl font-extrabold text-slate-900 font-serif flex items-center gap-2">
+                <Crown className="w-5 h-5 text-emerald-700" />
+                Manage Registered Users & Membership Upgrades
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">Search and manage registered users by name, email, or WhatsApp number</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Admin Search By User Name / Email / WhatsApp */}
+              <div className="relative flex-1 sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search user by name..."
+                  value={adminUserSearch}
+                  onChange={(e) => setAdminUserSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-emerald-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1.5 shrink-0 shadow-sm"
+              >
+                <UserPlus className="w-4 h-4" />
+                Add User
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-emerald-50 text-emerald-950 uppercase text-[10px] font-extrabold tracking-wider border-b border-emerald-200">
                 <tr>
                   <th className="p-3">User & Contact</th>
                   <th className="p-3">Current Plan</th>
@@ -477,74 +498,84 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/80">
-                {userSubscriptions.map((u, idx) => {
-                  const currentSelectedPlan = upgradePlanState[u.id] || u.plan || 'starter_3_or_4';
-                  return (
-                    <tr key={u.id || idx} className="hover:bg-slate-800/40">
-                      <td className="p-3 font-semibold text-white">
-                        <div className="text-sm">{u.name}</div>
-                        <div className="text-[10px] text-slate-400 font-normal">{u.email}</div>
-                        {u.whatsappNumber && (
-                          <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 mt-0.5">
-                            <Phone className="w-3 h-3" /> {u.whatsappNumber}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] uppercase ${
-                          u.plan === 'vip_15_singles' || u.plan === 'vip_monthly'
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                            : u.plan === 'starter_3_or_4'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                            : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          {u.plan ? u.plan.replace(/_/g, ' ') : 'Free Pass'}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        {u.bouncerVerified ? (
-                          <span className="text-emerald-400 font-bold flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+              <tbody className="divide-y divide-emerald-100">
+                {userSubscriptions
+                  .filter((u) => {
+                    if (!adminUserSearch.trim()) return true;
+                    const query = adminUserSearch.toLowerCase();
+                    return (
+                      u.name.toLowerCase().includes(query) ||
+                      (u.email && u.email.toLowerCase().includes(query)) ||
+                      (u.whatsappNumber && u.whatsappNumber.toLowerCase().includes(query))
+                    );
+                  })
+                  .map((u, idx) => {
+                    const currentSelectedPlan = upgradePlanState[u.id] || u.plan || 'starter_3_or_4';
+                    return (
+                      <tr key={u.id || idx} className="hover:bg-emerald-50/50">
+                        <td className="p-3 font-semibold text-slate-900">
+                          <div className="text-sm font-bold text-slate-900">{u.name}</div>
+                          <div className="text-[10px] text-slate-500 font-normal">{u.email}</div>
+                          {u.whatsappNumber && (
+                            <div className="text-[10px] text-emerald-700 font-mono flex items-center gap-1 mt-0.5">
+                              <Phone className="w-3 h-3" /> {u.whatsappNumber}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] uppercase ${
+                            u.plan === 'vip_15_singles' || u.plan === 'vip_monthly'
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : u.plan === 'starter_3_or_4'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {u.plan ? u.plan.replace(/_/g, ' ') : 'Free Pass'}
                           </span>
-                        ) : (
-                          <span className="text-amber-400 font-bold flex items-center gap-1">
-                            ⏳ Pending
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={currentSelectedPlan}
-                            onChange={(e) => setUpgradePlanState({ ...upgradePlanState, [u.id]: e.target.value as SubscriptionPlanId })}
-                            className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
-                          >
-                            <option value="free">Free Pass ($0)</option>
-                            <option value="starter_3_or_4">$6 Starter (4 Singles)</option>
-                            <option value="vip_15_singles">$10 VIP Bundle (15 Singles)</option>
-                          </select>
+                        </td>
+                        <td className="p-3">
+                          {u.bouncerVerified ? (
+                            <span className="text-emerald-700 font-bold flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+                            </span>
+                          ) : (
+                            <span className="text-amber-700 font-bold flex items-center gap-1">
+                              ⏳ Pending
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={currentSelectedPlan}
+                              onChange={(e) => setUpgradePlanState({ ...upgradePlanState, [u.id]: e.target.value as SubscriptionPlanId })}
+                              className="bg-slate-50 border border-emerald-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            >
+                              <option value="free">Free Pass ($0)</option>
+                              <option value="starter_3_or_4">$6 Starter (3-4 Singles)</option>
+                              <option value="vip_15_singles">$10 VIP Bundle (10 Singles)</option>
+                            </select>
 
+                            <button
+                              onClick={() => handleUpgradeUser(u.id, currentSelectedPlan)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] uppercase tracking-wider shrink-0 shadow-sm"
+                            >
+                              Upgrade
+                            </button>
+                          </div>
+                        </td>
+                        <td className="p-3 text-right">
                           <button
-                            onClick={() => handleUpgradeUser(u.id, currentSelectedPlan)}
-                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black text-[11px] uppercase tracking-wider shrink-0"
+                            onClick={() => handleRemoveUser(u.id, u.name)}
+                            className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                            title="Remove User & Single Profile"
                           >
-                            Upgrade
+                            <Trash2 className="w-4 h-4" />
                           </button>
-                        </div>
-                      </td>
-                      <td className="p-3 text-right">
-                        <button
-                          onClick={() => handleRemoveUser(u.id, u.name)}
-                          className="p-2 text-rose-400 hover:bg-rose-500/20 rounded-xl transition-colors"
-                          title="Remove User & Single Profile"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>

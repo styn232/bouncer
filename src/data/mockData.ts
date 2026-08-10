@@ -270,45 +270,48 @@ export const INITIAL_PROFILES: SingleProfile[] = [
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
-    id: 'free',
-    name: 'Free Single Pass',
-    price: 0,
-    billingPeriod: 'monthly',
-    tagline: 'Browse singles profiles and preview matches',
-    badge: 'FREE',
-    features: [
-      'Browse all Verified Singles',
-      'Name, Age, Location & Children info',
-      'Preview profiles with Bouncer badges'
-    ]
-  },
-  {
     id: 'starter_3_or_4',
-    name: '4 Singles Unlock Pass',
+    name: '1 to 3 Singles Pass',
     price: 6,
     billingPeriod: 'monthly',
-    tagline: 'Unlock direct WhatsApp contact details & matches for 3 to 4 Singles',
+    tagline: 'Unlock direct WhatsApp contact numbers & dates for 1 to 3 Singles',
     badge: '$6 STARTER',
-    popular: true,
+    popular: false,
     features: [
-      'Unlock WhatsApp Number for 4 Singles',
-      'Direct Click-to-Chat WhatsApp Access',
-      'Fast Bouncer Identity Verification',
-      'Add-to-Cart Date Requests'
+      'Select 1 to 3 Singles for $6',
+      'Unlock Direct WhatsApp Phone Numbers',
+      'Fast Identity Verification',
+      'Send Direct Date Requests'
     ]
   },
   {
-    id: 'vip_15_singles',
-    name: '15 Singles VIP Bundle',
+    id: 'starter_10_singles',
+    name: '4 to 10 Singles Bundle',
     price: 10,
     billingPeriod: 'monthly',
-    tagline: 'Unlock direct WhatsApp numbers for 15 Singles — Best Value!',
-    badge: 'BEST VALUE',
+    tagline: 'Unlock direct WhatsApp numbers for 4 to 10 Singles — Bundle Deal!',
+    badge: '$10 BUNDLE',
+    popular: false,
     features: [
-      'Unlock WhatsApp Numbers for 15 Singles',
-      'Unlimited Direct WhatsApp Click-to-Chat',
-      'VIP Gold Profile Badge',
-      'Priority Bouncer Clearance & Zero Wait',
+      'Select 4 to 10 Singles for $10',
+      'Unlock Direct WhatsApp Phone Numbers',
+      'Priority Bouncer Clearance',
+      'Direct WhatsApp Order List'
+    ]
+  },
+  {
+    id: 'vip_30_singles',
+    name: 'VIP Access (30+ Singles)',
+    price: 15,
+    billingPeriod: 'monthly',
+    tagline: 'Request and pay $15 for VIP Access to unlock MORE THAN 30 Singles!',
+    badge: '$15 VIP UNLIMITED',
+    popular: true,
+    features: [
+      'Unlock MORE THAN 30 Singles for $15',
+      'Direct WhatsApp Contact Numbers',
+      'VIP Gold Access Badge',
+      'Priority Concierge Service',
       'Full Bouncer Verification Guarantee'
     ]
   }

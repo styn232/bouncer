@@ -71,6 +71,7 @@ export default function App() {
   const [selectedChildren, setSelectedChildren] = useState('all');
   const [selectedIntent, setSelectedIntent] = useState('all');
   const [selectedBouncerStatus, setSelectedBouncerStatus] = useState('all');
+  const [sortByStars, setSortByStars] = useState(true);
 
   // Cart State
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -379,23 +380,29 @@ export default function App() {
     setSelectedBouncerStatus('all');
   };
 
-  // Gender-based matching rule:
-  // "If user is female display men; If user is male display females"
-  const displayedProfiles = profiles.filter((p) => {
-    if (selectedGender !== 'all') {
-      return p.gender === selectedGender;
-    }
-    if (currentUser.gender === 'female') {
-      return p.gender === 'male';
-    }
-    if (currentUser.gender === 'male') {
-      return p.gender === 'female';
-    }
-    return true;
-  });
+  // Gender-based matching rule + Star Ranking sort rule
+  const displayedProfiles = profiles
+    .filter((p) => {
+      if (selectedGender !== 'all') {
+        return p.gender === selectedGender;
+      }
+      if (currentUser.gender === 'female') {
+        return p.gender === 'male';
+      }
+      if (currentUser.gender === 'male') {
+        return p.gender === 'female';
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortByStars) {
+        return (b.averageRating || 0) - (a.averageRating || 0);
+      }
+      return 0;
+    });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
       
       {/* Toast Notification Container */}
       <ToastNotification toasts={toasts} onDismiss={removeToast} />
@@ -411,72 +418,98 @@ export default function App() {
           setAuthModalInitialMode('user');
           setIsAuthModalOpen(true);
         }}
+        onOpenLogin={() => {
+          setAuthModalInitialMode('user');
+          setIsAuthModalOpen(true);
+        }}
+        onOpenRegister={() => {
+          setAuthModalInitialMode('user');
+          setIsAuthModalOpen(true);
+        }}
         onOpenPayment={() => setIsPaymentModalOpen(true)}
       />
 
       {/* Main Body View Switching */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         
-        {/* Admin Session Security Status Link */}
-        <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800 rounded-2xl px-4 py-2.5 mb-6 text-xs text-slate-400">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>Active Session: <strong className="text-slate-200">{currentUser.name}</strong> ({currentUser.role === 'admin' ? '🛡️ Admin' : '👤 Single User'})</span>
-          </div>
+        {/* Admin Session Security Status Link (Only visible to Admin) */}
+        {currentUser.role === 'admin' && (
+          <div className="flex items-center justify-between bg-emerald-100/70 border border-emerald-300 rounded-2xl px-4 py-2.5 mb-6 text-xs text-emerald-950 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
+              <span>Active Staff Session: <strong className="text-emerald-900">{currentUser.name}</strong></span>
+            </div>
 
-          <button
-            onClick={() => {
-              if (currentUser.role === 'admin') {
-                setActiveTab('admin');
-              } else {
-                setAuthModalInitialMode('admin');
-                setIsAuthModalOpen(true);
-              }
-            }}
-            className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 hover:underline"
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            {currentUser.role === 'admin' ? 'Open Bouncer Admin Panel' : 'Admin Login (URL: /admin)'}
-          </button>
-        </div>
+            <button
+              onClick={() => setActiveTab('admin')}
+              className="text-emerald-800 hover:text-emerald-950 font-extrabold flex items-center gap-1 hover:underline"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Open Staff Control Panel
+            </button>
+          </div>
+        )}
 
         {/* VIEW 1: BROWSE SINGLES */}
         {activeTab === 'browse' && (
           <div>
+            {/* Singles Selection Pricing Alert Banner */}
+            <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 text-white rounded-2xl p-3.5 sm:p-4 mb-6 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 border border-emerald-600">
+              <div className="flex items-center gap-3">
+                <div className="p-2 sm:p-2.5 bg-emerald-950/40 text-emerald-200 rounded-xl border border-emerald-500/40 shrink-0">
+                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
+                </div>
+                <div>
+                  <h4 className="text-[11px] sm:text-xs font-black text-amber-300 uppercase tracking-wider">
+                    💡 Choose Singles Pricing Guide
+                  </h4>
+                  <p className="text-[11px] sm:text-xs text-emerald-50 mt-0.5 leading-snug">
+                    Select <strong className="text-amber-300 font-extrabold">$6 (1-3 Singles)</strong>, <strong className="text-amber-300 font-extrabold">$10 (4-10 Singles)</strong>, or <strong className="text-amber-300 font-extrabold">$15 VIP Access (30+ Singles)</strong> for direct WhatsApp numbers!
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setActiveTab('cart')}
+                className="w-full sm:w-auto px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-md shrink-0 transition-transform active:scale-95 text-center"
+              >
+                Chosen Singles ({cartItems.length})
+              </button>
+            </div>
             
             {/* Hero Section */}
-            <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-amber-500/20 p-6 sm:p-10 mb-8 shadow-2xl">
-              <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full filter blur-3xl pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-80 h-80 bg-rose-500/10 rounded-full filter blur-3xl pointer-events-none" />
+            <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-900 border border-emerald-700 p-5 sm:p-10 mb-8 shadow-xl text-white">
+              <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-400/10 rounded-full filter blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-80 h-80 bg-amber-400/10 rounded-full filter blur-3xl pointer-events-none" />
 
               <div className="relative z-10 max-w-3xl">
-                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-500/40 px-3.5 py-1 rounded-full text-amber-300 text-xs font-bold uppercase tracking-wider mb-4">
-                  <ShieldCheck className="w-4 h-4 text-amber-400" />
-                  Velvet Rope Guarantee • 100% Vetted Zimbabwe Singles
+                <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-emerald-950/60 border border-emerald-400/40 px-3 py-1 rounded-full text-emerald-200 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-3 shadow-sm">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Verified Platform • 100% Zimbabwe Singles</span>
                 </div>
 
-                <h1 className="text-3xl sm:text-5xl font-extrabold text-white font-serif tracking-tight leading-tight mb-3">
-                  Dating With Bouncer
+                <h1 className="text-2xl sm:text-5xl font-extrabold text-white font-serif tracking-tight leading-tight mb-2 sm:mb-3 uppercase">
+                  DATING WITH BOUNCER
                 </h1>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6 font-normal">
-                  Browse singles displaying <strong className="text-amber-400">Name, Age, Location, Gender, Children & Intent (Marriage or Funny)</strong>. Find someone interested? Add to cart to schedule your date!
+                <p className="text-[11px] sm:text-sm text-emerald-100 leading-relaxed mb-5 font-normal">
+                  Browse singles ranked by star ratings displaying <strong className="text-amber-300">Name, Age, Location, Gender, Children & Intent (Marriage or Funny)</strong>. Found someone? Click Choose Single to send your pick list for WhatsApp checkout!
                 </p>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                   <button
                     onClick={() => setIsPaymentModalOpen(true)}
-                    className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-xl flex items-center gap-2 transition-transform active:scale-95"
+                    className="px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[11px] sm:text-xs uppercase tracking-wider shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"
                   >
-                    <Crown className="w-4 h-4 fill-slate-950" />
-                    Get VIP Bouncer Membership
+                    <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-slate-950" />
+                    Get $15 VIP Access (30+ Singles)
                   </button>
 
                   <button
                     onClick={() => setIsUserModalOpen(true)}
-                    className="px-5 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-colors"
+                    className="px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl bg-emerald-950/60 hover:bg-emerald-900 text-white border border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-colors shadow-sm"
                   >
-                    Fill My Profile Features
+                    Update My Profile & Photos
                   </button>
                 </div>
               </div>
@@ -505,6 +538,8 @@ export default function App() {
                 setSelectedIntent={setSelectedIntent}
                 selectedBouncerStatus={selectedBouncerStatus}
                 setSelectedBouncerStatus={setSelectedBouncerStatus}
+                sortByStars={sortByStars}
+                setSortByStars={setSortByStars}
                 onReset={handleResetFilters}
                 totalResults={displayedProfiles.length}
               />
@@ -531,7 +566,7 @@ export default function App() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-2.5 sm:gap-6">
                     {displayedProfiles.map((profile) => (
                       <SingleCard
                         key={profile.id}

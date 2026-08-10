@@ -224,6 +224,36 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 ))}
               </div>
 
+              {/* Local EcoCash & InnBucks Direct Payment Guide Banner */}
+              <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-2xl p-4 mb-6 text-white shadow-inner">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                    EcoCash & InnBucks Mobile Payment Option
+                  </span>
+                  <span className="text-[10px] bg-emerald-700 text-white font-bold px-2 py-0.5 rounded-full">
+                    No Card Needed
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="bg-slate-900/90 p-3 rounded-xl border border-emerald-500/30">
+                    <span className="text-emerald-300 font-bold block text-[11px]">📱 EcoCash Direct USSD</span>
+                    <span className="font-mono text-amber-300 text-xs font-black block my-1 bg-slate-950 p-2 rounded border border-amber-500/40 select-all">
+                      *153*1*1*0771490167*{selectedPlan.price}#
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">EcoCash Number: <strong>0771490167</strong></span>
+                  </div>
+
+                  <div className="bg-slate-900/90 p-3 rounded-xl border border-emerald-500/30">
+                    <span className="text-amber-300 font-bold block text-[11px]">💵 InnBucks Direct Number</span>
+                    <span className="font-mono text-emerald-300 text-xs font-black block my-1 bg-slate-950 p-2 rounded border border-emerald-500/40 select-all">
+                      0771490167
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">Send payment to InnBucks account <strong>0771490167</strong></span>
+                  </div>
+                </div>
+              </div>
+
               {/* Payment Details Form */}
               <form onSubmit={handleSubmitPayment} className="bg-slate-950 border border-slate-800 rounded-2xl p-6">
                 <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">

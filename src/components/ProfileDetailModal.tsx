@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle } from 'lucide-react';
+import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck } from 'lucide-react';
 import { SingleProfile, User } from '../types';
 
 interface ProfileDetailModalProps {
@@ -194,16 +194,16 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
 
               {/* WhatsApp Number Unlocked / Paywalled Box */}
               {isUnlocked ? (
-                <div className="p-4 bg-emerald-950/40 border border-emerald-500/40 rounded-2xl mb-6 flex flex-col gap-2 shadow-lg">
+                <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl mb-6 flex flex-col gap-2 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Direct WhatsApp Access Unlocked
+                    <span className="text-xs font-extrabold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Direct WhatsApp Access Unlocked
                     </span>
-                    <span className="text-[10px] font-extrabold bg-emerald-500 text-slate-950 px-2 py-0.5 rounded-full">PAID MEMBER</span>
+                    <span className="text-[10px] font-extrabold bg-emerald-600 text-white px-2 py-0.5 rounded-full">PAID MEMBER</span>
                   </div>
-                  <p className="text-xs text-slate-200">
+                  <p className="text-xs text-slate-700">
                     Direct Contact Number:{' '}
-                    <strong className="text-emerald-300 font-mono text-sm tracking-wider">
+                    <strong className="text-emerald-900 font-mono text-sm tracking-wider">
                       {profile.whatsappNumber || '+263 77 123 4567'}
                     </strong>
                   </p>
@@ -211,35 +211,35 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                     href={`https://wa.me/${(profile.whatsappNumber || '263771234567').replace(/[^0-9]/g, '')}?text=Hi%20${encodeURIComponent(profile.name.split(' ')[0])},%20I%20found%20your%20profile%20on%20Dating%20With%20Bouncer!`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
+                    className="mt-1 w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-md transition-transform active:scale-95"
                   >
                     <MessageCircle className="w-4 h-4" />
                     Click to Chat on WhatsApp with {profile.name.split(' ')[0]}
                   </a>
                 </div>
               ) : (
-                <div className="p-4 bg-slate-950 border border-amber-500/30 rounded-2xl mb-6 flex flex-col gap-2">
+                <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl mb-6 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Lock className="w-4 h-4 text-amber-400" /> Direct WhatsApp Number
+                    <span className="text-xs font-extrabold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-emerald-700" /> Direct WhatsApp Number
                     </span>
-                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">🔒 Unlocks After Payment</span>
+                    <span className="text-[10px] bg-emerald-200 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">🔒 Unlocks After Payment</span>
                   </div>
-                  <div className="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-xl border border-slate-800 my-1">
-                    <span className="text-xs text-slate-400 font-mono">
+                  <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-emerald-200 my-1">
+                    <span className="text-xs text-slate-600 font-mono">
                       {profile.whatsappNumber ? `${profile.whatsappNumber.slice(0, 7)} *** ****` : '+263 77 *** ****'}
                     </span>
-                    <span className="text-[11px] text-amber-400 font-bold">Hidden</span>
+                    <span className="text-[11px] text-emerald-800 font-bold">Hidden</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Pay <strong className="text-white">$6 for 3-4 Singles</strong> or <strong className="text-amber-400">$10 for 15 Singles</strong> to unlock direct WhatsApp chat & contact numbers!
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Pay <strong className="text-slate-900">$6 for 1 to 3 Singles</strong> or <strong className="text-emerald-800">$10 for 4 to 10 Singles</strong> to unlock direct WhatsApp chat & contact numbers!
                   </p>
                   <button
                     onClick={() => onAddToCart(profile)}
-                    className="mt-1 w-full py-2.5 bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
+                    className="mt-1 w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-md transition-transform active:scale-95"
                   >
-                    <ShoppingBag className="w-4 h-4" />
-                    {isInCart ? 'In Cart - Click Checkout' : `Add ${profile.name.split(' ')[0]} to Cart to Unlock WhatsApp`}
+                    <UserCheck className="w-4 h-4" />
+                    {isInCart ? 'Single Chosen - In Your List' : `Choose ${profile.name.split(' ')[0]} to Unlock WhatsApp`}
                   </button>
                 </div>
               )}
@@ -380,18 +380,18 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
               </div>
             </div>
 
-            {/* Bottom Add To Cart CTA */}
-            <div className="pt-4 border-t border-slate-800">
+            {/* Bottom Choose Single CTA */}
+            <div className="pt-4 border-t border-slate-200">
               <button
                 onClick={() => onAddToCart(profile)}
-                className={`w-full py-3.5 px-6 rounded-2xl font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-xl ${
+                className={`w-full py-3.5 px-6 rounded-2xl font-extrabold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md ${
                   isInCart
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                    : 'bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 hover:from-amber-400 hover:to-rose-400 text-white shadow-rose-950/50'
+                    ? 'bg-emerald-700 hover:bg-emerald-800 text-white ring-2 ring-emerald-500'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30'
                 }`}
               >
-                <ShoppingBag className="w-5 h-5" />
-                {isInCart ? 'Remove from Singles Cart' : 'Add Single to Cart'}
+                <UserCheck className="w-5 h-5" />
+                {isInCart ? 'Single Chosen - In List' : 'Choose Single'}
               </button>
             </div>
           </div>
