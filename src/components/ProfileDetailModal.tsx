@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck } from 'lucide-react';
+import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck, Eye } from 'lucide-react';
 import { SingleProfile, User } from '../types';
 
 interface ProfileDetailModalProps {
@@ -39,11 +39,24 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
   const [newComment, setNewComment] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
+  const [currentViewsCount, setCurrentViewsCount] = useState<number>(profile?.viewsCount || 0);
+
   React.useEffect(() => {
     if (profile) {
       setLocalReviews(profile.reviews || []);
+      setCurrentViewsCount(profile.viewsCount || 0);
+
+      // Increment view count on backend
+      fetch(`/api/profiles/${profile.id}/view`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.viewsCount) {
+            setCurrentViewsCount(data.viewsCount);
+          }
+        })
+        .catch(() => {});
     }
-  }, [profile]);
+  }, [profile?.id]);
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,6 +131,10 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                 <div className="bg-slate-950/80 backdrop-blur-md border border-amber-500/40 text-amber-300 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-amber-400" />
                   Bouncer Verified
+                </div>
+                <div className="bg-slate-950/80 backdrop-blur-md border border-slate-700/60 text-slate-200 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 shadow-md">
+                  <Eye className="w-4 h-4 text-amber-400" />
+                  <span>{currentViewsCount} Profile Views</span>
                 </div>
               </div>
             </div>

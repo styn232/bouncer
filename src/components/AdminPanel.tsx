@@ -59,6 +59,92 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newPhoto, setNewPhoto] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
   const [newBouncerStatus, setNewBouncerStatus] = useState<BouncerStatus>('verified');
 
+  // Edit Profile Modal state
+  const [editingProfile, setEditingProfile] = useState<SingleProfile | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAge, setEditAge] = useState(25);
+  const [editCity, setEditCity] = useState('Harare');
+  const [editSubLocation, setEditSubLocation] = useState('Borrowdale');
+  const [editGender, setEditGender] = useState<'female' | 'male'>('female');
+  const [editChildrenCount, setEditChildrenCount] = useState(0);
+  const [editIntent, setEditIntent] = useState<DatingIntent>('Marriage');
+  const [editOccupation, setEditOccupation] = useState('Professional');
+  const [editWhatsapp, setEditWhatsapp] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editPhoto, setEditPhoto] = useState('');
+  const [editBouncerStatus, setEditBouncerStatus] = useState<BouncerStatus>('verified');
+  const [editBouncerNotes, setEditBouncerNotes] = useState('');
+  const [editHeight, setEditHeight] = useState("5'7\"");
+  const [editRelationshipGoal, setEditRelationshipGoal] = useState('Marriage / Long-term');
+
+  const handleOpenEditModal = (p: SingleProfile) => {
+    setEditingProfile(p);
+    setEditName(p.name);
+    setEditAge(p.age);
+    setEditCity(p.city || 'Harare');
+    setEditSubLocation(p.subLocation || 'Borrowdale');
+    setEditGender(p.gender || 'female');
+    setEditChildrenCount(p.childrenCount ?? 0);
+    setEditIntent(p.intent || 'Marriage');
+    setEditOccupation(p.occupation || 'Professional');
+    setEditWhatsapp(p.whatsappNumber || '+263 77 123 4567');
+    setEditBio(p.bio || '');
+    setEditPhoto(p.photos[0] || '');
+    setEditBouncerStatus(p.bouncerStatus);
+    setEditBouncerNotes(p.bouncerNotes || '');
+    setEditHeight(p.height || "5'7\"");
+    setEditRelationshipGoal(p.relationshipGoal || 'Marriage / Long-term');
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const compressed = await compressImageFile(file, 1000, 0.82);
+        setEditPhoto(compressed);
+      } catch {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (typeof reader.result === 'string') {
+            setEditPhoto(reader.result);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProfile || !editName) return;
+
+    const fullLocation = `${editCity} (${editSubLocation}), Zimbabwe`;
+
+    onEditProfile(editingProfile.id, {
+      name: editName,
+      age: Number(editAge),
+      city: editCity,
+      subLocation: editSubLocation,
+      location: fullLocation,
+      childrenCount: Number(editChildrenCount),
+      intent: editIntent,
+      whatsappNumber: editWhatsapp,
+      gender: editGender,
+      occupation: editOccupation,
+      bio: editBio,
+      photos: editPhoto ? [editPhoto, ...editingProfile.photos.slice(1)] : editingProfile.photos,
+      bouncerStatus: editBouncerStatus,
+      bouncerNotes: editBouncerNotes,
+      height: editHeight,
+      relationshipGoal: editRelationshipGoal
+    });
+
+    setIsEditModalOpen(false);
+    setEditingProfile(null);
+  };
+
   // Search state for registered users in admin panel
   const [adminUserSearch, setAdminUserSearch] = useState('');
 
@@ -338,6 +424,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <th className="p-3">Profile</th>
                   <th className="p-3">Name, Age & Location</th>
                   <th className="p-3">Occupation</th>
+                  <th className="p-3">Views</th>
                   <th className="p-3">Bouncer Badge</th>
                   <th className="p-3 text-right">Actions</th>
                 </tr>
@@ -358,6 +445,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <div className="text-[11px] text-slate-400 font-normal">📍 {p.location}</div>
                     </td>
                     <td className="p-3">{p.occupation}</td>
+                    <td className="p-3 font-semibold text-amber-300">
+                      👁️ {p.viewsCount || 0}
+                    </td>
                     <td className="p-3">
                       {p.bouncerStatus === 'vip_approved' ? (
                         <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 rounded-full font-bold text-[10px]">
@@ -373,7 +463,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </span>
                       )}
                     </td>
-                    <td className="p-3 text-right space-x-2">
+                    <td className="p-3 text-right space-x-1">
+                      <button
+                        onClick={() => handleOpenEditModal(p)}
+                        className="p-2 text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
+                        title="Edit Profile Fields & Photo"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => onDeleteProfile(p.id)}
                         className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
@@ -1049,6 +1146,274 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black uppercase"
                 >
                   Create Single Profile
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: EDIT EXISTING SINGLE PROFILE */}
+      {isEditModalOpen && editingProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
+              <div className="flex items-center gap-3">
+                <img
+                  src={editPhoto || editingProfile.photos[0]}
+                  alt="Profile"
+                  referrerPolicy="no-referrer"
+                  className="w-12 h-12 rounded-xl object-cover ring-2 ring-amber-500/50"
+                />
+                <div>
+                  <h3 className="text-xl font-extrabold text-white font-serif">Edit Single Profile</h3>
+                  <p className="text-xs text-slate-400">Update fields, upload photo, and manage Bouncer status.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+              
+              {/* Profile Photo Upload */}
+              <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2">
+                <label className="block text-amber-400 font-bold uppercase tracking-wider text-[11px]">
+                  📸 Profile Photo (Upload File from Device)
+                </label>
+                <div className="flex items-center gap-4">
+                  <img
+                    src={editPhoto || editingProfile.photos[0]}
+                    alt="Preview"
+                    referrerPolicy="no-referrer"
+                    className="w-16 h-16 rounded-2xl object-cover shrink-0 ring-2 ring-amber-500/60 shadow-md"
+                  />
+                  <div className="flex-1 space-y-1.5">
+                    <label
+                      htmlFor="admin-edit-photo-upload"
+                      className="cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition-colors w-full shadow-md"
+                    >
+                      <Upload className="w-4 h-4 text-slate-950" /> Upload New Photo File
+                    </label>
+                    <input
+                      id="admin-edit-photo-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleEditImageUpload}
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      Select photo file from gallery or computer (JPG, PNG, WEBP).
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Age</label>
+                  <input
+                    type="number"
+                    value={editAge}
+                    onChange={e => setEditAge(Number(e.target.value))}
+                    required
+                    min={18}
+                    max={99}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">WhatsApp Number</label>
+                  <input
+                    type="text"
+                    value={editWhatsapp}
+                    onChange={e => setEditWhatsapp(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Occupation</label>
+                  <input
+                    type="text"
+                    value={editOccupation}
+                    onChange={e => setEditOccupation(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Gender</label>
+                  <select
+                    value={editGender}
+                    onChange={e => setEditGender(e.target.value as 'female' | 'male')}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  >
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">👶 Children Count</label>
+                  <select
+                    value={editChildrenCount}
+                    onChange={e => setEditChildrenCount(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  >
+                    <option value={0}>0 (No children)</option>
+                    <option value={1}>1 Child</option>
+                    <option value={2}>2 Children</option>
+                    <option value={3}>3+ Children</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">📍 Zimbabwe City</label>
+                  <select
+                    value={editCity}
+                    onChange={e => {
+                      const nextCity = e.target.value;
+                      setEditCity(nextCity);
+                      const nextData = ZIMBABWE_LOCATIONS.find((l) => l.city === nextCity);
+                      if (nextData && nextData.subLocations.length > 0) {
+                        setEditSubLocation(nextData.subLocations[0]);
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  >
+                    {ZIMBABWE_LOCATIONS.map((loc) => (
+                      <option key={loc.city} value={loc.city}>
+                        {loc.city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">🏘️ Sub-location</label>
+                  <select
+                    value={editSubLocation}
+                    onChange={e => setEditSubLocation(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  >
+                    {(ZIMBABWE_LOCATIONS.find(l => l.city.toLowerCase() === editCity.toLowerCase())?.subLocations || ['CBD']).map((sub) => (
+                      <option key={sub} value={sub}>
+                        {sub}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">💍 Dating Intent</label>
+                  <select
+                    value={editIntent}
+                    onChange={e => setEditIntent(e.target.value as DatingIntent)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-bold"
+                  >
+                    <option value="Marriage">💍 Seeking Marriage</option>
+                    <option value="Funny">😂 Funny & Good Vibe</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">🛡️ Bouncer Status</label>
+                  <select
+                    value={editBouncerStatus}
+                    onChange={e => setEditBouncerStatus(e.target.value as BouncerStatus)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-bold"
+                  >
+                    <option value="verified">✅ Verified</option>
+                    <option value="vip_approved">✨ VIP Approved</option>
+                    <option value="pending_check">⏳ Pending Review</option>
+                    <option value="bounced">❌ Bounced / Banned</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Height</label>
+                  <input
+                    type="text"
+                    value={editHeight}
+                    onChange={e => setEditHeight(e.target.value)}
+                    placeholder="e.g. 5'8&quot;"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Relationship Goal</label>
+                  <input
+                    type="text"
+                    value={editRelationshipGoal}
+                    onChange={e => setEditRelationshipGoal(e.target.value)}
+                    placeholder="e.g. Long-term relationship"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-bold mb-1">Bio</label>
+                <textarea
+                  rows={2}
+                  value={editBio}
+                  onChange={e => setEditBio(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-bold mb-1">Bouncer Notes</label>
+                <input
+                  type="text"
+                  value={editBouncerNotes}
+                  onChange={e => setEditBouncerNotes(e.target.value)}
+                  placeholder="Verification notes or clearance remarks..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-300"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black uppercase"
+                >
+                  Save Profile Changes
                 </button>
               </div>
             </form>

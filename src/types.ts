@@ -35,6 +35,7 @@ export interface SingleProfile {
   relationshipGoal: string; // e.g. "Marriage", "VIP Lounge dates", etc.
   isFeatured?: boolean;
   isNew?: boolean;
+  viewsCount?: number;
   createdAt: string;
 }
 

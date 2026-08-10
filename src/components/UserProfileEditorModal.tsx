@@ -35,6 +35,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   const [seeking, setSeeking] = useState(currentUser.seeking || 'male');
   const [avatar, setAvatar] = useState(currentUser.avatar || '');
   const [interestsText, setInterestsText] = useState((currentUser.interests || []).join(', '));
+  const [bouncerVerified, setBouncerVerified] = useState(currentUser.bouncerVerified || false);
 
   const [isSaved, setIsSaved] = useState(false);
 
@@ -78,7 +79,8 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
       gender: gender as any,
       seeking: seeking as any,
       avatar,
-      interests
+      interests,
+      bouncerVerified
     });
     setIsSaved(true);
     setTimeout(() => {
@@ -137,25 +139,35 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-xs font-bold text-white">
-                  Bouncer Verification Status
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>Bouncer Verification Badge</span>
+                  {bouncerVerified && (
+                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase">
+                      Gold Badge Active
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px] text-slate-400">
-                  {currentUser.bouncerVerified
-                    ? '✅ Your profile is Bouncer Verified! Gold Badge active.'
-                    : '⏳ Unverified single. Request Bouncer clearance for Gold Badge status.'}
+                  {bouncerVerified
+                    ? '✅ Your profile is Bouncer Verified! Gold Badge is active.'
+                    : '⏳ Unverified single. Toggle on or apply for Bouncer Gold Badge clearance.'}
                 </div>
               </div>
             </div>
 
-            {!currentUser.bouncerVerified && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={onApplyBouncerBadge}
-                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shrink-0 transition-colors"
+                type="button"
+                onClick={() => setBouncerVerified(!bouncerVerified)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold shrink-0 transition-all border ${
+                  bouncerVerified
+                    ? 'bg-emerald-600 border-emerald-500 text-white'
+                    : 'bg-amber-500 hover:bg-amber-400 border-amber-400 text-slate-950'
+                }`}
               >
-                Apply for Badge
+                {bouncerVerified ? '✅ Verified Badge Active' : '⚡ Enable Verified Badge'}
               </button>
-            )}
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">

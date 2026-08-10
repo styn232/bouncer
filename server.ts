@@ -19,9 +19,12 @@ async function startServer() {
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // In-memory persistent database states
-  let profiles: SingleProfile[] = [...INITIAL_PROFILES];
+  let profiles: SingleProfile[] = INITIAL_PROFILES.map((p, i) => ({
+    ...p,
+    viewsCount: p.viewsCount || Math.floor((i + 1) * 27 + 14)
+  }));
   let users: User[] = [MOCK_ADMIN_USER, MOCK_DEMO_USER];
-  let currentUser: User = MOCK_DEMO_USER;
+  let currentUser: User | null = MOCK_DEMO_USER;
   let transactions: PaymentTransaction[] = [...MOCK_TRANSACTIONS];
   let matchOrders: MatchOrder[] = [...MOCK_MATCH_ORDERS];
 
@@ -98,6 +101,11 @@ async function startServer() {
     });
   });
 
+  app.post('/api/auth/logout', (_req, res) => {
+    currentUser = null;
+    res.json({ success: true, message: 'Logged out successfully' });
+  });
+
   app.post('/api/auth/register', (req, res) => {
     const { email, name, age, city, subLocation, location, gender, childrenCount, intent, bio, whatsappNumber } = req.body;
     if (!email || !name) {
@@ -162,7 +170,7 @@ async function startServer() {
   });
 
   app.put('/api/auth/profile', (req, res) => {
-    const { name, email, whatsappNumber, age, city, subLocation, childrenCount, intent, location, bio, occupation, gender, seeking, interests, avatar } = req.body;
+    const { name, email, whatsappNumber, age, city, subLocation, childrenCount, intent, location, bio, occupation, gender, seeking, interests, avatar, bouncerVerified } = req.body;
     if (!currentUser) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
@@ -185,7 +193,8 @@ async function startServer() {
       ...(gender && { gender }),
       ...(seeking && { seeking }),
       ...(interests && { interests }),
-      ...(avatar && { avatar })
+      ...(avatar && { avatar }),
+      ...(bouncerVerified !== undefined && { bouncerVerified: Boolean(bouncerVerified) })
     };
 
     // Update in users array
@@ -212,7 +221,8 @@ async function startServer() {
         gender: currentUser.gender || profiles[pIdx].gender,
         seeking: currentUser.seeking || profiles[pIdx].seeking,
         interests: currentUser.interests || profiles[pIdx].interests,
-        photos: avatar ? [avatar, ...profiles[pIdx].photos.slice(1)] : profiles[pIdx].photos
+        photos: avatar ? [avatar, ...profiles[pIdx].photos.slice(1)] : profiles[pIdx].photos,
+        bouncerStatus: currentUser.bouncerVerified ? 'verified' : profiles[pIdx].bouncerStatus
       };
     } else {
       const newProf: SingleProfile = {
@@ -373,11 +383,21 @@ async function startServer() {
       height: height || "5'8\"",
       relationshipGoal: relationshipGoal || 'Long-term relationship',
       isNew: true,
+      viewsCount: 1,
       createdAt: new Date().toISOString()
     };
 
     profiles.unshift(newProfile);
     res.json({ success: true, profile: newProfile });
+  });
+
+  app.post('/api/profiles/:id/view', (req, res) => {
+    const idx = profiles.findIndex(p => p.id === req.params.id);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+    profiles[idx].viewsCount = (profiles[idx].viewsCount || 0) + 1;
+    res.json({ success: true, viewsCount: profiles[idx].viewsCount });
   });
 
   app.put('/api/profiles/:id', (req, res) => {

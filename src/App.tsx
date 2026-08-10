@@ -287,6 +287,34 @@ export default function App() {
   };
 
   // Admin Actions
+  const handleAdminEditProfile = async (id: string, updatedData: Partial<SingleProfile>) => {
+    try {
+      const res = await fetch(`/api/profiles/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData)
+      });
+      if (res.ok) {
+        addToast('Profile Updated ✍️', 'Single profile details and photo successfully saved!', 'success');
+        fetchProfiles();
+        fetchInitialData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setCurrentUser(null);
+      setActiveTab('browse');
+      addToast('Logged Out', 'You have been logged out successfully.', 'info');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
+
   const handleAdminAddProfile = async (newProfData: Partial<SingleProfile>) => {
     try {
       const res = await fetch('/api/profiles', {
@@ -413,6 +441,8 @@ export default function App() {
         cartCount={cartItems.length}
         currentUser={currentUser}
         siteSettings={siteSettings}
+        isLoggedIn={!!currentUser}
+        onLogout={handleLogout}
         onOpenAuth={() => {
           setAuthModalInitialMode('user');
           setIsAuthModalOpen(true);
@@ -734,7 +764,7 @@ export default function App() {
             matchOrders={matchOrders}
             siteSettings={siteSettings}
             onAddProfile={handleAdminAddProfile}
-            onEditProfile={(id, data) => fetchProfiles()}
+            onEditProfile={handleAdminEditProfile}
             onDeleteProfile={handleAdminDeleteProfile}
             onUpdateBouncerStatus={handleAdminUpdateBouncerStatus}
             onUpdateSiteSettings={handleUpdateSiteSettings}
