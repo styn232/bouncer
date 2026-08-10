@@ -303,6 +303,7 @@ export default function App() {
           `📢 ${profName} from ${profCity} (${newProfData.age || 25} yrs) just joined Dating With Bouncer!`,
           'bouncer'
         );
+        handleResetFilters();
         fetchProfiles();
         fetchInitialData();
       }
@@ -380,21 +381,19 @@ export default function App() {
     setSelectedBouncerStatus('all');
   };
 
-  // Gender-based matching rule + Star Ranking sort rule
+  // Filter and Sort Profiles (Newly added profiles prioritized at top)
   const displayedProfiles = profiles
     .filter((p) => {
       if (selectedGender !== 'all') {
         return p.gender === selectedGender;
       }
-      if (currentUser.gender === 'female') {
-        return p.gender === 'male';
-      }
-      if (currentUser.gender === 'male') {
-        return p.gender === 'female';
-      }
+      // Show all profiles when selectedGender is 'all'
       return true;
     })
     .sort((a, b) => {
+      // Always feature newly added profiles first so users instantly see their additions!
+      if (a.isNew && !b.isNew) return -1;
+      if (!a.isNew && b.isNew) return 1;
       if (sortByStars) {
         return (b.averageRating || 0) - (a.averageRating || 0);
       }

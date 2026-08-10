@@ -48,7 +48,8 @@ export const INITIAL_PROFILES: SingleProfile[] = [
     height: "5'7\"",
     relationshipGoal: 'Marriage & Family',
     isFeatured: true,
-    createdAt: '2026-08-01T10:00:00Z'
+    isNew: true,
+    createdAt: '2026-08-08T10:00:00Z'
   },
   {
     id: 'p2',

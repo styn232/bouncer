@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, X, User as UserIcon, Lock, Mail, Sparkles, Check, Baby, MapPin } from 'lucide-react';
+import { ShieldCheck, X, User as UserIcon, Lock, Mail, Sparkles, Check, Baby, MapPin, Upload } from 'lucide-react';
 import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 import { DatingIntent } from '../types';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [subLocation, setSubLocation] = useState('Borrowdale');
   const [intent, setIntent] = useState<DatingIntent>('Marriage');
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [avatar, setAvatar] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
 
   // Admin form state
   const [adminKey, setAdminKey] = useState('');
@@ -123,7 +125,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             subLocation,
             location: fullLocation,
             intent,
-            whatsappNumber
+            whatsappNumber,
+            avatar
           })
         });
 
@@ -393,6 +396,49 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {/* USER REGISTER FIELDS */}
             {mode === 'user_register' && (
               <>
+                {/* Profile Photo File Upload */}
+                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2">
+                  <label className="block font-bold text-amber-400 uppercase tracking-wider text-[10px]">
+                    📸 Upload Profile Photo (File Upload from Device)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={avatar}
+                      alt="Preview"
+                      referrerPolicy="no-referrer"
+                      className="w-12 h-12 rounded-xl object-cover ring-2 ring-amber-500/50 shrink-0"
+                    />
+                    <div className="flex-1">
+                      <label className="cursor-pointer inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors w-full shadow-md">
+                        <Upload className="w-3.5 h-3.5 text-slate-950" />
+                        Choose Photo File
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                const compressed = await compressImageFile(file, 1000, 0.82);
+                                setAvatar(compressed);
+                              } catch {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  if (typeof reader.result === 'string') {
+                                    setAvatar(reader.result);
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">

@@ -15,7 +15,8 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // In-memory persistent database states
   let profiles: SingleProfile[] = [...INITIAL_PROFILES];
@@ -152,6 +153,7 @@ async function startServer() {
       relationshipGoal: 'Marriage / Long-term',
       reviews: [],
       averageRating: 5.0,
+      isNew: true,
       createdAt: new Date().toISOString()
     };
 
@@ -370,6 +372,7 @@ async function startServer() {
       compatibilityScore: Math.floor(Math.random() * 10) + 90,
       height: height || "5'8\"",
       relationshipGoal: relationshipGoal || 'Long-term relationship',
+      isNew: true,
       createdAt: new Date().toISOString()
     };
 

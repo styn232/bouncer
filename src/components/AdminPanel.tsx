@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image, Upload, Settings, Phone, UserPlus } from 'lucide-react';
 import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings, DatingIntent } from '../types';
 import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface AdminPanelProps {
   profiles: SingleProfile[];
@@ -712,7 +713,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     Header Logo Image
                   </label>
                   <p className="text-[11px] text-slate-400">
-                    Upload an image file or paste an image URL to display as the primary header logo.
+                    Upload an image file from your device to display as the primary header logo.
                   </p>
                 </div>
                 {logoUrl && (
@@ -726,36 +727,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 items-center">
-                <label className="cursor-pointer px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-2 border border-slate-700 shrink-0">
-                  <Upload className="w-4 h-4 text-amber-400" />
-                  Upload Logo File
+              <div>
+                <label className="cursor-pointer px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-md shrink-0 w-full sm:w-auto">
+                  <Upload className="w-4 h-4 text-slate-950" />
+                  Upload Logo File from Device
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setLogoUrl(reader.result as string);
-                        };
-                        reader.readAsDataURL(file);
+                        try {
+                          const compressed = await compressImageFile(file, 800, 0.85);
+                          setLogoUrl(compressed);
+                        } catch {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setLogoUrl(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
                       }
                     }}
                   />
                 </label>
-
-                <div className="text-slate-500 text-[11px] font-bold uppercase">or</div>
-
-                <input
-                  type="text"
-                  value={logoUrl}
-                  onChange={e => setLogoUrl(e.target.value)}
-                  placeholder="Paste Logo Image URL (https://...)"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-mono text-[11px] focus:outline-none focus:border-amber-500"
-                />
               </div>
 
               {/* Logo Preview */}
@@ -769,7 +765,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               )}
             </div>
 
-            {/* Site Icon Upload / URL */}
+            {/* Site Icon Upload */}
             <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -777,7 +773,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     Site Icon / Favicon
                   </label>
                   <p className="text-[11px] text-slate-400">
-                    Upload an icon file or paste an image URL to replace the Bouncer shield icon.
+                    Upload an icon file from your device to replace the Bouncer shield icon.
                   </p>
                 </div>
                 {iconUrl && (
@@ -791,36 +787,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 items-center">
-                <label className="cursor-pointer px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-2 border border-slate-700 shrink-0">
-                  <Upload className="w-4 h-4 text-amber-400" />
-                  Upload Icon File
+              <div>
+                <label className="cursor-pointer px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-md shrink-0 w-full sm:w-auto">
+                  <Upload className="w-4 h-4 text-slate-950" />
+                  Upload Icon File from Device
                   <input
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setIconUrl(reader.result as string);
-                        };
-                        reader.readAsDataURL(file);
+                        try {
+                          const compressed = await compressImageFile(file, 400, 0.85);
+                          setIconUrl(compressed);
+                        } catch {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setIconUrl(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
                       }
                     }}
                   />
                 </label>
-
-                <div className="text-slate-500 text-[11px] font-bold uppercase">or</div>
-
-                <input
-                  type="text"
-                  value={iconUrl}
-                  onChange={e => setIconUrl(e.target.value)}
-                  placeholder="Paste Icon Image URL (https://...)"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-mono text-[11px] focus:outline-none focus:border-amber-500"
-                />
               </div>
 
               {/* Icon Preview */}
@@ -989,46 +980,47 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-400 font-bold mb-1">📸 Photo Image (Upload File or Enter URL)</label>
-                <div className="flex items-center gap-3 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                <label className="block text-slate-400 font-bold mb-1">📸 Profile Photo (Upload File from Device)</label>
+                <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
                   <img
                     src={newPhoto}
                     alt="Preview"
                     referrerPolicy="no-referrer"
-                    className="w-12 h-12 rounded-xl object-cover shrink-0 ring-1 ring-amber-500/40"
+                    className="w-14 h-14 rounded-xl object-cover shrink-0 ring-2 ring-amber-500/40"
                   />
                   <div className="flex-1 space-y-1">
                     <label
                       htmlFor="admin-photo-upload"
-                      className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-[11px] border border-slate-700 transition-colors"
+                      className="cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors w-full shadow-md"
                     >
-                      <Upload className="w-3.5 h-3.5 text-amber-400" /> Choose File from Device
+                      <Upload className="w-4 h-4 text-slate-950" /> Upload Photo File (Device / Gallery)
                     </label>
                     <input
                       id="admin-photo-upload"
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            if (typeof reader.result === 'string') {
-                              setNewPhoto(reader.result);
-                            }
-                          };
-                          reader.readAsDataURL(file);
+                          try {
+                            const compressed = await compressImageFile(file, 1000, 0.82);
+                            setNewPhoto(compressed);
+                          } catch {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              if (typeof reader.result === 'string') {
+                                setNewPhoto(reader.result);
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          }
                         }
                       }}
                     />
-                    <input
-                      type="text"
-                      value={newPhoto}
-                      onChange={e => setNewPhoto(e.target.value)}
-                      placeholder="https://images.unsplash.com/photo-..."
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-white font-mono text-[10px]"
-                    />
+                    <p className="text-[10px] text-slate-400">
+                      Select an image file from your device (JPG, PNG, WEBP). No URL needed!
+                    </p>
                   </div>
                 </div>
               </div>

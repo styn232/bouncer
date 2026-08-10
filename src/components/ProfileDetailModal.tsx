@@ -108,9 +108,17 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
               />
-              <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md border border-amber-500/40 text-amber-300 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-amber-400" />
-                Bouncer Verified
+              <div className="absolute top-3 left-3 flex flex-col gap-1 items-start">
+                {(profile.isNew || (profile.createdAt && (new Date().getTime() - new Date(profile.createdAt).getTime()) < 14 * 24 * 60 * 60 * 1000)) && (
+                  <div className="bg-gradient-to-r from-rose-600 to-pink-600 border border-rose-300 text-white text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg animate-pulse">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                    <span>🔥 NEW SINGLE</span>
+                  </div>
+                )}
+                <div className="bg-slate-950/80 backdrop-blur-md border border-amber-500/40 text-amber-300 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  Bouncer Verified
+                </div>
               </div>
             </div>
 

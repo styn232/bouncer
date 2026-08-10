@@ -51,8 +51,14 @@ export const SingleCard: React.FC<SingleCardProps> = ({
         {/* Subtle Gradient Overlay for badge visibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/30" />
 
-        {/* Bouncer Verification Status Badge */}
-        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 flex flex-col gap-1 z-10">
+        {/* Bouncer Verification & NEW Status Badges */}
+        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 flex flex-col gap-1 z-10 items-start">
+          {(profile.isNew || (profile.createdAt && (new Date().getTime() - new Date(profile.createdAt).getTime()) < 14 * 24 * 60 * 60 * 1000)) && (
+            <span className="bg-gradient-to-r from-rose-600 to-pink-600 text-white font-black text-[9px] sm:text-[10px] uppercase tracking-wider px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full shadow-lg flex items-center gap-1 border border-rose-300 ring-2 ring-rose-500/30 animate-pulse">
+              <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-300 fill-amber-300" />
+              <span>🔥 NEW SINGLE</span>
+            </span>
+          )}
           {profile.bouncerStatus === 'vip_approved' && (
             <span className="bg-emerald-600 text-white font-extrabold text-[8px] sm:text-[10px] uppercase tracking-wider px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full shadow-md flex items-center gap-1 border border-emerald-300">
               <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-300 fill-amber-300" />

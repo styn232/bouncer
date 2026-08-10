@@ -34,6 +34,7 @@ export interface SingleProfile {
   height: string;
   relationshipGoal: string; // e.g. "Marriage", "VIP Lounge dates", etc.
   isFeatured?: boolean;
+  isNew?: boolean;
   createdAt: string;
 }
 
