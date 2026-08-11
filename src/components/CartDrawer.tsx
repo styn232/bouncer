@@ -10,7 +10,7 @@ interface CartDrawerProps {
   onRemoveFromCart: (profileId: string) => void;
   onUpdateCartItem: (profileId: string, dateType: DateType, icebreakerMessage: string, preferredTime: string) => void;
   onCheckout: () => void;
-  currentUser: User;
+  currentUser?: User | null;
   onOpenPayment: () => void;
 }
 
@@ -47,7 +47,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   // Format exact user WhatsApp checkout message:
   // "Hi Auntie I need these Singles: Name 1, Name 2. My name is [User Name]"
   const chosenSinglesNames = cartItems.map(i => `${i.profile.name} (${i.profile.age}, ${i.profile.city || i.profile.location})`).join(', ');
-  const whatsappTextMessage = `Hi Auntie I need these Singles: ${chosenSinglesNames || 'Selected Singles'}. My name is ${currentUser.name || 'a Member'}.`;
+  const whatsappTextMessage = `Hi Auntie I need these Singles: ${chosenSinglesNames || 'Selected Singles'}. My name is ${currentUser?.name || 'a Member'}.`;
   const whatsappDirectUrl = `https://wa.me/263715786859?text=${encodeURIComponent(whatsappTextMessage)}`;
 
   const handleCheckoutSubmit = async () => {
@@ -331,7 +331,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     Send Chosen Singles List to Auntie on WhatsApp
                   </div>
                   <p className="text-xs text-slate-600 mt-1">
-                    Your chosen list will be formatted as: <span className="font-semibold text-slate-800 italic">"Hi Auntie I need these Singles: {chosenSinglesNames}. My name is {currentUser.name}."</span>
+                    Your chosen list will be formatted as: <span className="font-semibold text-slate-800 italic">"Hi Auntie I need these Singles: {chosenSinglesNames}. My name is {currentUser?.name || 'a Member'}."</span>
                   </p>
                 </div>
 

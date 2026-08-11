@@ -8,7 +8,7 @@ import { compressImageFile } from '../utils/imageCompressor';
 interface UserProfileEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: User;
+  currentUser?: User | null;
   onSaveProfile: (updatedData: Partial<User>) => void;
   onApplyBouncerBadge: () => void;
 }
@@ -20,22 +20,24 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   onSaveProfile,
   onApplyBouncerBadge
 }) => {
-  if (!isOpen) return null;
+  if (!isOpen || !currentUser) return null;
 
-  const [name, setName] = useState(currentUser.name || '');
-  const [email, setEmail] = useState(currentUser.email || '');
-  const [age, setAge] = useState(currentUser.age || 25);
-  const [city, setCity] = useState(currentUser.city || 'Harare');
-  const [subLocation, setSubLocation] = useState(currentUser.subLocation || 'Borrowdale');
-  const [childrenCount, setChildrenCount] = useState<number>(currentUser.childrenCount ?? 0);
-  const [intent, setIntent] = useState<DatingIntent>(currentUser.intent || 'Marriage');
-  const [bio, setBio] = useState(currentUser.bio || '');
-  const [whatsappNumber, setWhatsappNumber] = useState(currentUser.whatsappNumber || '+263 77 123 4567');
-  const [gender, setGender] = useState(currentUser.gender || 'female');
-  const [seeking, setSeeking] = useState(currentUser.seeking || 'male');
-  const [avatar, setAvatar] = useState(currentUser.avatar || '');
-  const [interestsText, setInterestsText] = useState((currentUser.interests || []).join(', '));
-  const [bouncerVerified, setBouncerVerified] = useState(currentUser.bouncerVerified || false);
+  const [name, setName] = useState(currentUser?.name || '');
+  const [email, setEmail] = useState(currentUser?.email || '');
+  const [age, setAge] = useState(currentUser?.age || 25);
+  const [city, setCity] = useState(currentUser?.city || 'Harare');
+  const [subLocation, setSubLocation] = useState(currentUser?.subLocation || 'Borrowdale');
+  const [childrenCount, setChildrenCount] = useState<number>(currentUser?.childrenCount ?? 0);
+  const [intent, setIntent] = useState<DatingIntent>(currentUser?.intent || 'Marriage');
+  const [bio, setBio] = useState(currentUser?.bio || '');
+  const [whatsappNumber, setWhatsappNumber] = useState(currentUser?.whatsappNumber || '+263 77 123 4567');
+  const [gender, setGender] = useState(currentUser?.gender || 'female');
+  const [seeking, setSeeking] = useState(currentUser?.seeking || 'male');
+  const [photo1, setPhoto1] = useState(currentUser?.avatar || '');
+  const [photo2, setPhoto2] = useState('');
+  const [photo3, setPhoto3] = useState('');
+  const [interestsText, setInterestsText] = useState((currentUser?.interests || []).join(', '));
+  const [bouncerVerified, setBouncerVerified] = useState(currentUser?.bouncerVerified || false);
 
   const [isSaved, setIsSaved] = useState(false);
 
@@ -43,21 +45,22 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   const activeCityData = ZIMBABWE_LOCATIONS.find(l => l.city.toLowerCase() === city.toLowerCase());
   const availableSubLocations = activeCityData ? activeCityData.subLocations : ['CBD'];
 
-  const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const compressed = await compressImageFile(file, 1000, 0.82);
-        setAvatar(compressed);
-      } catch {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          if (typeof reader.result === 'string') {
-            setAvatar(reader.result);
-          }
-        };
-        reader.readAsDataURL(file);
-      }
+  const handlePhotoUpload = async (index: 1 | 2 | 3, file: File) => {
+    try {
+      const compressed = await compressImageFile(file, 1000, 0.82);
+      if (index === 1) setPhoto1(compressed);
+      if (index === 2) setPhoto2(compressed);
+      if (index === 3) setPhoto3(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          if (index === 1) setPhoto1(reader.result);
+          if (index === 2) setPhoto2(reader.result);
+          if (index === 3) setPhoto3(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -78,7 +81,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
       whatsappNumber,
       gender: gender as any,
       seeking: seeking as any,
-      avatar,
+      avatar: photo1,
       interests,
       bouncerVerified
     });
@@ -117,7 +120,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
 
           <div className="flex items-center gap-3 mb-6">
             <img
-              src={avatar || currentUser.avatar}
+              src={photo1 || currentUser.avatar}
               alt={name}
               referrerPolicy="no-referrer"
               className="w-16 h-16 rounded-2xl object-cover ring-2 ring-amber-500/40"
@@ -172,38 +175,114 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             
-            {/* Upload Picture from Files */}
+            {/* Upload Up to 3 Photos */}
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
               <label className="block font-bold text-amber-400 uppercase tracking-wider text-[11px]">
-                📸 Upload Profile Picture from Device
+                📸 Upload Your Profile Photos (Up to 3 Photos)
               </label>
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <img
-                  src={avatar || currentUser.avatar}
-                  alt="Profile Avatar Preview"
-                  referrerPolicy="no-referrer"
-                  className="w-20 h-20 rounded-2xl object-cover ring-2 ring-amber-500/50 shadow-md shrink-0"
-                />
-                <div className="flex-1 w-full space-y-2">
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Photo 1 (Main) */}
+                <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 flex flex-col items-center gap-2">
+                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden ring-2 ring-amber-500/50 shadow-md">
+                    <img
+                      src={photo1 || currentUser.avatar}
+                      alt="Main Photo"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-1 left-1 bg-amber-500 text-slate-950 text-[8px] font-black px-1.5 py-0.5 rounded-md">
+                      Main
+                    </span>
+                  </div>
                   <label
-                    htmlFor="user-avatar-upload"
-                    className="cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition-colors w-full"
+                    htmlFor="user-photo1-upload"
+                    className="cursor-pointer inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-[10px] border border-slate-700 transition-colors w-full"
                   >
-                    <Upload className="w-4 h-4 text-amber-400" />
-                    Upload Image File (Device Gallery / Files)
+                    <Upload className="w-3 h-3 text-amber-400" />
+                    Photo 1
                   </label>
                   <input
-                    id="user-avatar-upload"
+                    id="user-photo1-upload"
                     type="file"
                     accept="image/*"
-                    onChange={handleImageFileUpload}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handlePhotoUpload(1, file);
+                    }}
                     className="hidden"
                   />
-                  <p className="text-[10px] text-slate-500">
-                    Select a photo from your computer or mobile device (JPG, PNG, WEBP).
-                  </p>
+                </div>
+
+                {/* Photo 2 */}
+                <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 flex flex-col items-center gap-2">
+                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-slate-700 bg-slate-950 flex items-center justify-center">
+                    {photo2 ? (
+                      <img
+                        src={photo2}
+                        alt="Photo 2"
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Camera className="w-6 h-6 text-slate-600" />
+                    )}
+                  </div>
+                  <label
+                    htmlFor="user-photo2-upload"
+                    className="cursor-pointer inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-[10px] border border-slate-700 transition-colors w-full"
+                  >
+                    <Upload className="w-3 h-3 text-amber-400" />
+                    Photo 2
+                  </label>
+                  <input
+                    id="user-photo2-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handlePhotoUpload(2, file);
+                    }}
+                    className="hidden"
+                  />
+                </div>
+
+                {/* Photo 3 */}
+                <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 flex flex-col items-center gap-2">
+                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-slate-700 bg-slate-950 flex items-center justify-center">
+                    {photo3 ? (
+                      <img
+                        src={photo3}
+                        alt="Photo 3"
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Camera className="w-6 h-6 text-slate-600" />
+                    )}
+                  </div>
+                  <label
+                    htmlFor="user-photo3-upload"
+                    className="cursor-pointer inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-[10px] border border-slate-700 transition-colors w-full"
+                  >
+                    <Upload className="w-3 h-3 text-amber-400" />
+                    Photo 3
+                  </label>
+                  <input
+                    id="user-photo3-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handlePhotoUpload(3, file);
+                    }}
+                    className="hidden"
+                  />
                 </div>
               </div>
+              <p className="text-[10px] text-slate-500 text-center">
+                Singles can upload up to 3 photos directly from device or gallery (JPG, PNG, WEBP).
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

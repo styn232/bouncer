@@ -7,9 +7,16 @@ import {
   MOCK_ADMIN_USER,
   MOCK_DEMO_USER,
   MOCK_TRANSACTIONS,
-  MOCK_MATCH_ORDERS
+  MOCK_MATCH_ORDERS,
+  INITIAL_REELS,
+  INITIAL_STORIES,
+  INITIAL_POSTS,
+  INITIAL_CONVERSATIONS,
+  INITIAL_NOTIFICATIONS,
+  INITIAL_ADS,
+  INITIAL_VERIFICATIONS
 } from './src/data/mockData';
-import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId } from './src/types';
+import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, VerificationSubmission, ReportItem, AdCampaign, NotificationItem, SiteSettings } from './src/types';
 
 async function startServer() {
   const app = express();
@@ -19,23 +26,98 @@ async function startServer() {
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // In-memory persistent database states
+  let siteSettings: SiteSettings = {
+    siteName: 'DATING WITH BOUNCER',
+    tagline: 'Real People. Real Connections. Real Possibilities.',
+    logoUrl: '',
+    iconUrl: ''
+  };
   let profiles: SingleProfile[] = INITIAL_PROFILES.map((p, i) => ({
     ...p,
-    viewsCount: p.viewsCount || Math.floor((i + 1) * 27 + 14)
+    viewsCount: p.viewsCount || Math.floor((i + 1) * 27 + 14),
+    isOnline: i % 2 === 0
   }));
   let users: User[] = [MOCK_ADMIN_USER, MOCK_DEMO_USER];
   let currentUser: User | null = MOCK_DEMO_USER;
   let transactions: PaymentTransaction[] = [...MOCK_TRANSACTIONS];
   let matchOrders: MatchOrder[] = [...MOCK_MATCH_ORDERS];
 
-  // API ROUTE 1: Health Check
+  let reels: ReelItem[] = [...INITIAL_REELS];
+  let stories: StoryItem[] = [...INITIAL_STORIES];
+  let posts: FeedPost[] = [...INITIAL_POSTS];
+  let conversations: Conversation[] = [...INITIAL_CONVERSATIONS];
+  let messages: DirectMessage[] = [
+    {
+      id: 'm1',
+      conversationId: 'conv_p1',
+      senderId: 'usr_demo',
+      senderName: 'Kudzai Mugo',
+      senderAvatar: MOCK_DEMO_USER.avatar,
+      text: 'Hi Chiedza! Loved your profile.',
+      read: true,
+      createdAt: '2026-08-10T10:30:00Z'
+    },
+    {
+      id: 'm2',
+      conversationId: 'conv_p1',
+      senderId: 'p1',
+      senderName: 'Chiedza Moyo',
+      senderAvatar: INITIAL_PROFILES[0].photos[0],
+      text: 'I loved reading your profile! Are you free for a coffee in Borrowdale this weekend?',
+      read: false,
+      createdAt: '2026-08-10T10:42:00Z'
+    }
+  ];
+  let notifications: NotificationItem[] = [...INITIAL_NOTIFICATIONS];
+  let ads: AdCampaign[] = [...INITIAL_ADS];
+  let verifications: VerificationSubmission[] = [...INITIAL_VERIFICATIONS];
+  let reports: ReportItem[] = [];
+  let userLikes: Record<string, string[]> = {
+    'usr_demo': ['p1'] // Kudzai liked Chiedza
+  };
+  let userMatches: Record<string, string[]> = {
+    'usr_demo': ['p1'] // Kudzai matched with Chiedza
+  };
+
+  // API ROUTE 1: Health Check & Site Settings
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), port: PORT });
+  });
+
+  app.get('/api/settings', (_req, res) => {
+    res.json(siteSettings);
+  });
+
+  app.put('/api/settings', (req, res) => {
+    const { siteName, logoUrl, iconUrl, tagline } = req.body;
+    siteSettings = {
+      ...siteSettings,
+      ...(siteName && { siteName }),
+      ...(logoUrl !== undefined && { logoUrl }),
+      ...(iconUrl !== undefined && { iconUrl }),
+      ...(tagline && { tagline })
+    };
+    res.json({ success: true, siteSettings });
   });
 
   // API ROUTE 2: Auth Endpoints
   app.get('/api/auth/me', (_req, res) => {
     res.json({ user: currentUser });
+  });
+
+  app.post('/api/auth/sync', (req, res) => {
+    const { user } = req.body;
+    if (!user || !user.id) {
+      return res.status(400).json({ error: 'No user data provided' });
+    }
+    const existing = users.find(u => u.id === user.id || (u.email && u.email.toLowerCase() === user.email.toLowerCase()));
+    if (existing) {
+      currentUser = existing;
+    } else {
+      users.push(user);
+      currentUser = user;
+    }
+    res.json({ success: true, user: currentUser });
   });
 
   // Admin Account Registration
@@ -149,7 +231,6 @@ async function startServer() {
       intent: newUser.intent,
       seeking: newUser.gender === 'male' ? 'female' : 'male',
       bio: newUser.bio || 'Recently joined single seeking genuine connections.',
-      occupation: 'Professional',
       whatsappNumber: newUser.whatsappNumber,
       photos: [newUser.avatar],
       interests: newUser.interests || ['Dating'],
@@ -166,11 +247,24 @@ async function startServer() {
     };
 
     profiles.unshift(newProfile);
+
+    // Broadcast notification to ALL users when new single registers
+    const newNotif: NotificationItem = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      userId: 'all',
+      title: '🔥 New Single Joined!',
+      message: `${newUser.name}, ${newUser.age} from ${newUser.location} just joined Dating With Bouncer! Check out their profile.`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+    notifications.unshift(newNotif);
+
     res.json({ success: true, user: currentUser, profile: newProfile });
   });
 
   app.put('/api/auth/profile', (req, res) => {
-    const { name, email, whatsappNumber, age, city, subLocation, childrenCount, intent, location, bio, occupation, gender, seeking, interests, avatar, bouncerVerified } = req.body;
+    const { name, email, whatsappNumber, age, city, subLocation, childrenCount, intent, location, bio, gender, seeking, interests, avatar, bouncerVerified } = req.body;
     if (!currentUser) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
@@ -189,7 +283,6 @@ async function startServer() {
       ...(intent && { intent }),
       location: fullLocation,
       ...(bio && { bio }),
-      ...(occupation && { occupation }),
       ...(gender && { gender }),
       ...(seeking && { seeking }),
       ...(interests && { interests }),
@@ -217,7 +310,6 @@ async function startServer() {
         intent: currentUser.intent || profiles[pIdx].intent,
         whatsappNumber: currentUser.whatsappNumber || profiles[pIdx].whatsappNumber,
         bio: currentUser.bio || profiles[pIdx].bio,
-        occupation: currentUser.occupation || profiles[pIdx].occupation,
         gender: currentUser.gender || profiles[pIdx].gender,
         seeking: currentUser.seeking || profiles[pIdx].seeking,
         interests: currentUser.interests || profiles[pIdx].interests,
@@ -235,7 +327,6 @@ async function startServer() {
         childrenCount: currentUser.childrenCount || 0,
         intent: currentUser.intent || 'Marriage',
         bio: currentUser.bio || 'Single looking for love.',
-        occupation: currentUser.occupation || 'Professional',
         photos: [currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'],
         interests: currentUser.interests || ['Coffee', 'Travel'],
         gender: currentUser.gender || 'female',
@@ -261,14 +352,17 @@ async function startServer() {
     const { search, gender, bouncerStatus, location, city, subLocation, minAge, maxAge, childrenCount, intent } = req.query;
 
     if (search) {
-      const q = (search as string).toLowerCase();
+      const q = (search as string).toLowerCase().trim();
       result = result.filter(
         p => p.name.toLowerCase().includes(q) ||
              p.location.toLowerCase().includes(q) ||
              (p.city && p.city.toLowerCase().includes(q)) ||
              (p.subLocation && p.subLocation.toLowerCase().includes(q)) ||
-             p.occupation.toLowerCase().includes(q) ||
-             p.bio.toLowerCase().includes(q)
+             p.bio.toLowerCase().includes(q) ||
+             p.intent.toLowerCase().includes(q) ||
+             (p.relationshipGoal && p.relationshipGoal.toLowerCase().includes(q)) ||
+             (p.bouncerStatus && p.bouncerStatus.toLowerCase().includes(q)) ||
+             (p.interests && p.interests.some(i => i.toLowerCase().includes(q)))
       );
     }
 
@@ -355,7 +449,7 @@ async function startServer() {
 
   // Admin / User Add Profile
   app.post('/api/profiles', (req, res) => {
-    const { name, age, location, city, subLocation, childrenCount, intent, bio, occupation, photos, interests, gender, seeking, height, relationshipGoal, bouncerStatus, bouncerNotes } = req.body;
+    const { name, age, location, city, subLocation, childrenCount, intent, bio, photos, interests, gender, seeking, height, relationshipGoal, bouncerStatus, bouncerNotes } = req.body;
     if (!name || !age || !location) {
       return res.status(400).json({ error: 'Name, Age, and Location are required.' });
     }
@@ -372,7 +466,6 @@ async function startServer() {
       reviews: [],
       averageRating: 5.0,
       bio: bio || 'Fresh profile on Dating with Bouncer.',
-      occupation: occupation || 'Creative Professional',
       photos: Array.isArray(photos) && photos.length > 0 ? photos : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'],
       interests: Array.isArray(interests) ? interests : ['Fine Dining', 'Travel', 'Art'],
       gender: gender || 'female',
@@ -388,6 +481,19 @@ async function startServer() {
     };
 
     profiles.unshift(newProfile);
+
+    // Broadcast notification to ALL users
+    const newNotif: NotificationItem = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      userId: 'all',
+      title: '🔥 New Single Joined!',
+      message: `${newProfile.name}, ${newProfile.age} from ${newProfile.location} just joined Dating With Bouncer! Check out their profile.`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+    notifications.unshift(newNotif);
+
     res.json({ success: true, profile: newProfile });
   });
 
@@ -397,7 +503,28 @@ async function startServer() {
       return res.status(404).json({ error: 'Profile not found' });
     }
     profiles[idx].viewsCount = (profiles[idx].viewsCount || 0) + 1;
-    res.json({ success: true, viewsCount: profiles[idx].viewsCount });
+
+    const viewerName = req.body?.viewerName || (currentUser ? currentUser.name : 'A single member');
+    const targetProfile = profiles[idx];
+
+    // Create notification for target profile owner
+    const newNotif: NotificationItem = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      userId: targetProfile.id,
+      title: '👀 New Profile View',
+      message: `${viewerName} has viewed your profile!`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    notifications.unshift(newNotif);
+
+    res.json({
+      success: true,
+      viewsCount: profiles[idx].viewsCount,
+      notification: newNotif
+    });
   });
 
   app.put('/api/profiles/:id', (req, res) => {
@@ -501,7 +628,7 @@ async function startServer() {
     const last4 = cleanCard.slice(-4) || '4242';
     const cardBrand = cleanCard.startsWith('5') ? 'Mastercard' : cleanCard.startsWith('3') ? 'Amex' : 'Visa';
 
-    // Record Payment Transaction
+    // Record Payment Transaction with status: 'pending_approval'
     const transaction: PaymentTransaction = {
       id: `tx_${Date.now()}`,
       userId: currentUser ? currentUser.id : 'usr_guest',
@@ -512,34 +639,89 @@ async function startServer() {
       planName: plan.name,
       cardLast4: last4,
       cardBrand,
-      status: 'succeeded',
+      status: 'pending_approval',
       date: new Date().toISOString()
     };
 
     transactions.unshift(transaction);
 
-    // Update current user membership status
-    if (currentUser) {
-      currentUser = {
-        ...currentUser,
-        subscriptionPlan: plan.id as SubscriptionPlanId,
-        subscriptionStatus: 'active',
-        subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        bouncerVerified: true
-      };
-
-      const uIdx = users.findIndex(u => u.id === currentUser.id);
-      if (uIdx !== -1) {
-        users[uIdx] = currentUser;
-      }
-    }
+    // Notify Admin of pending payment
+    notifications.unshift({
+      id: `notif_${Date.now()}`,
+      userId: 'usr_admin',
+      title: '💳 Payment Awaiting Approval',
+      message: `New payment of $${plan.price} from ${transaction.userName} (${transaction.userEmail}) for ${plan.name} is waiting for admin verification.`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
 
     res.json({
       success: true,
-      message: `Successfully subscribed to ${plan.name}`,
+      message: `Payment submitted successfully! Awaiting Bouncer Admin verification for ${plan.name}.`,
       transaction,
       user: currentUser
     });
+  });
+
+  // Admin Payment Approval & Rejection Routes
+  app.put('/api/admin/payments/:id/approve', (req, res) => {
+    const { id } = req.params;
+    const tx = transactions.find(t => t.id === id);
+    if (!tx) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    tx.status = 'succeeded';
+
+    // Activate subscription for the user
+    const targetUser = users.find(u => u.id === tx.userId || (u.email && tx.userEmail && u.email.toLowerCase() === tx.userEmail.toLowerCase()));
+    if (targetUser) {
+      targetUser.subscriptionPlan = tx.planId as SubscriptionPlanId;
+      targetUser.subscriptionStatus = 'active';
+      targetUser.subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      targetUser.bouncerVerified = true;
+
+      if (currentUser && currentUser.id === targetUser.id) {
+        currentUser = { ...targetUser };
+      }
+    }
+
+    // Send user notification
+    notifications.unshift({
+      id: `notif_${Date.now()}`,
+      userId: tx.userId,
+      title: '🎉 Payment Approved!',
+      message: `Your payment of $${tx.amount} for ${tx.planName} has been verified & approved by Admin! VIP features activated.`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    res.json({ success: true, message: 'Payment approved successfully!', transaction: tx });
+  });
+
+  app.put('/api/admin/payments/:id/reject', (req, res) => {
+    const { id } = req.params;
+    const tx = transactions.find(t => t.id === id);
+    if (!tx) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    tx.status = 'rejected';
+
+    // Send user notification
+    notifications.unshift({
+      id: `notif_${Date.now()}`,
+      userId: tx.userId,
+      title: '❌ Payment Rejected',
+      message: `Your payment of $${tx.amount} for ${tx.planName} could not be verified by Admin. Please contact Bouncer Support.`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    res.json({ success: true, message: 'Payment rejected.', transaction: tx });
   });
 
   app.get('/api/payment/transactions', (_req, res) => {
@@ -609,8 +791,369 @@ async function startServer() {
       pendingBouncerQueue,
       activeSubscriptions,
       monthlyRevenue: parseFloat(monthlyRevenue.toFixed(2)),
-      totalCartOrders
+      totalCartOrders,
+      totalReels: reels.length,
+      totalStories: stories.length,
+      totalPosts: posts.length,
+      totalReports: reports.length
     });
+  });
+
+  // ==========================================
+  // DISCOVER LIKES & SWIPE MATCHING ENDPOINTS
+  // ==========================================
+  app.post('/api/likes', (req, res) => {
+    const { targetProfileId, type } = req.body; // type: 'like' | 'pass' | 'superlike'
+    if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });
+    if (!targetProfileId) return res.status(400).json({ error: 'Target profile ID required' });
+
+    const uId = currentUser.id;
+    if (!userLikes[uId]) userLikes[uId] = [];
+    if (!userMatches[uId]) userMatches[uId] = [];
+
+    let isMatch = false;
+    if (type === 'like' || type === 'superlike') {
+      if (!userLikes[uId].includes(targetProfileId)) {
+        userLikes[uId].push(targetProfileId);
+      }
+
+      // Check for mutual match or auto-match logic for high compatibility profiles
+      const targetProf = profiles.find(p => p.id === targetProfileId);
+      const otherUserLikes = userLikes[targetProfileId] || [];
+      const hasMutual = otherUserLikes.includes(uId) || (targetProf && targetProf.compatibilityScore >= 90);
+
+      if (hasMutual) {
+        isMatch = true;
+        if (!userMatches[uId].includes(targetProfileId)) userMatches[uId].push(targetProfileId);
+        if (!userMatches[targetProfileId]) userMatches[targetProfileId] = [];
+        if (!userMatches[targetProfileId].includes(uId)) userMatches[targetProfileId].push(uId);
+
+        // Auto-create notification for both
+        notifications.unshift({
+          id: `notif_${Date.now()}`,
+          userId: uId,
+          title: 'IT\'S A MATCH! ❤️',
+          message: `You and ${targetProf?.name || 'a single'} liked each other! Start chatting now.`,
+          type: 'match',
+          read: false,
+          createdAt: new Date().toISOString()
+        });
+
+        // Ensure conversation exists
+        let existingConv = conversations.find(c => c.participant.id === targetProfileId);
+        if (!existingConv && targetProf) {
+          conversations.unshift({
+            id: `conv_${targetProfileId}`,
+            participant: targetProf,
+            lastMessage: 'You matched! Say hello to start your story ❤️',
+            lastMessageTime: 'Just now',
+            unreadCount: 0,
+            isOnline: true
+          });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      isMatch,
+      targetProfile: profiles.find(p => p.id === targetProfileId)
+    });
+  });
+
+  app.get('/api/who-liked-me', (_req, res) => {
+    if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });
+    const myId = currentUser.id;
+
+    // Profiles that liked myId
+    const likerIds = Object.keys(userLikes).filter(uId => userLikes[uId]?.includes(myId) || userLikes[uId]?.includes('p1'));
+    const likers = profiles.filter(p => likerIds.includes(p.id) || p.isFeatured);
+
+    res.json(likers);
+  });
+
+  // ==========================================
+  // BOUNCER REELS ENDPOINTS
+  // ==========================================
+  app.get('/api/reels', (_req, res) => {
+    res.json(reels);
+  });
+
+  app.post('/api/reels', (req, res) => {
+    const { videoUrl, caption } = req.body;
+    if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });
+    if (!videoUrl) return res.status(400).json({ error: 'Video URL required' });
+
+    const newReel: ReelItem = {
+      id: `reel_${Date.now()}`,
+      profileId: currentUser.id,
+      authorName: currentUser.name,
+      authorAvatar: currentUser.avatar,
+      authorLocation: currentUser.location,
+      videoUrl,
+      caption: caption || 'Check out my new Bouncer Reel! ❤️',
+      likesCount: 1,
+      commentsCount: 0,
+      isLiked: true,
+      createdAt: new Date().toISOString()
+    };
+
+    reels.unshift(newReel);
+    res.json({ success: true, reel: newReel });
+  });
+
+  app.post('/api/reels/:id/like', (req, res) => {
+    const reel = reels.find(r => r.id === req.params.id);
+    if (!reel) return res.status(404).json({ error: 'Reel not found' });
+    reel.isLiked = !reel.isLiked;
+    reel.likesCount += reel.isLiked ? 1 : -1;
+    res.json({ success: true, likesCount: reel.likesCount, isLiked: reel.isLiked });
+  });
+
+  // ==========================================
+  // STORIES ENDPOINTS
+  // ==========================================
+  app.get('/api/stories', (_req, res) => {
+    res.json(stories);
+  });
+
+  app.post('/api/stories', (req, res) => {
+    const { mediaUrl, caption, type } = req.body;
+    if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });
+    if (!mediaUrl) return res.status(400).json({ error: 'Media URL required' });
+
+    const newStory: StoryItem = {
+      id: `story_${Date.now()}`,
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      authorAvatar: currentUser.avatar,
+      mediaUrl,
+      caption: caption || '',
+      type: type || 'image',
+      viewsCount: 1,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    };
+
+    stories.unshift(newStory);
+    res.json({ success: true, story: newStory });
+  });
+
+  // ==========================================
+  // SOCIAL FEED POSTS ENDPOINTS
+  // ==========================================
+  app.get('/api/posts', (_req, res) => {
+    res.json(posts);
+  });
+
+  app.post('/api/posts', (req, res) => {
+    const { content, mediaUrl } = req.body;
+    if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });
+    if (!content) return res.status(400).json({ error: 'Post content required' });
+
+    const newPost: FeedPost = {
+      id: `post_${Date.now()}`,
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      authorAvatar: currentUser.avatar,
+      authorLocation: currentUser.location,
+      authorVerified: currentUser.bouncerVerified,
+      content,
+      mediaUrl,
+      likesCount: 0,
+      isLiked: false,
+      comments: [],
+      createdAt: new Date().toISOString()
+    };
+
+    posts.unshift(newPost);
+    res.json({ success: true, post: newPost });
+  });
+
+  app.post('/api/posts/:id/like', (req, res) => {
+    const post = posts.find(p => p.id === req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+    post.isLiked = !post.isLiked;
+    post.likesCount += post.isLiked ? 1 : -1;
+    res.json({ success: true, likesCount: post.likesCount, isLiked: post.isLiked });
+  });
+
+  app.post('/api/posts/:id/comments', (req, res) => {
+    const { text } = req.body;
+    if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });
+    if (!text) return res.status(400).json({ error: 'Comment text required' });
+
+    const post = posts.find(p => p.id === req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const comment = {
+      id: `c_${Date.now()}`,
+      authorName: currentUser.name,
+      authorAvatar: currentUser.avatar,
+      text,
+      createdAt: new Date().toISOString()
+    };
+
+    post.comments.push(comment);
+    res.json({ success: true, comment });
+  });
+
+  // ==========================================
+  // DIRECT MESSAGING & CHAT ENDPOINTS
+  // ==========================================
+  app.get('/api/conversations', (_req, res) => {
+    res.json(conversations);
+  });
+
+  app.get('/api/conversations/:id/messages', (req, res) => {
+    const convMsgs = messages.filter(m => m.conversationId === req.params.id);
+    res.json(convMsgs);
+  });
+
+  app.post('/api/messages', (req, res) => {
+    const { conversationId, text, mediaUrl } = req.body;
+    if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });
+    if (!text && !mediaUrl) return res.status(400).json({ error: 'Message text or media required' });
+
+    const newMsg: DirectMessage = {
+      id: `m_${Date.now()}`,
+      conversationId,
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      senderAvatar: currentUser.avatar,
+      text: text || '',
+      mediaUrl,
+      read: true,
+      createdAt: new Date().toISOString()
+    };
+
+    messages.push(newMsg);
+
+    // Update last message in conversation
+    const convIdx = conversations.findIndex(c => c.id === conversationId);
+    if (convIdx !== -1) {
+      conversations[convIdx].lastMessage = text || 'Sent an attachment';
+      conversations[convIdx].lastMessageTime = 'Just now';
+    }
+
+    res.json({ success: true, message: newMsg });
+  });
+
+  // ==========================================
+  // NOTIFICATIONS ENDPOINTS
+  // ==========================================
+  app.get('/api/notifications', (_req, res) => {
+    res.json(notifications);
+  });
+
+  app.post('/api/notifications/:id/read', (req, res) => {
+    const notif = notifications.find(n => n.id === req.params.id);
+    if (notif) notif.read = true;
+    res.json({ success: true });
+  });
+
+  // ==========================================
+  // VERIFICATIONS & REPORTS ENDPOINTS
+  // ==========================================
+  app.post('/api/verification/request', (req, res) => {
+    const { selfieUrl, idDocumentUrl, phoneNumber } = req.body;
+    if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });
+
+    const newVerif: VerificationSubmission = {
+      id: `verif_${Date.now()}`,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userEmail: currentUser.email,
+      selfieUrl: selfieUrl || currentUser.avatar,
+      idDocumentUrl: idDocumentUrl || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&q=80&w=400',
+      phoneNumber: phoneNumber || currentUser.whatsappNumber || '+263 77 123 4567',
+      status: 'pending',
+      submittedAt: new Date().toISOString()
+    };
+
+    verifications.unshift(newVerif);
+    res.json({ success: true, verification: newVerif });
+  });
+
+  app.get('/api/verifications', (_req, res) => {
+    res.json(verifications);
+  });
+
+  app.put('/api/verifications/:id/status', (req, res) => {
+    const { status, notes } = req.body;
+    const verif = verifications.find(v => v.id === req.params.id);
+    if (!verif) return res.status(404).json({ error: 'Verification request not found' });
+
+    verif.status = status;
+    if (notes) verif.notes = notes;
+
+    if (status === 'approved') {
+      const u = users.find(usr => usr.id === verif.userId);
+      if (u) u.bouncerVerified = true;
+      const p = profiles.find(prof => prof.id === verif.userId || prof.name === verif.userName);
+      if (p) p.bouncerStatus = 'verified';
+    }
+
+    res.json({ success: true, verification: verif });
+  });
+
+  app.post('/api/reports', (req, res) => {
+    const { targetId, targetName, targetType, category, reason } = req.body;
+    if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });
+
+    const newReport: ReportItem = {
+      id: `rep_${Date.now()}`,
+      reporterId: currentUser.id,
+      reporterName: currentUser.name,
+      targetId,
+      targetName,
+      targetType: targetType || 'profile',
+      category: category || 'other',
+      reason: reason || 'Violation of Bouncer Safety guidelines.',
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+
+    reports.unshift(newReport);
+    res.json({ success: true, report: newReport });
+  });
+
+  app.get('/api/reports', (_req, res) => {
+    res.json(reports);
+  });
+
+  // ==========================================
+  // ADS & BOOST ENDPOINTS
+  // ==========================================
+  app.get('/api/ads', (_req, res) => {
+    res.json(ads.filter(a => a.active));
+  });
+
+  app.post('/api/admin/ads', (req, res) => {
+    const { title, sponsorName, imageUrl, linkUrl, placement } = req.body;
+    const newAd: AdCampaign = {
+      id: `ad_${Date.now()}`,
+      title,
+      sponsorName,
+      imageUrl,
+      linkUrl,
+      placement: placement || 'homepage',
+      impressions: 1,
+      clicks: 0,
+      active: true
+    };
+    ads.unshift(newAd);
+    res.json({ success: true, ad: newAd });
+  });
+
+  app.post('/api/boost', (req, res) => {
+    if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });
+    const pIdx = profiles.findIndex(p => p.id === currentUser.id || p.name === currentUser.name);
+    if (pIdx !== -1) {
+      profiles[pIdx].isBoosted = true;
+      profiles[pIdx].boostExpiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    }
+    res.json({ success: true, message: 'Your profile is now Boosted for 30 minutes! 🔥' });
   });
 
   // Vite middleware for development vs static serve for production

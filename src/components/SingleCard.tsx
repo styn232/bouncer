@@ -1,23 +1,25 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { MapPin, ShieldCheck, Eye, Heart, Sparkles, ChevronLeft, ChevronRight, Check, Star, UserCheck } from 'lucide-react';
-import { SingleProfile } from '../types';
+import { SingleProfile, User } from '../types';
 
 interface SingleCardProps {
   profile: SingleProfile;
-  isInCart: boolean;
-  onAddToCart: (profile: SingleProfile) => void;
+  isInCart?: boolean;
+  onAddToCart?: (profile: SingleProfile) => void;
   onViewDetails: (profile: SingleProfile) => void;
+  currentUser?: User | null;
 }
 
 export const SingleCard: React.FC<SingleCardProps> = ({
   profile,
-  isInCart,
-  onAddToCart,
-  onViewDetails
+  onViewDetails,
+  currentUser
 }) => {
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
+
+  const isOwner = currentUser && (currentUser.id === profile.id || currentUser.email === profile.email);
 
   const nextPhoto = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -50,28 +52,6 @@ export const SingleCard: React.FC<SingleCardProps> = ({
 
         {/* Subtle Gradient Overlay for badge visibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/30" />
-
-        {/* Bouncer Verification & NEW Status Badges */}
-        <div className="absolute top-2 sm:top-3 left-2 sm:left-3 flex flex-col gap-1 z-10 items-start">
-          {(profile.isNew || (profile.createdAt && (new Date().getTime() - new Date(profile.createdAt).getTime()) < 14 * 24 * 60 * 60 * 1000)) && (
-            <span className="bg-gradient-to-r from-rose-600 to-pink-600 text-white font-black text-[9px] sm:text-[10px] uppercase tracking-wider px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full shadow-lg flex items-center gap-1 border border-rose-300 ring-2 ring-rose-500/30 animate-pulse">
-              <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-300 fill-amber-300" />
-              <span>🔥 NEW SINGLE</span>
-            </span>
-          )}
-          {profile.bouncerStatus === 'vip_approved' && (
-            <span className="bg-emerald-600 text-white font-extrabold text-[8px] sm:text-[10px] uppercase tracking-wider px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full shadow-md flex items-center gap-1 border border-emerald-300">
-              <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-300 fill-amber-300" />
-              <span>VIP Single</span>
-            </span>
-          )}
-          {profile.bouncerStatus === 'verified' && (
-            <span className="bg-white/95 text-emerald-700 font-extrabold text-[8px] sm:text-[10px] uppercase tracking-wider px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-emerald-300 shadow-sm backdrop-blur-md flex items-center gap-1">
-              <ShieldCheck className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-emerald-600" />
-              <span>Bouncer Vetted</span>
-            </span>
-          )}
-        </div>
 
         {/* Top Right Quick Like Button */}
         <button
@@ -106,11 +86,13 @@ export const SingleCard: React.FC<SingleCardProps> = ({
           </div>
         )}
 
-        {/* Views Count Overlay Pill */}
-        <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3 bg-slate-950/80 backdrop-blur-md border border-slate-700/60 text-slate-200 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 sm:py-1 rounded-lg sm:rounded-xl shadow-md flex items-center gap-1">
-          <Eye className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400" />
-          <span>{profile.viewsCount || 0} views</span>
-        </div>
+        {/* Views Count Overlay Pill (Owner Only) */}
+        {isOwner && (
+          <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3 bg-slate-950/80 backdrop-blur-md border border-slate-700/60 text-slate-200 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 sm:py-1 rounded-lg sm:rounded-xl shadow-md flex items-center gap-1">
+            <Eye className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400" />
+            <span>{profile.viewsCount || 0} views</span>
+          </div>
+        )}
 
         {/* Star Rating Overlay Pill */}
         <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3 bg-white/95 backdrop-blur-md border border-amber-200 text-slate-900 text-[9px] sm:text-[11px] font-black px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-lg sm:rounded-xl shadow-md flex items-center gap-0.5 sm:gap-1">
@@ -122,13 +104,25 @@ export const SingleCard: React.FC<SingleCardProps> = ({
       {/* Card Body - Display Name, Age, Location Prominently */}
       <div className="p-3 sm:p-5 flex-1 flex flex-col justify-between bg-white">
         <div>
-          {/* Prominent Name, Age Header */}
-          <div className="flex items-baseline justify-between mb-1">
-            <h3 className="text-sm sm:text-xl font-extrabold text-slate-900 tracking-tight flex items-baseline gap-1 sm:gap-2 font-serif truncate">
+          {/* Prominent Name, Age & Verified Badges Header */}
+          <div className="flex items-center justify-between mb-1 gap-1">
+            <h3 className="text-sm sm:text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-1 sm:gap-1.5 font-serif truncate min-w-0">
               <span className="truncate">{profile.name}</span>
               <span className="text-emerald-700 font-sans text-xs sm:text-lg font-extrabold shrink-0">
                 , {profile.age}
               </span>
+              {profile.bouncerStatus === 'vip_approved' && (
+                <span className="inline-flex items-center gap-0.5 bg-amber-500 text-slate-950 font-black text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full shrink-0 shadow-xs" title="VIP Single">
+                  <Sparkles className="w-2.5 h-2.5 fill-slate-950 text-slate-950" />
+                  <span>VIP</span>
+                </span>
+              )}
+              {profile.bouncerStatus === 'verified' && (
+                <span className="inline-flex items-center gap-0.5 bg-emerald-100 text-emerald-800 font-extrabold text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full border border-emerald-300 shrink-0" title="Bouncer Vetted">
+                  <ShieldCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-600" />
+                  <span>Vetted</span>
+                </span>
+              )}
             </h3>
           </div>
 
@@ -171,42 +165,16 @@ export const SingleCard: React.FC<SingleCardProps> = ({
               </span>
             </div>
           </div>
-
-          {/* Bio Snippet */}
-          <p className="text-[10px] sm:text-xs text-slate-600 line-clamp-2 leading-tight sm:leading-relaxed mb-2 sm:mb-4 italic bg-emerald-50/50 p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl border border-emerald-100/60">
-            "{profile.bio}"
-          </p>
         </div>
 
-        {/* Action Buttons: Choose Single & View Profile */}
-        <div className="flex items-center gap-1.5 sm:gap-2 pt-2 sm:pt-3 border-t border-emerald-100">
+        {/* Action Button: View Profile */}
+        <div className="pt-2 sm:pt-3 border-t border-emerald-100">
           <button
             onClick={() => onViewDetails(profile)}
-            className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 transition-colors flex items-center justify-center shrink-0"
-            title="View Full Profile"
+            className="w-full py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md active:scale-[0.98]"
           >
-            <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-700" />
-          </button>
-
-          <button
-            onClick={() => onAddToCart(profile)}
-            className={`flex-1 py-2 sm:py-3 px-2 sm:px-4 rounded-xl sm:rounded-2xl font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 sm:gap-2 shadow-md ${
-              isInCart
-                ? 'bg-emerald-700 hover:bg-emerald-800 text-white ring-2 ring-emerald-500'
-                : 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-[0.98]'
-            }`}
-          >
-            {isInCart ? (
-              <>
-                <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white stroke-[3]" />
-                <span className="truncate">Chosen</span>
-              </>
-            ) : (
-              <>
-                <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                <span className="truncate">Choose</span>
-              </>
-            )}
+            <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            <span>View Profile</span>
           </button>
         </div>
 

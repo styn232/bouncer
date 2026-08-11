@@ -7,7 +7,7 @@ interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   plans: SubscriptionPlan[];
-  currentUser: User;
+  currentUser?: User | null;
   onPaymentSuccess: (planId: SubscriptionPlanId, transactionData: any) => void;
 }
 
@@ -21,7 +21,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   if (!isOpen) return null;
 
   const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>('starter_3_or_4');
-  const [cardHolderName, setCardHolderName] = useState(currentUser.name || '');
+  const [cardHolderName, setCardHolderName] = useState(currentUser?.name || '');
   const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242');
   const [expDate, setExpDate] = useState('08/28');
   const [cvc, setCvc] = useState('123');
@@ -42,7 +42,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const handleQuickSandboxFill = () => {
-    setCardHolderName(currentUser.name || 'Alex Mercer');
+    setCardHolderName(currentUser?.name || 'Alex Mercer');
     setCardNumber('4242 4242 4242 4242');
     setExpDate('12/28');
     setCvc('888');
@@ -126,10 +126,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <Check className="w-8 h-8" />
               </div>
               <h3 className="text-2xl font-extrabold text-white mb-1 font-serif">
-                Membership Payment Approved! 🍾
+                Payment Submitted for Approval! 🥂
               </h3>
-              <p className="text-xs text-slate-400 max-w-md mx-auto mb-6">
-                Your Bouncer VIP Membership is now live. Enjoy unlimited Add to Cart matches and priority velvet rope clearance!
+              <p className="text-xs text-amber-300 font-semibold max-w-md mx-auto mb-6 bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl">
+                Your payment of ${receiptData.amount} for {receiptData.planName} has been recorded and sent to Bouncer Admin for verification. Once approved by Admin, your VIP features will be activated!
               </p>
 
               {/* Receipt Box */}

@@ -3,7 +3,8 @@ import { SingleProfile, SubscriptionPlan, User, PaymentTransaction, MatchOrder, 
 export const INITIAL_SITE_SETTINGS: SiteSettings = {
   siteName: 'DATING WITH BOUNCER',
   logoUrl: '',
-  iconUrl: ''
+  iconUrl: '',
+  tagline: 'Real People. Real Connections. Real Possibilities.'
 };
 
 export const INITIAL_PROFILES: SingleProfile[] = [
@@ -350,7 +351,6 @@ export const MOCK_DEMO_USER: User = {
   subscriptionExpiresAt: '2026-09-06T12:00:00Z',
   avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=200',
   bio: 'Lover of art, espresso, and good conversation. Verified VIP Single seeking marriage!',
-  occupation: 'Financial Analyst',
   gender: 'male',
   seeking: 'female',
   interests: ['Coffee', 'Art', 'Fitness', 'Travel'],
@@ -408,3 +408,212 @@ export const MOCK_MATCH_ORDERS: MatchOrder[] = [
     createdAt: '2026-08-05T20:05:00Z'
   }
 ];
+
+export const INITIAL_REELS = [
+  {
+    id: 'reel_1',
+    profileId: 'p1',
+    authorName: 'Chiedza Moyo',
+    authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+    authorLocation: 'Harare (Borrowdale)',
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-girl-looking-at-the-camera-and-smiling-34440-large.mp4',
+    caption: 'Sunday coffee vibes in Borrowdale! ☕ What is your favourite date spot in Harare? ❤️ #DatingWithBouncer #VerifiedSingle',
+    likesCount: 142,
+    commentsCount: 28,
+    isLiked: false,
+    createdAt: '2026-08-09T10:00:00Z'
+  },
+  {
+    id: 'reel_2',
+    profileId: 'p2',
+    authorName: 'Tarisai Ndlovu',
+    authorAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200',
+    authorLocation: 'Bulawayo (Kumalo)',
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-young-man-smiling-at-the-camera-42895-large.mp4',
+    caption: 'Making joke about traditional braai sauce in Bulawayo! Laughs are 100% guaranteed on our first date. 😂🔥 #BouncerComedy',
+    likesCount: 98,
+    commentsCount: 19,
+    isLiked: true,
+    createdAt: '2026-08-08T15:30:00Z'
+  },
+  {
+    id: 'reel_3',
+    profileId: 'p3',
+    authorName: 'Rudo Mpofu',
+    authorAvatar: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&q=80&w=200',
+    authorLocation: 'Victoria Falls',
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-woman-walking-on-a-sunny-afternoon-41151-large.mp4',
+    caption: 'Sunset cruise over Zambezi river in Vic Falls. Looking for a partner to share these views with! 🌅 #VictoriaFalls #BouncerDating',
+    likesCount: 210,
+    commentsCount: 34,
+    isLiked: false,
+    createdAt: '2026-08-07T18:15:00Z'
+  }
+];
+
+export const INITIAL_STORIES = [
+  {
+    id: 'story_1',
+    authorId: 'p1',
+    authorName: 'Chiedza',
+    authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+    mediaUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=800',
+    type: 'image' as const,
+    caption: 'Morning tea session before starting coding! 🍵✨',
+    viewsCount: 89,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'story_2',
+    authorId: 'p3',
+    authorName: 'Rudo',
+    authorAvatar: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&q=80&w=200',
+    mediaUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800',
+    type: 'image' as const,
+    caption: 'Wildlife safari tour in Victoria Falls 🦁 Safari date anyone?',
+    viewsCount: 112,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'story_3',
+    authorId: 'p5',
+    authorName: 'Nyasha',
+    authorAvatar: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&q=80&w=200',
+    mediaUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=800',
+    type: 'image' as const,
+    caption: 'New fashion design preview! 💃 #MutareSingle',
+    viewsCount: 67,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  }
+];
+
+export const INITIAL_POSTS = [
+  {
+    id: 'post_1',
+    authorId: 'p1',
+    authorName: 'Chiedza Moyo',
+    authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+    authorLocation: 'Harare (Borrowdale)',
+    authorVerified: true,
+    content: 'Question for all the gentlemen on Dating with Bouncer: What is your idea of a perfect first date in Harare? Dinner at a nice restaurant or a casual Sunday coffee & walk?',
+    mediaUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=800',
+    likesCount: 34,
+    isLiked: false,
+    comments: [
+      {
+        id: 'c1',
+        authorName: 'Kudzai Mugo',
+        authorAvatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=200',
+        text: 'A quiet coffee date at Avondale or Borrowdale Lane is always best for great conversations!',
+        createdAt: '2026-08-09T11:20:00Z'
+      }
+    ],
+    createdAt: '2026-08-09T09:30:00Z'
+  },
+  {
+    id: 'post_2',
+    authorId: 'p2',
+    authorName: 'Tarisai Ndlovu',
+    authorAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200',
+    authorLocation: 'Bulawayo',
+    authorVerified: true,
+    content: 'A good sense of humor is the #1 green flag in a long-term partner. Agree or disagree? Comment below! 😂👇',
+    likesCount: 48,
+    isLiked: true,
+    comments: [],
+    createdAt: '2026-08-08T14:15:00Z'
+  }
+];
+
+export const INITIAL_CONVERSATIONS = [
+  {
+    id: 'conv_p1',
+    participant: INITIAL_PROFILES[0],
+    lastMessage: 'I loved reading your profile! Are you free for a coffee in Borrowdale this weekend?',
+    lastMessageTime: '10:42 AM',
+    unreadCount: 1,
+    isOnline: true
+  },
+  {
+    id: 'conv_p3',
+    participant: INITIAL_PROFILES[2],
+    lastMessage: 'Victoria Falls sounds amazing! When are you hosting your next safari date?',
+    lastMessageTime: 'Yesterday',
+    unreadCount: 0,
+    isOnline: false
+  }
+];
+
+export const INITIAL_NOTIFICATIONS = [
+  {
+    id: 'notif_1',
+    userId: 'usr_demo',
+    title: 'New Match Alert! ❤️',
+    message: 'You and Chiedza Moyo matched! Start a conversation now.',
+    type: 'match' as const,
+    read: false,
+    createdAt: '2026-08-10T08:00:00Z'
+  },
+  {
+    id: 'notif_2',
+    userId: 'usr_demo',
+    title: 'Profile View Alert 👁️',
+    message: 'Rudo Mpofu from Victoria Falls viewed your profile!',
+    type: 'like' as const,
+    read: true,
+    createdAt: '2026-08-09T18:30:00Z'
+  },
+  {
+    id: 'notif_3',
+    userId: 'usr_demo',
+    title: 'Bouncer Verification Approved ✅',
+    message: 'Your Bouncer Identity Verification has been approved by Chief Admin.',
+    type: 'verification' as const,
+    read: true,
+    createdAt: '2026-08-07T12:00:00Z'
+  }
+];
+
+export const INITIAL_ADS = [
+  {
+    id: 'ad_1',
+    title: 'Borrowdale VIP Lounge & Restaurant',
+    sponsorName: 'Borrowdale VIP Lounge',
+    imageUrl: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=800',
+    linkUrl: 'https://datingwithbouncer.com/vip-lounge',
+    placement: 'homepage' as const,
+    impressions: 1420,
+    clicks: 184,
+    active: true
+  },
+  {
+    id: 'ad_2',
+    title: 'Victoria Falls Luxury Sunset Cruises',
+    sponsorName: 'Vic Falls Safaris',
+    imageUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800',
+    linkUrl: 'https://datingwithbouncer.com/vic-falls',
+    placement: 'feed' as const,
+    impressions: 890,
+    clicks: 92,
+    active: true
+  }
+];
+
+export const INITIAL_VERIFICATIONS = [
+  {
+    id: 'verif_101',
+    userId: 'usr_demo',
+    userName: 'Kudzai Mugo',
+    userEmail: 'single@bouncer.date',
+    selfieUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=400',
+    idDocumentUrl: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&q=80&w=400',
+    phoneNumber: '+263 77 123 4567',
+    status: 'approved' as const,
+    submittedAt: '2026-08-07T10:00:00Z',
+    notes: 'National ID & selfie matched verified user.'
+  }
+];
+

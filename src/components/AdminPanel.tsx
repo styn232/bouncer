@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image, Upload, Settings, Phone, UserPlus } from 'lucide-react';
+import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp } from 'lucide-react';
 import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings, DatingIntent } from '../types';
 import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -17,6 +17,8 @@ interface AdminPanelProps {
   onDeleteProfile: (id: string) => void;
   onUpdateBouncerStatus: (id: string, status: BouncerStatus, notes?: string) => void;
   onUpdateSiteSettings?: (updated: Partial<SiteSettings>) => void;
+  onApprovePayment?: (txId: string) => void;
+  onRejectPayment?: (txId: string) => void;
   onRefreshData: () => void;
 }
 
@@ -32,9 +34,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeleteProfile,
   onUpdateBouncerStatus,
   onUpdateSiteSettings,
+  onApprovePayment,
+  onRejectPayment,
   onRefreshData
 }) => {
-  const [activeTab, setActiveTab] = useState<'profiles' | 'queue' | 'subscriptions' | 'audit' | 'orders' | 'branding'>('profiles');
+  const [activeTab, setActiveTab] = useState<'profiles' | 'queue' | 'subscriptions' | 'audit' | 'orders' | 'branding' | 'views'>('profiles');
   const [searchTerm, setSearchTerm] = useState('');
   
   // Branding state
@@ -54,7 +58,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newGender, setNewGender] = useState<'female' | 'male'>('female');
   const [newChildrenCount, setNewChildrenCount] = useState(0);
   const [newIntent, setNewIntent] = useState<DatingIntent>('Marriage');
-  const [newOccupation, setNewOccupation] = useState('Professional');
   const [newBio, setNewBio] = useState('');
   const [newPhoto, setNewPhoto] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
   const [newBouncerStatus, setNewBouncerStatus] = useState<BouncerStatus>('verified');
@@ -69,7 +72,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editGender, setEditGender] = useState<'female' | 'male'>('female');
   const [editChildrenCount, setEditChildrenCount] = useState(0);
   const [editIntent, setEditIntent] = useState<DatingIntent>('Marriage');
-  const [editOccupation, setEditOccupation] = useState('Professional');
   const [editWhatsapp, setEditWhatsapp] = useState('');
   const [editBio, setEditBio] = useState('');
   const [editPhoto, setEditPhoto] = useState('');
@@ -87,7 +89,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditGender(p.gender || 'female');
     setEditChildrenCount(p.childrenCount ?? 0);
     setEditIntent(p.intent || 'Marriage');
-    setEditOccupation(p.occupation || 'Professional');
     setEditWhatsapp(p.whatsappNumber || '+263 77 123 4567');
     setEditBio(p.bio || '');
     setEditPhoto(p.photos[0] || '');
@@ -132,7 +133,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       intent: editIntent,
       whatsappNumber: editWhatsapp,
       gender: editGender,
-      occupation: editOccupation,
       bio: editBio,
       photos: editPhoto ? [editPhoto, ...editingProfile.photos.slice(1)] : editingProfile.photos,
       bouncerStatus: editBouncerStatus,
@@ -171,7 +171,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       intent: newIntent,
       whatsappNumber: newWhatsapp || '+263 77 123 4567',
       gender: newGender,
-      occupation: newOccupation,
       bio: newBio || 'Newly added single on Dating With Bouncer.',
       photos: [newPhoto],
       interests: ['Dating', 'Travel', 'Music'],
@@ -235,12 +234,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const filteredProfiles = profiles.filter(
     p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         p.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         p.occupation.toLowerCase().includes(searchTerm.toLowerCase())
+         p.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const pendingQueue = profiles.filter(p => p.bouncerStatus === 'pending_check');
   const paidTransactions = transactions.filter(t => t.amount > 0);
+
+  // View Analytics Calculations
+  const totalViewsCount = profiles.reduce((acc, p) => acc + (p.viewsCount || 0), 0);
+  const avgViewsPerProfile = profiles.length > 0 ? Math.round(totalViewsCount / profiles.length) : 0;
+  const sortedByViews = [...profiles].sort((a, b) => (b.viewsCount || 0) - (a.viewsCount || 0));
+  const maxViewsInList = sortedByViews.length > 0 ? (sortedByViews[0].viewsCount || 1) : 1;
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6">
@@ -277,7 +281,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
 
         {/* Overview Stats Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-8 pt-6 border-t border-slate-800">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mt-8 pt-6 border-t border-slate-800">
           
           <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Singles</div>
@@ -309,6 +313,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div className="text-xl font-extrabold text-white font-serif mt-1">{stats.totalCartOrders}</div>
           </div>
 
+          <div
+            onClick={() => setActiveTab('views')}
+            className="bg-slate-950 p-3.5 rounded-2xl border border-amber-500/50 hover:border-amber-400 cursor-pointer transition-all group shadow-sm"
+          >
+            <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Profile Views</span>
+              <Eye className="w-3.5 h-3.5 text-amber-400 group-hover:scale-125 transition-transform" />
+            </div>
+            <div className="text-xl font-extrabold text-amber-300 font-serif mt-1 flex items-baseline gap-1">
+              <span>{totalViewsCount}</span>
+              <span className="text-[10px] text-slate-400 font-normal">views</span>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -324,6 +342,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         >
           <Users className="w-4 h-4" />
           Manage Profiles ({profiles.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('views')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all flex items-center gap-2 ${
+            activeTab === 'views'
+              ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
+              : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+          }`}
+        >
+          <Eye className="w-4 h-4 text-amber-400" />
+          View Stats & Traffic ({totalViewsCount})
         </button>
 
         <button
@@ -364,7 +394,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           }`}
         >
           <DollarSign className="w-4 h-4" />
-          Payment Audit Logs ({transactions.length})
+          Payment Approvals & Logs
+          {transactions.filter(t => t.status === 'pending_approval').length > 0 && (
+            <span className="bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full animate-pulse">
+              {transactions.filter(t => t.status === 'pending_approval').length} PENDING
+            </span>
+          )}
         </button>
 
         <button
@@ -423,7 +458,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <tr>
                   <th className="p-3">Profile</th>
                   <th className="p-3">Name, Age & Location</th>
-                  <th className="p-3">Occupation</th>
                   <th className="p-3">Views</th>
                   <th className="p-3">Bouncer Badge</th>
                   <th className="p-3 text-right">Actions</th>
@@ -444,7 +478,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <div className="text-sm">{p.name}, <span className="text-amber-400">{p.age}</span></div>
                       <div className="text-[11px] text-slate-400 font-normal">📍 {p.location}</div>
                     </td>
-                    <td className="p-3">{p.occupation}</td>
                     <td className="p-3 font-semibold text-amber-300">
                       👁️ {p.viewsCount || 0}
                     </td>
@@ -517,7 +550,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <h4 className="text-lg font-bold text-white font-serif">
                         {p.name}, <span className="text-amber-400 font-sans">{p.age}</span>
                       </h4>
-                      <p className="text-xs text-slate-400">📍 {p.location} • {p.occupation}</p>
+                      <p className="text-xs text-slate-400">📍 {p.location}</p>
                       <p className="text-xs text-slate-300 italic mt-1">"{p.bio}"</p>
                     </div>
                   </div>
@@ -696,19 +729,65 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <th className="p-3">Customer</th>
                   <th className="p-3">Plan</th>
                   <th className="p-3">Amount</th>
-                  <th className="p-3">Card</th>
+                  <th className="p-3">Method</th>
+                  <th className="p-3">Status</th>
                   <th className="p-3">Timestamp</th>
+                  <th className="p-3 text-right">Admin Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80">
                 {transactions.map((tx) => (
                   <tr key={tx.id} className="hover:bg-slate-800/40">
                     <td className="p-3 font-mono text-amber-400">{tx.id}</td>
-                    <td className="p-3 font-semibold text-white">{tx.userName}</td>
-                    <td className="p-3">{tx.planName}</td>
+                    <td className="p-3 font-semibold text-white">
+                      <div>{tx.userName}</div>
+                      <div className="text-[10px] text-slate-400">{tx.userEmail}</div>
+                    </td>
+                    <td className="p-3 font-bold text-slate-200">{tx.planName}</td>
                     <td className="p-3 font-bold text-emerald-400">${tx.amount.toFixed(2)}</td>
-                    <td className="p-3">{tx.cardBrand} •••• {tx.cardLast4}</td>
+                    <td className="p-3 text-[11px]">{tx.cardBrand} {tx.cardLast4 ? `•••• ${tx.cardLast4}` : ''}</td>
+                    <td className="p-3">
+                      {tx.status === 'pending_approval' ? (
+                        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full text-[10px] font-extrabold animate-pulse">
+                          ⏳ Pending Approval
+                        </span>
+                      ) : tx.status === 'succeeded' ? (
+                        <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
+                          ✅ Approved
+                        </span>
+                      ) : (
+                        <span className="bg-rose-500/20 text-rose-400 border border-rose-500/40 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
+                          ❌ Rejected
+                        </span>
+                      )}
+                    </td>
                     <td className="p-3 text-[11px] text-slate-400">{new Date(tx.date).toLocaleString()}</td>
+                    <td className="p-3 text-right">
+                      {tx.status === 'pending_approval' ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onApprovePayment && onApprovePayment(tx.id)}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] uppercase rounded-xl flex items-center gap-1 shadow-md"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRejectPayment && onRejectPayment(tx.id)}
+                            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[10px] uppercase rounded-xl flex items-center gap-1 shadow-md"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            Reject
+                          </button>
+                        </div>
+                      ) : tx.status === 'succeeded' ? (
+                        <span className="text-[10px] text-emerald-400 font-bold">Verified</span>
+                      ) : (
+                        <span className="text-[10px] text-rose-400 font-bold">Declined</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -759,7 +838,220 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 6: BRANDING & LOGO SETTINGS */}
+      {/* TAB: VIEW STATS & TRAFFIC ANALYTICS */}
+      {activeTab === 'views' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Eye className="w-6 h-6 text-amber-400" />
+                  <h2 className="text-xl font-extrabold text-white font-serif">Profile View Stats & Popularity Analytics</h2>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Track real-time profile views, traffic distribution, and member popularity ranking across Zimbabwe.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 bg-slate-950 px-4 py-2 rounded-2xl border border-slate-800">
+                <BarChart3 className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-bold text-slate-300">
+                  Total Impressions: <strong className="text-amber-300 font-extrabold">{totalViewsCount}</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* View Stats Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                  <Eye className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Profile Views</div>
+                  <div className="text-2xl font-black text-amber-300 font-serif mt-0.5">{totalViewsCount}</div>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                  <TrendingUp className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Views / Single</div>
+                  <div className="text-2xl font-black text-emerald-400 font-serif mt-0.5">{avgViewsPerProfile}</div>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                  <Crown className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Most Viewed Single</div>
+                  <div className="text-sm font-extrabold text-white font-serif mt-0.5 truncate max-w-[140px]">
+                    {sortedByViews[0] ? `${sortedByViews[0].name} (${sortedByViews[0].viewsCount || 0})` : 'N/A'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                  <BarChart3 className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top Location Hub</div>
+                  <div className="text-sm font-extrabold text-amber-200 font-serif mt-0.5 truncate max-w-[140px]">
+                    {sortedByViews[0]?.city || 'Harare'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Top 5 Most Viewed Singles Leaderboard Visual */}
+            <div className="mt-8 pt-6 border-t border-slate-800">
+              <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Crown className="w-4 h-4 text-amber-400" />
+                Top Most Viewed Singles Leaderboard
+              </h3>
+
+              <div className="space-y-3">
+                {sortedByViews.slice(0, 5).map((p, rank) => {
+                  const pct = Math.round(((p.viewsCount || 0) / maxViewsInList) * 100);
+                  const shareOfTotal = totalViewsCount > 0 ? (((p.viewsCount || 0) / totalViewsCount) * 100).toFixed(1) : '0';
+                  return (
+                    <div key={p.id} className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-3">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[11px] ${
+                            rank === 0 ? 'bg-amber-400 text-slate-950' : rank === 1 ? 'bg-slate-300 text-slate-950' : rank === 2 ? 'bg-amber-700 text-white' : 'bg-slate-800 text-slate-400'
+                          }`}>
+                            #{rank + 1}
+                          </span>
+                          <img
+                            src={p.photos[0]}
+                            alt={p.name}
+                            referrerPolicy="no-referrer"
+                            className="w-9 h-9 rounded-xl object-cover ring-2 ring-slate-700"
+                          />
+                          <div>
+                            <div className="font-bold text-white flex items-center gap-1.5">
+                              <span>{p.name}, {p.age}</span>
+                              <span className="text-[10px] text-slate-400 font-normal">📍 {p.location}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400">Intent: <strong className="text-amber-300">{p.intent}</strong></div>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-sm font-black text-amber-300 font-serif flex items-center gap-1 justify-end">
+                            <Eye className="w-3.5 h-3.5 text-amber-400" />
+                            <span>{p.viewsCount || 0} views</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400">{shareOfTotal}% of total site traffic</div>
+                        </div>
+                      </div>
+
+                      {/* Bar indicator */}
+                      <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-amber-500 to-rose-500 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.max(pct, 4)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Complete Profile Views Traffic Table */}
+            <div className="mt-8 pt-6 border-t border-slate-800">
+              <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center justify-between">
+                <span>All Singles Ranked by View Traffic</span>
+                <span className="text-xs text-slate-400 font-normal">Total {sortedByViews.length} Profiles</span>
+              </h3>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-800">
+                    <tr>
+                      <th className="p-3">Rank</th>
+                      <th className="p-3">Single Profile</th>
+                      <th className="p-3">Location</th>
+                      <th className="p-3">View Count</th>
+                      <th className="p-3">Traffic Share</th>
+                      <th className="p-3">Bouncer Status</th>
+                      <th className="p-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 bg-slate-900/50">
+                    {sortedByViews.map((p, idx) => {
+                      const share = totalViewsCount > 0 ? (((p.viewsCount || 0) / totalViewsCount) * 100).toFixed(1) : '0';
+                      return (
+                        <tr key={p.id} className="hover:bg-slate-800/40 transition-colors">
+                          <td className="p-3 font-mono font-bold text-slate-400">#{idx + 1}</td>
+                          <td className="p-3 font-semibold text-white">
+                            <div className="flex items-center gap-2.5">
+                              <img
+                                src={p.photos[0]}
+                                alt={p.name}
+                                referrerPolicy="no-referrer"
+                                className="w-8 h-8 rounded-lg object-cover ring-1 ring-slate-700"
+                              />
+                              <div>
+                                <div className="font-bold text-white">{p.name}, {p.age}</div>
+                                <div className="text-[10px] text-amber-400 font-medium">{p.intent}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div>📍 {p.location}</div>
+                          </td>
+                          <td className="p-3 font-extrabold text-amber-300 font-mono text-sm">
+                            👁️ {p.viewsCount || 0}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-200">{share}%</span>
+                              <div className="w-16 bg-slate-950 h-1.5 rounded-full overflow-hidden hidden sm:block">
+                                <div
+                                  className="bg-amber-400 h-full rounded-full"
+                                  style={{ width: `${Math.min(Number(share) * 3, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            {p.bouncerStatus === 'verified' || p.bouncerStatus === 'vip_approved' ? (
+                              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                ✅ Verified
+                              </span>
+                            ) : (
+                              <span className="bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full text-[10px]">
+                                {p.bouncerStatus}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            <button
+                              onClick={() => handleOpenEditModal(p)}
+                              className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/30 transition-colors"
+                            >
+                              Edit Profile
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
       {activeTab === 'branding' && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
           <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-800">
@@ -1051,7 +1343,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block text-slate-400 font-bold mb-1">💍 Dating Intent</label>
                   <select
@@ -1062,17 +1354,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <option value="Marriage">💍 Seeking Marriage</option>
                     <option value="Funny">😂 Funny & Good Vibe</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Occupation</label>
-                  <input
-                    type="text"
-                    value={newOccupation}
-                    onChange={e => setNewOccupation(e.target.value)}
-                    placeholder="e.g. Business Executive"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                  />
                 </div>
               </div>
 
@@ -1239,7 +1520,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block text-slate-400 font-bold mb-1">WhatsApp Number</label>
                   <input
@@ -1247,16 +1528,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     value={editWhatsapp}
                     onChange={e => setEditWhatsapp(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 font-bold mb-1">Occupation</label>
-                  <input
-                    type="text"
-                    value={editOccupation}
-                    onChange={e => setEditOccupation(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                   />
                 </div>
               </div>

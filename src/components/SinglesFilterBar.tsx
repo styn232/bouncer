@@ -63,7 +63,7 @@ export const SinglesFilterBar: React.FC<SinglesFilterBarProps> = ({
       {/* Search Input */}
       <div>
         <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
-          Search Singles
+          Search Singles & Dating Keywords
         </label>
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -71,9 +71,27 @@ export const SinglesFilterBar: React.FC<SinglesFilterBarProps> = ({
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Name, bio, occupation..."
+            placeholder="Search keywords (e.g. Marriage, Harare, Verified, Engineer)..."
             className="w-full bg-slate-50 border border-emerald-200 focus:border-emerald-500 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
+        </div>
+
+        {/* Popular Keyword Search Quick Pills */}
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {['Marriage', 'Harare', 'Bulawayo', 'Borrowdale', 'Verified', 'Professional', 'Travel', 'Funny'].map((kw) => (
+            <button
+              key={kw}
+              type="button"
+              onClick={() => setSearchTerm(searchTerm === kw ? '' : kw)}
+              className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold transition-all border ${
+                searchTerm.toLowerCase() === kw.toLowerCase()
+                  ? 'bg-amber-400 text-slate-950 border-amber-500 shadow-sm'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-200/80'
+              }`}
+            >
+              #{kw}
+            </button>
+          ))}
         </div>
       </div>
 

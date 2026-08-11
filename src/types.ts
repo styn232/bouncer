@@ -18,8 +18,7 @@ export interface SingleProfile {
   city?: string; // e.g. "Harare"
   subLocation?: string; // e.g. "Borrowdale"
   bio: string;
-  occupation?: string; // Optional field, omitted from card displays
-  whatsappNumber?: string; // e.g. "+263 77 123 4567" - ONLY displayed after payment!
+  whatsappNumber?: string; // e.g. "+263 77 123 4567"
   photos: string[];
   interests: string[];
   gender: 'female' | 'male' | 'non-binary';
@@ -36,6 +35,10 @@ export interface SingleProfile {
   isFeatured?: boolean;
   isNew?: boolean;
   viewsCount?: number;
+  isOnline?: boolean;
+  lastActive?: string;
+  isBoosted?: boolean;
+  boostExpiresAt?: string;
   createdAt: string;
 }
 
@@ -45,6 +48,7 @@ export interface SiteSettings {
   siteName: string;
   logoUrl: string;
   iconUrl: string;
+  tagline?: string;
 }
 
 export interface User {
@@ -62,7 +66,6 @@ export interface User {
   avatar: string;
   bio?: string;
   whatsappNumber?: string;
-  occupation?: string;
   gender?: 'female' | 'male' | 'non-binary';
   seeking?: 'female' | 'male' | 'everyone';
   childrenCount?: number;
@@ -70,6 +73,15 @@ export interface User {
   interests?: string[];
   purchasedProfileIds?: string[]; // IDs of profile WhatsApp numbers unlocked after payment
   bouncerVerified: boolean;
+  isOnline?: boolean;
+  superLikesCount?: number;
+  boostsCount?: number;
+  blockedUserIds?: string[];
+  privacySettings?: {
+    whoCanMessage: 'everyone' | 'matches_only' | 'verified_only';
+    showOnlineStatus: boolean;
+    showLastSeen: boolean;
+  };
   createdAt: string;
 }
 
@@ -116,7 +128,7 @@ export interface PaymentTransaction {
   planName: string;
   cardLast4: string;
   cardBrand: string;
-  status: 'succeeded' | 'processing' | 'failed';
+  status: 'pending_approval' | 'succeeded' | 'processing' | 'failed' | 'rejected';
   date: string;
 }
 
@@ -127,4 +139,137 @@ export interface AdminStats {
   activeSubscriptions: number;
   monthlyRevenue: number;
   totalCartOrders: number;
+  totalReels?: number;
+  totalStories?: number;
+  totalPosts?: number;
+  totalReports?: number;
 }
+
+// Reel item for short-form vertical videos
+export interface ReelItem {
+  id: string;
+  profileId: string;
+  authorName: string;
+  authorAvatar: string;
+  authorLocation: string;
+  videoUrl: string;
+  posterUrl?: string;
+  caption: string;
+  likesCount: number;
+  commentsCount: number;
+  isLiked?: boolean;
+  createdAt: string;
+}
+
+// 24-hour Status Story item
+export interface StoryItem {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar: string;
+  mediaUrl: string;
+  type: 'image' | 'video' | 'text';
+  caption?: string;
+  viewsCount: number;
+  createdAt: string;
+  expiresAt: string;
+}
+
+// Social Feed Post item
+export interface FeedPostComment {
+  id: string;
+  authorName: string;
+  authorAvatar: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface FeedPost {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar: string;
+  authorLocation: string;
+  authorVerified?: boolean;
+  content: string;
+  mediaUrl?: string;
+  likesCount: number;
+  isLiked?: boolean;
+  comments: FeedPostComment[];
+  createdAt: string;
+}
+
+// Direct Message & Conversation items
+export interface DirectMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar: string;
+  text: string;
+  mediaUrl?: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  participant: SingleProfile;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  isOnline?: boolean;
+}
+
+// Verification Request item
+export interface VerificationSubmission {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  selfieUrl: string;
+  idDocumentUrl: string;
+  phoneNumber: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: string;
+  notes?: string;
+}
+
+// User Report item
+export interface ReportItem {
+  id: string;
+  reporterId: string;
+  reporterName: string;
+  targetId: string;
+  targetName: string;
+  targetType: 'profile' | 'post' | 'reel' | 'message';
+  category: 'fake_account' | 'scam' | 'harassment' | 'spam' | 'nudity' | 'other';
+  reason: string;
+  status: 'pending' | 'reviewed' | 'actioned' | 'dismissed';
+  createdAt: string;
+}
+
+// Ad Campaign item
+export interface AdCampaign {
+  id: string;
+  title: string;
+  sponsorName: string;
+  imageUrl: string;
+  linkUrl: string;
+  placement: 'homepage' | 'feed' | 'reels' | 'sidebar';
+  impressions: number;
+  clicks: number;
+  active: boolean;
+}
+
+// Notification item
+export interface NotificationItem {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'like' | 'match' | 'message' | 'verification' | 'system';
+  read: boolean;
+  createdAt: string;
+}
+

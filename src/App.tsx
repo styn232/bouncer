@@ -1,67 +1,109 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter } from 'lucide-react';
-import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats } from './types';
-import { Navbar } from './components/Navbar';
+import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye } from 'lucide-react';
+import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage } from './types';
+import { Navbar, MainTabType } from './components/Navbar';
 import { SinglesFilterBar } from './components/SinglesFilterBar';
 import { SingleCard } from './components/SingleCard';
 import { ProfileDetailModal } from './components/ProfileDetailModal';
-import { CartDrawer } from './components/CartDrawer';
 import { PaymentModal } from './components/PaymentModal';
 import { UserProfileEditorModal } from './components/UserProfileEditorModal';
 import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
 import { ToastNotification, Toast } from './components/ToastNotification';
 
+// Dating with Bouncer 2.0 Components
+import { HeroSection } from './components/HeroSection';
+import { DiscoverDeck } from './components/DiscoverDeck';
+import { BouncerReels } from './components/BouncerReels';
+import { StoriesBar } from './components/StoriesBar';
+import { SocialFeed } from './components/SocialFeed';
+import { WhoLikedMe } from './components/WhoLikedMe';
+import { VerificationModal } from './components/VerificationModal';
+import { SafetyCenterModal } from './components/SafetyCenterModal';
+import { ReportModal } from './components/ReportModal';
+import { MatchQuizModal } from './components/MatchQuizModal';
+
 export default function App() {
   // Navigation & Tabs state
-  const [activeTab, setActiveTab] = useState<'browse' | 'cart' | 'vip' | 'profile' | 'admin'>('browse');
+  const [activeTab, setActiveTab] = useState<MainTabType>('discover');
 
   // Check URL pathname for /admin
   useEffect(() => {
-    if (window.location.pathname === '/admin' || window.location.search.includes('admin=true')) {
+    if (window.location.pathname === '/admin') {
       setActiveTab('admin');
     }
   }, []);
 
-  // Site Settings state (Admin can upload logo and site icon)
-  const [siteSettings, setSiteSettings] = useState<{ siteName: string; logoUrl: string; iconUrl: string }>({
+  // Site Settings state
+  const [siteSettings, setSiteSettings] = useState<{ siteName: string; tagline: string; logoUrl: string; iconUrl: string }>({
     siteName: 'DATING WITH BOUNCER',
+    tagline: 'Real People. Real Connections. Real Possibilities.',
     logoUrl: '',
     iconUrl: ''
   });
 
-  const handleUpdateSiteSettings = (updated: Partial<{ siteName: string; logoUrl: string; iconUrl: string }>) => {
+  const handleUpdateSiteSettings = async (updated: Partial<{ siteName: string; tagline: string; logoUrl: string; iconUrl: string }>) => {
     setSiteSettings(prev => ({ ...prev, ...updated }));
     if (updated.siteName) {
       document.title = updated.siteName;
     }
-    addToast('Brand Settings Updated 🎨', 'Logo and site details updated successfully!', 'success');
+    try {
+      await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+      addToast('Branding Saved! 🎨', 'Logo, favicon, and brand settings updated.', 'success');
+    } catch (err) {
+      console.error('Failed to update site settings on server:', err);
+    }
   };
+
+  // Sync favicon with site settings iconUrl
+  useEffect(() => {
+    if (siteSettings.iconUrl) {
+      const faviconEl = document.getElementById('site-favicon') as HTMLLinkElement;
+      if (faviconEl) {
+        faviconEl.href = siteSettings.iconUrl;
+      }
+    }
+  }, [siteSettings.iconUrl]);
 
   // Data states
   const [profiles, setProfiles] = useState<SingleProfile[]>([]);
+  const [reels, setReels] = useState<ReelItem[]>([]);
+  const [stories, setStories] = useState<StoryItem[]>([]);
+  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [likers, setLikers] = useState<SingleProfile[]>([]);
+
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
-  const [currentUser, setCurrentUser] = useState<User>({
+  const [currentUser, setCurrentUser] = useState<User | null>({
     id: 'usr_demo',
-    email: 'single@bouncer.date',
-    name: 'Tendai Moyo',
-    age: 27,
+    email: 'kudzai@bouncer.date',
+    name: 'Kudzai Mugo',
+    age: 28,
     city: 'Harare',
     subLocation: 'Borrowdale',
     location: 'Harare (Borrowdale), Zimbabwe',
     childrenCount: 0,
     intent: 'Marriage',
     role: 'user',
-    subscriptionPlan: 'vip_monthly',
+    subscriptionPlan: 'free',
     subscriptionStatus: 'active',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-    bio: 'Verified VIP Single on Dating with Bouncer seeking genuine connection.',
+    bio: 'Looking for a genuine life partner on Bouncer.',
+    whatsappNumber: '+263 77 123 4567',
+    gender: 'female',
+    interests: ['Fine Dining', 'Travel', 'Music'],
     bouncerVerified: true,
     createdAt: new Date().toISOString()
   });
 
-  // Comprehensive Filter States
+  // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCity, setSelectedCity] = useState('all');
   const [selectedSubLocation, setSelectedSubLocation] = useState('all');
@@ -76,12 +118,17 @@ export default function App() {
   // Cart State
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  // Modals
+  // Modals state
   const [selectedProfileModal, setSelectedProfileModal] = useState<SingleProfile | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalInitialMode, setAuthModalInitialMode] = useState<'user' | 'admin'>('user');
+
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+  const [isSafetyModalOpen, setIsSafetyModalOpen] = useState(false);
+  const [isMatchQuizModalOpen, setIsMatchQuizModalOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{ id: string; name: string; type: 'profile' | 'post' | 'message' } | null>(null);
 
   // Admin Data states
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
@@ -112,7 +159,7 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Fetch Profiles from Backend with rich filter parameters
+  // Fetch Profiles from Backend
   const fetchProfiles = async () => {
     try {
       setIsLoadingProfiles(true);
@@ -139,13 +186,89 @@ export default function App() {
     }
   };
 
+  // Fetch Social & Chat Features Data
+  const fetchSocialData = async () => {
+    try {
+      const reelsRes = await fetch('/api/reels');
+      if (reelsRes.ok) setReels(await reelsRes.json());
+
+      const storiesRes = await fetch('/api/stories');
+      if (storiesRes.ok) setStories(await storiesRes.json());
+
+      const postsRes = await fetch('/api/posts');
+      if (postsRes.ok) setPosts(await postsRes.json());
+
+      const convsRes = await fetch('/api/conversations');
+      if (convsRes.ok) {
+        const convs = await convsRes.json();
+        setConversations(convs);
+        if (convs.length > 0 && !activeConvId) {
+          setActiveConvId(convs[0].id);
+        }
+      }
+
+      const likersRes = await fetch('/api/who-liked-me');
+      if (likersRes.ok) setLikers(await likersRes.json());
+    } catch (err) {
+      console.error('Failed to fetch social data:', err);
+    }
+  };
+
+  // Fetch Messages for Active Conversation
+  const fetchActiveMessages = async (convId: string) => {
+    try {
+      const res = await fetch(`/api/conversations/${convId}/messages`);
+      if (res.ok) {
+        setMessages(await res.json());
+      }
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeConvId) {
+      fetchActiveMessages(activeConvId);
+    }
+  }, [activeConvId]);
+
   // Fetch Auth & Admin Data
   const fetchInitialData = async () => {
     try {
-      const meRes = await fetch('/api/auth/me');
-      if (meRes.ok) {
-        const data = await meRes.json();
-        if (data.user) setCurrentUser(data.user);
+      // 1. Session Persistence Check
+      const savedUserStr = localStorage.getItem('bouncer_logged_user');
+      if (savedUserStr) {
+        try {
+          const savedUser = JSON.parse(savedUserStr);
+          setCurrentUser(savedUser);
+          // Sync with server
+          fetch('/api/auth/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: savedUser })
+          });
+        } catch (e) {
+          console.error('Error parsing stored user session:', e);
+        }
+      } else {
+        const meRes = await fetch('/api/auth/me');
+        if (meRes.ok) {
+          const data = await meRes.json();
+          if (data.user) {
+            setCurrentUser(data.user);
+            localStorage.setItem('bouncer_logged_user', JSON.stringify(data.user));
+          }
+        }
+      }
+
+      // 2. Fetch Site Settings
+      const settingsRes = await fetch('/api/settings');
+      if (settingsRes.ok) {
+        const st = await settingsRes.json();
+        if (st && st.siteName) {
+          setSiteSettings(st);
+          if (st.siteName) document.title = st.siteName;
+        }
       }
 
       const plansRes = await fetch('/api/subscriptions/plans');
@@ -177,13 +300,48 @@ export default function App() {
         const matches = await matchRes.json();
         setMatchOrders(matches);
       }
+
+      fetchSocialData();
     } catch (err) {
       console.error('Data fetch error:', err);
     }
   };
 
+  const handleApprovePayment = async (txId: string) => {
+    try {
+      const res = await fetch(`/api/admin/payments/${txId}/approve`, { method: 'PUT' });
+      if (res.ok) {
+        addToast('Payment Approved! 💳', 'User subscription plan activated successfully.', 'success');
+        fetchInitialData();
+        fetchProfiles();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRejectPayment = async (txId: string) => {
+    try {
+      const res = await fetch(`/api/admin/payments/${txId}/reject`, { method: 'PUT' });
+      if (res.ok) {
+        addToast('Payment Rejected ❌', 'Transaction rejected by admin.', 'info');
+        fetchInitialData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Poll real-time updates (notifications, transactions, profiles) every 6 seconds
   useEffect(() => {
-    fetchInitialData();
+    const interval = setInterval(() => {
+      fetchProfiles();
+      fetch('/api/payment/transactions')
+        .then(r => r.json())
+        .then(txs => setTransactions(txs))
+        .catch(() => {});
+    }, 6000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -201,8 +359,8 @@ export default function App() {
   ]);
 
   // Handle Tab Selection with Admin Auth Gate
-  const handleSelectTab = (tab: 'browse' | 'cart' | 'vip' | 'profile' | 'admin') => {
-    if (tab === 'admin' && currentUser.role !== 'admin') {
+  const handleSelectTab = (tab: MainTabType) => {
+    if (tab === 'admin' && currentUser?.role !== 'admin') {
       setAuthModalInitialMode('admin');
       setIsAuthModalOpen(true);
       return;
@@ -261,6 +419,116 @@ export default function App() {
     }
   };
 
+  // Swipe & Like Actions
+  const handleLikeProfile = async (targetId: string, type: 'like' | 'pass' | 'superlike') => {
+    try {
+      const res = await fetch('/api/likes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetProfileId: targetId, type })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.isMatch) {
+          addToast('IT\'S A MATCH! ❤️', `You and ${data.targetProfile?.name || 'a single'} liked each other! Start chatting now.`, 'bouncer');
+          fetchSocialData();
+        } else if (type === 'like' || type === 'superlike') {
+          addToast('Liked Profile ❤️', `Sent interest to ${data.targetProfile?.name || 'single'}.`, 'success');
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Social Feed Handlers
+  const handleCreatePost = async (content: string, mediaUrl?: string) => {
+    try {
+      const res = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, mediaUrl })
+      });
+      if (res.ok) {
+        addToast('Published to Community Feed! 💬', 'Your post is now live for singles on Bouncer.', 'success');
+        fetchSocialData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleLikePost = async (postId: string) => {
+    try {
+      const res = await fetch(`/api/posts/${postId}/like`, { method: 'POST' });
+      if (res.ok) fetchSocialData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCommentPost = async (postId: string, text: string) => {
+    try {
+      const res = await fetch(`/api/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      if (res.ok) fetchSocialData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Chat Handlers
+  const handleSendMessage = async (convId: string, text: string, mediaUrl?: string) => {
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: convId, text, mediaUrl })
+      });
+      if (res.ok) {
+        fetchActiveMessages(convId);
+        fetchSocialData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Verification & Safety Handlers
+  const handleSubmitVerification = async (selfieUrl: string, idDocumentUrl: string, phoneNumber: string) => {
+    try {
+      const res = await fetch('/api/verification/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selfieUrl, idDocumentUrl, phoneNumber })
+      });
+      if (res.ok) {
+        addToast('Verification Request Submitted 🛡️', 'Staff Bouncers are reviewing your document.', 'bouncer');
+        fetchInitialData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSubmitReport = async (targetId: string, targetName: string, targetType: string, category: string, reason: string) => {
+    try {
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetId, targetName, targetType, category, reason })
+      });
+      if (res.ok) {
+        addToast('Safety Report Filed', 'Staff moderators will inspect this report within 15 mins.', 'info');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // User Profile Saved
   const handleSaveUserProfile = async (updatedData: Partial<User>) => {
     try {
@@ -282,8 +550,7 @@ export default function App() {
 
   // Apply Bouncer Badge
   const handleApplyBouncerBadge = () => {
-    handleSaveUserProfile({ bouncerVerified: true });
-    addToast('Bouncer Verification Granted! 🛡️', 'Your profile is now Gold Badge Bouncer Verified!', 'bouncer');
+    setIsVerificationModalOpen(true);
   };
 
   // Admin Actions
@@ -307,12 +574,13 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      setCurrentUser(null);
-      setActiveTab('browse');
-      addToast('Logged Out', 'You have been logged out successfully.', 'info');
     } catch (err) {
       console.error('Logout error:', err);
     }
+    localStorage.removeItem('bouncer_logged_user');
+    setCurrentUser(null);
+    setActiveTab('home');
+    addToast('Logged Out', 'You have been logged out successfully.', 'info');
   };
 
   const handleAdminAddProfile = async (newProfData: Partial<SingleProfile>) => {
@@ -370,33 +638,6 @@ export default function App() {
     }
   };
 
-  // Switch Role helper for instant admin testing
-  const handleToggleAdminRole = async () => {
-    const nextRole = currentUser.role === 'admin' ? 'user' : 'admin';
-    const email = nextRole === 'admin' ? 'admin@bouncer.date' : 'single@bouncer.date';
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, role: nextRole })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCurrentUser(data.user);
-        addToast(
-          `Switched to ${nextRole === 'admin' ? 'Bouncer Admin' : 'Single User'}`,
-          `You are now viewing as ${data.user.name}`,
-          'bouncer'
-        );
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // Locations list derived from profiles
-  const locationsList = Array.from(new Set(profiles.map((p) => p.location))).sort();
-
   const handleResetFilters = () => {
     setSearchTerm('');
     setSelectedCity('all');
@@ -409,17 +650,15 @@ export default function App() {
     setSelectedBouncerStatus('all');
   };
 
-  // Filter and Sort Profiles (Newly added profiles prioritized at top)
+  // Filter and Sort Profiles
   const displayedProfiles = profiles
     .filter((p) => {
       if (selectedGender !== 'all') {
         return p.gender === selectedGender;
       }
-      // Show all profiles when selectedGender is 'all'
       return true;
     })
     .sort((a, b) => {
-      // Always feature newly added profiles first so users instantly see their additions!
       if (a.isNew && !b.isNew) return -1;
       if (!a.isNew && b.isNew) return 1;
       if (sortByStars) {
@@ -429,7 +668,7 @@ export default function App() {
     });
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-rose-500 selection:text-white">
       
       {/* Toast Notification Container */}
       <ToastNotification toasts={toasts} onDismiss={removeToast} />
@@ -459,95 +698,41 @@ export default function App() {
       />
 
       {/* Main Body View Switching */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 space-y-6">
         
-        {/* Admin Session Security Status Link (Only visible to Admin) */}
-        {currentUser.role === 'admin' && (
-          <div className="flex items-center justify-between bg-emerald-100/70 border border-emerald-300 rounded-2xl px-4 py-2.5 mb-6 text-xs text-emerald-950 shadow-sm">
+        {/* Admin Session Security Alert (Only visible to Admin) */}
+        {currentUser?.role === 'admin' && (
+          <div className="flex items-center justify-between bg-emerald-950/80 border border-emerald-500/40 rounded-2xl px-4 py-2.5 text-xs text-emerald-300 shadow-md">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
-              <span>Active Staff Session: <strong className="text-emerald-900">{currentUser.name}</strong></span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>Active Staff Session: <strong className="text-white">{currentUser.name}</strong></span>
             </div>
 
             <button
               onClick={() => setActiveTab('admin')}
-              className="text-emerald-800 hover:text-emerald-950 font-extrabold flex items-center gap-1 hover:underline"
+              className="text-emerald-400 hover:text-white font-extrabold flex items-center gap-1 hover:underline"
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
+              <ShieldCheck className="w-4 h-4" />
               Open Staff Control Panel
             </button>
           </div>
         )}
 
-        {/* VIEW 1: BROWSE SINGLES */}
-        {activeTab === 'browse' && (
-          <div>
-            {/* Singles Selection Pricing Alert Banner */}
-            <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 text-white rounded-2xl p-3.5 sm:p-4 mb-6 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 border border-emerald-600">
-              <div className="flex items-center gap-3">
-                <div className="p-2 sm:p-2.5 bg-emerald-950/40 text-emerald-200 rounded-xl border border-emerald-500/40 shrink-0">
-                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
-                </div>
-                <div>
-                  <h4 className="text-[11px] sm:text-xs font-black text-amber-300 uppercase tracking-wider">
-                    💡 Choose Singles Pricing Guide
-                  </h4>
-                  <p className="text-[11px] sm:text-xs text-emerald-50 mt-0.5 leading-snug">
-                    Select <strong className="text-amber-300 font-extrabold">$6 (1-3 Singles)</strong>, <strong className="text-amber-300 font-extrabold">$10 (4-10 Singles)</strong>, or <strong className="text-amber-300 font-extrabold">$15 VIP Access (30+ Singles)</strong> for direct WhatsApp numbers!
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setActiveTab('cart')}
-                className="w-full sm:w-auto px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-md shrink-0 transition-transform active:scale-95 text-center"
-              >
-                Chosen Singles ({cartItems.length})
-              </button>
-            </div>
-            
-            {/* Hero Section */}
-            <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-slate-900 border border-emerald-700 p-5 sm:p-10 mb-8 shadow-xl text-white">
-              <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-400/10 rounded-full filter blur-3xl pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-80 h-80 bg-amber-400/10 rounded-full filter blur-3xl pointer-events-none" />
-
-              <div className="relative z-10 max-w-3xl">
-                <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-emerald-950/60 border border-emerald-400/40 px-3 py-1 rounded-full text-emerald-200 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-3 shadow-sm">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>Verified Platform • 100% Zimbabwe Singles</span>
-                </div>
-
-                <h1 className="text-2xl sm:text-5xl font-extrabold text-white font-serif tracking-tight leading-tight mb-2 sm:mb-3 uppercase">
-                  DATING WITH BOUNCER
-                </h1>
-
-                <p className="text-[11px] sm:text-sm text-emerald-100 leading-relaxed mb-5 font-normal">
-                  Browse singles ranked by star ratings displaying <strong className="text-amber-300">Name, Age, Location, Gender, Children & Intent (Marriage or Funny)</strong>. Found someone? Click Choose Single to send your pick list for WhatsApp checkout!
-                </p>
-
-                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-                  <button
-                    onClick={() => setIsPaymentModalOpen(true)}
-                    className="px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[11px] sm:text-xs uppercase tracking-wider shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"
-                  >
-                    <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-slate-950" />
-                    Get $15 VIP Access (30+ Singles)
-                  </button>
-
-                  <button
-                    onClick={() => setIsUserModalOpen(true)}
-                    className="px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl bg-emerald-950/60 hover:bg-emerald-900 text-white border border-emerald-500/50 text-[11px] sm:text-xs font-bold transition-colors shadow-sm"
-                  >
-                    Update My Profile & Photos
-                  </button>
-                </div>
-              </div>
+        {/* DISCOVER & HOME TAB: DIRECT SINGLES DIRECTORY */}
+        {(activeTab === 'discover' || activeTab === 'home') && (
+          <div className="space-y-6">
+            {/* Main Singles Directory Section Header */}
+            <div className="border-b border-slate-800 pb-4">
+              <h2 className="text-2xl sm:text-3xl font-black text-white font-serif flex items-center gap-2">
+                <Flame className="w-6 h-6 sm:w-7 sm:h-7 text-amber-400 shrink-0" />
+                <span>Discover Vetted Singles</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                Browse verified singles in your area vetted by Bouncer Security.
+              </p>
             </div>
 
-            {/* RESPONSIVE LAYOUT: Side Bar Filter on PC (Desktop) & Top Filter Bar on Mobile */}
             <div className="flex flex-col lg:flex-row items-start gap-8">
-              
-              {/* Filter Sidebar / Top Bar Component */}
               <SinglesFilterBar
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
@@ -573,11 +758,10 @@ export default function App() {
                 totalResults={displayedProfiles.length}
               />
 
-              {/* Main Content Singles Grid */}
-              <div className="flex-1 w-full">
+              <div className="flex-1 w-full space-y-6">
                 {isLoadingProfiles ? (
                   <div className="text-center py-20 bg-slate-900/40 rounded-3xl border border-slate-800">
-                    <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <div className="w-10 h-10 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-xs text-slate-400">Loading Bouncer-vetted singles...</p>
                   </div>
                 ) : displayedProfiles.length === 0 ? (
@@ -589,47 +773,93 @@ export default function App() {
                     </p>
                     <button
                       onClick={handleResetFilters}
-                      className="px-4 py-2 bg-amber-500 text-slate-950 rounded-xl text-xs font-bold"
+                      className="px-4 py-2 bg-rose-500 text-white rounded-xl text-xs font-bold"
                     >
                       Clear All Filters
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-2.5 sm:gap-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
                     {displayedProfiles.map((profile) => (
                       <SingleCard
                         key={profile.id}
                         profile={profile}
-                        isInCart={cartItems.some((item) => item.profileId === profile.id)}
-                        onAddToCart={handleAddToCart}
-                        onViewDetails={(p) => setSelectedProfileModal(p)}
+                        currentUser={currentUser}
+                        onViewDetails={(p) => {
+                          setSelectedProfileModal(p);
+                          if (currentUser && currentUser.id !== p.id) {
+                            addToast('👀 Profile Viewed', `${currentUser.name} viewed ${p.name}'s profile. Notification sent to profile owner!`, 'info');
+                          }
+                        }}
                       />
                     ))}
                   </div>
                 )}
               </div>
-
             </div>
-
           </div>
         )}
 
-        {/* VIEW 2: SINGLES CART */}
-        {activeTab === 'cart' && (
-          <CartDrawer
-            isOpen={true}
-            onClose={() => setActiveTab('browse')}
-            cartItems={cartItems}
-            onRemoveFromCart={handleRemoveFromCart}
-            onUpdateCartItem={handleUpdateCartItem}
-            onCheckout={handleCartCheckoutSubmit}
+        {/* TAB 3: BOUNCER REELS */}
+        {activeTab === 'reels' && (
+          <div className="max-w-md mx-auto">
+            <BouncerReels
+              reels={reels}
+              onLikeReel={(id) => {
+                fetch(`/api/reels/${id}/like`, { method: 'POST' }).then(() => fetchSocialData());
+              }}
+              onCommentReel={(id) => {
+                const text = prompt('Add your comment on this Reel:');
+                if (text) {
+                  addToast('Comment Posted!', 'Your comment was added to the Reel.', 'success');
+                }
+              }}
+              onReportReel={(id, author) => setReportTarget({ id, name: author, type: 'post' })}
+            />
+          </div>
+        )}
+
+        {/* TAB 4: SOCIAL COMMUNITY FEED */}
+        {activeTab === 'feed' && (
+          <div className="max-w-2xl mx-auto space-y-6">
+            <StoriesBar
+              stories={stories}
+              currentUser={currentUser}
+              onAddStory={() => {
+                const url = prompt('Enter story photo URL:');
+                if (url) {
+                  fetch('/api/stories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mediaUrl: url, caption: 'Story update!' })
+                  }).then(() => fetchSocialData());
+                }
+              }}
+            />
+
+            <SocialFeed
+              posts={posts}
+              currentUser={currentUser}
+              onCreatePost={handleCreatePost}
+              onLikePost={handleLikePost}
+              onCommentPost={handleCommentPost}
+              onReportPost={(postId, name) => setReportTarget({ id: postId, name, type: 'post' })}
+            />
+          </div>
+        )}
+
+        {/* TAB 7: WHO LIKED ME */}
+        {activeTab === 'wholikedme' && (
+          <WhoLikedMe
+            likers={likers}
             currentUser={currentUser}
-            onOpenPayment={() => setIsPaymentModalOpen(true)}
+            onOpenUpgrade={() => setIsPaymentModalOpen(true)}
+            onSelectProfile={(p) => setSelectedProfileModal(p)}
           />
         )}
 
-        {/* VIEW 3: VIP MEMBERSHIP & PAYMENTS */}
-        {activeTab === 'vip' && (
+        {/* TAB 8: VIP MEMBERSHIP & PRICING */}
+        {activeTab === 'pricing' && (
           <div className="max-w-4xl mx-auto py-8">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
               <div className="text-center max-w-2xl mx-auto mb-10">
@@ -682,12 +912,12 @@ export default function App() {
                     <button
                       onClick={() => setIsPaymentModalOpen(true)}
                       className={`w-full py-3 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg transition-all ${
-                        currentUser.subscriptionPlan === plan.id
+                        currentUser?.subscriptionPlan === plan.id
                           ? 'bg-emerald-600 text-white cursor-default'
                           : 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950'
                       }`}
                     >
-                      {currentUser.subscriptionPlan === plan.id ? 'Current Active Plan' : 'Select Plan & Pay'}
+                      {currentUser?.subscriptionPlan === plan.id ? 'Current Active Plan' : 'Select Plan & Pay'}
                     </button>
                   </div>
                 ))}
@@ -696,33 +926,44 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 4: MY ACCOUNT & PROFILE EDIT */}
-        {activeTab === 'profile' && (
+        {/* TAB 9: MY PROFILE */}
+        {activeTab === 'profile' && currentUser && (
           <div className="max-w-2xl mx-auto py-8">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-              <div className="flex items-center justify-between pb-6 border-b border-slate-800 mb-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
+              <div className="flex items-center justify-between pb-6 border-b border-slate-800">
                 <div className="flex items-center gap-4">
                   <img
                     src={currentUser.avatar}
                     alt={currentUser.name}
                     referrerPolicy="no-referrer"
-                    className="w-16 h-16 rounded-2xl object-cover ring-2 ring-amber-500/40"
+                    className="w-16 h-16 rounded-2xl object-cover ring-2 ring-rose-500"
                   />
                   <div>
-                    <h2 className="text-2xl font-bold text-white font-serif">{currentUser.name}, {currentUser.age}</h2>
+                    <h2 className="text-2xl font-bold text-white font-serif flex items-center gap-2">
+                      <span>{currentUser.name}, {currentUser.age}</span>
+                      {currentUser.bouncerVerified && <ShieldCheck className="w-5 h-5 text-emerald-400" />}
+                    </h2>
                     <p className="text-xs text-slate-400">📍 {currentUser.location} • {currentUser.email}</p>
-                    <span className="inline-block mt-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full">
-                      {currentUser.subscriptionPlan.replace('_', ' ')} Member
+                    <span className="inline-block mt-1 bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full">
+                      {(currentUser.subscriptionPlan || 'free').replace('_', ' ')} Member
                     </span>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setIsUserModalOpen(true)}
-                  className="px-4 py-2 bg-amber-500 text-slate-950 text-xs font-bold rounded-xl"
-                >
-                  Edit My Profile
-                </button>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 text-xs font-bold shadow-xs">
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Profile Details Locked</span>
+                  </div>
+                  {currentUser.role === 'admin' && (
+                    <button
+                      onClick={() => setIsUserModalOpen(true)}
+                      className="text-[11px] text-amber-400 hover:underline font-bold"
+                    >
+                      Admin Profile Edit
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-4 text-xs">
@@ -749,13 +990,103 @@ export default function App() {
                   <div className="font-bold text-slate-400 uppercase mb-1">My Bio & Vibe</div>
                   <p className="text-slate-200">{currentUser.bio || 'No bio entered yet.'}</p>
                 </div>
+
+                {/* Owner-Only Profile Views & Notification Log */}
+                <div className="p-4 bg-slate-950/90 border border-amber-500/30 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-amber-300 font-extrabold text-xs sm:text-sm">
+                      <Eye className="w-4 h-4 text-amber-400" />
+                      <span>My Profile Views ({profiles.find(p => p.id === currentUser.id || p.name.toLowerCase() === currentUser.name.toLowerCase())?.viewsCount || 24} Views)</span>
+                    </div>
+                    <span className="text-[10px] text-amber-300 font-bold bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/40">
+                      Seen by Owner Only
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <p className="text-[11px] text-slate-400 font-medium">Recent Profile View Notifications:</p>
+                    <div className="space-y-1.5">
+                      <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 text-xs flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-amber-400">👁️</span>
+                          <span className="text-white font-bold">Chiedza Moyo</span>
+                          <span className="text-slate-300">has viewed your profile!</span>
+                        </div>
+                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Just now</span>
+                      </div>
+                      <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 text-xs flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-amber-400">👁️</span>
+                          <span className="text-white font-bold">Rudo Mpofu</span>
+                          <span className="text-slate-300">has viewed your profile!</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400">15 mins ago</span>
+                      </div>
+                      <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 text-xs flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-amber-400">👁️</span>
+                          <span className="text-white font-bold">Tarisai Ndlovu</span>
+                          <span className="text-slate-300">has viewed your profile!</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400">2 hours ago</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsVerificationModalOpen(true)}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Request Verification Badge Shield</span>
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* VIEW 5: BOUNCER ADMIN DASHBOARD (Protected - Only shown after admin login) */}
-        {activeTab === 'admin' && currentUser.role === 'admin' && (
+        {/* TAB 10: BOUNCER SAFETY CENTER */}
+        {activeTab === 'safety' && (
+          <div className="max-w-2xl mx-auto py-8">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 space-y-6">
+              <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+                <ShieldCheck className="w-8 h-8 text-emerald-400" />
+                <div>
+                  <h2 className="text-2xl font-black text-white font-serif">Bouncer Safety & Trust Center</h2>
+                  <p className="text-xs text-slate-400">Our promise for genuine, secure dating in Zimbabwe</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 text-xs text-slate-300">
+                <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-2xl">
+                  <h3 className="font-bold text-emerald-300 text-sm mb-1">100% Identity Vetted Community</h3>
+                  <p>Every profile is cross-checked using phone verification, selfie comparison, and Bouncer staff moderation.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-bold text-white text-sm">Key Safety Advice:</h4>
+                  <ul className="list-disc list-inside space-y-1.5 text-slate-400">
+                    <li>Never send money or wire transfers to anyone met online.</li>
+                    <li>Always meet in public locations (lounges, coffee shops) for your first dates.</li>
+                    <li>Keep early chat communications inside Dating With Bouncer.</li>
+                    <li>Report any suspicious activity immediately using our 1-click report button.</li>
+                  </ul>
+                </div>
+
+                <button
+                  onClick={() => setIsSafetyModalOpen(true)}
+                  className="w-full py-3 bg-slate-800 text-white font-bold text-xs rounded-xl border border-slate-700"
+                >
+                  Open Full Bouncer Safety Guidelines
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 11: BOUNCER ADMIN PANEL */}
+        {activeTab === 'admin' && currentUser?.role === 'admin' && (
           <AdminPanel
             profiles={profiles}
             stats={adminStats}
@@ -768,20 +1099,21 @@ export default function App() {
             onDeleteProfile={handleAdminDeleteProfile}
             onUpdateBouncerStatus={handleAdminUpdateBouncerStatus}
             onUpdateSiteSettings={handleUpdateSiteSettings}
+            onApprovePayment={handleApprovePayment}
+            onRejectPayment={handleRejectPayment}
             onRefreshData={fetchInitialData}
           />
         )}
 
       </main>
 
-      {/* Profile Detail Quick View Modal */}
+      {/* Quick View Profile Detail Modal */}
       <ProfileDetailModal
         profile={selectedProfileModal}
         isOpen={!!selectedProfileModal}
         currentUser={currentUser}
         onClose={() => setSelectedProfileModal(null)}
-        isInCart={selectedProfileModal ? cartItems.some((item) => item.profileId === selectedProfileModal.id) : false}
-        onAddToCart={handleAddToCart}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
       {/* Payment Gateway Modal */}
@@ -790,13 +1122,13 @@ export default function App() {
         onClose={() => setIsPaymentModalOpen(false)}
         plans={subscriptionPlans}
         currentUser={currentUser}
-        onPaymentSuccess={(planId) => {
+        onPaymentSuccess={() => {
           fetchInitialData();
-          addToast('Payment Successful! 🥂', 'Your VIP subscription plan has been upgraded.', 'success');
+          addToast('Payment Submitted! 🥂', 'Your payment is recorded and awaiting Bouncer Admin verification.', 'bouncer');
         }}
       />
 
-      {/* User Profile Features Editor Modal */}
+      {/* User Profile Editor Modal */}
       <UserProfileEditorModal
         isOpen={isUserModalOpen}
         onClose={() => setIsUserModalOpen(false)}
@@ -812,6 +1144,7 @@ export default function App() {
         initialMode={authModalInitialMode}
         onLoginSuccess={(user) => {
           setCurrentUser(user);
+          localStorage.setItem('bouncer_logged_user', JSON.stringify(user));
           if (user.role === 'admin') {
             setActiveTab('admin');
             addToast('Welcome Admin 🛡️', 'Authenticated to Bouncer Admin Backend.', 'bouncer');
@@ -822,28 +1155,70 @@ export default function App() {
         }}
       />
 
+      {/* Verification Shield Modal */}
+      <VerificationModal
+        isOpen={isVerificationModalOpen}
+        onClose={() => setIsVerificationModalOpen(false)}
+        onSubmitVerification={handleSubmitVerification}
+      />
+
+      {/* Safety Center Modal */}
+      <SafetyCenterModal
+        isOpen={isSafetyModalOpen}
+        onClose={() => setIsSafetyModalOpen(false)}
+      />
+
+      {/* Report User/Post Modal */}
+      {reportTarget && (
+        <ReportModal
+          isOpen={!!reportTarget}
+          targetId={reportTarget.id}
+          targetName={reportTarget.name}
+          targetType={reportTarget.type}
+          onClose={() => setReportTarget(null)}
+          onSubmitReport={handleSubmitReport}
+        />
+      )}
+
+      {/* Match Compatibility Quiz Modal */}
+      <MatchQuizModal
+        isOpen={isMatchQuizModalOpen}
+        onClose={() => setIsMatchQuizModalOpen(false)}
+        onCompleteQuiz={(score, answers) => {
+          addToast('Quiz Complete! ✨', `Your compatibility baseline is set to ${score}%!`, 'bouncer');
+        }}
+      />
+
       {/* Global Footer */}
       <footer className="bg-slate-950 border-t border-slate-900 py-8 text-xs text-slate-500 mt-12">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-amber-500" />
-            <span className="font-bold text-slate-300 font-serif">DATING WITH BOUNCER</span>
+            <span className="font-bold text-slate-300 font-serif">DATING WITH BOUNCER 2.0</span>
             <span>• Vetted Zimbabwe Singles Platform</span>
           </div>
 
-          <div className="flex items-center gap-4 text-[11px]">
-            <span>Name, Age & Location Display</span>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-[11px]">
+            <button onClick={() => setActiveTab('safety')} className="hover:text-white transition-colors">
+              Safety Center
+            </button>
             <span>•</span>
-            <span>Add to Cart Checkout</span>
+            <button onClick={() => setIsVerificationModalOpen(true)} className="hover:text-white transition-colors">
+              Get Verified Shield
+            </button>
+            <span>•</span>
+            <button onClick={() => setActiveTab('wholikedme')} className="hover:text-white transition-colors">
+              Who Liked Me
+            </button>
             <span>•</span>
             <button
               onClick={() => {
                 setAuthModalInitialMode('admin');
                 setIsAuthModalOpen(true);
               }}
-              className="text-amber-400 font-bold hover:underline"
+              className="text-rose-400 font-bold hover:underline"
             >
-              Admin Portal
+              Staff Admin Portal
             </button>
           </div>
         </div>
