@@ -25,14 +25,12 @@ import { ReportModal } from './components/ReportModal';
 import { MatchQuizModal } from './components/MatchQuizModal';
 
 export default function App() {
-  // Navigation & Tabs state
-  const [activeTab, setActiveTab] = useState<MainTabType>('discover');
+  // Navigation & Tabs state - Default to Admin mode
+  const [activeTab, setActiveTab] = useState<MainTabType>('admin');
 
   // Check URL pathname for /admin
   useEffect(() => {
-    if (window.location.pathname === '/admin') {
-      setActiveTab('admin');
-    }
+    setActiveTab('admin');
   }, []);
 
   // Site Settings state
@@ -82,23 +80,17 @@ export default function App() {
 
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>({
-    id: 'usr_demo',
-    email: 'kudzai@bouncer.date',
-    name: 'Kudzai Mugo',
-    age: 28,
+    id: 'usr_admin',
+    email: 'admin@bouncer.date',
+    name: 'Bouncer Chief Admin',
+    age: 35,
+    location: 'Harare HQ, Zimbabwe',
     city: 'Harare',
-    subLocation: 'Borrowdale',
-    location: 'Harare (Borrowdale), Zimbabwe',
-    childrenCount: 0,
-    intent: 'Marriage',
-    role: 'user',
-    subscriptionPlan: 'free',
+    role: 'admin',
+    subscriptionPlan: 'ultimate_access',
     subscriptionStatus: 'active',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-    bio: 'Looking for a genuine life partner on Bouncer.',
-    whatsappNumber: '+263 77 123 4567',
-    gender: 'female',
-    interests: ['Fine Dining', 'Travel', 'Music'],
+    bio: 'Head Bouncer and Dating Platform Administrator.',
     bouncerVerified: true,
     createdAt: new Date().toISOString()
   });
@@ -332,16 +324,9 @@ export default function App() {
     }
   };
 
-  // Poll real-time updates (notifications, transactions, profiles) every 6 seconds
+  // Initial fetch on mount without auto-refreshing polling
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchProfiles();
-      fetch('/api/payment/transactions')
-        .then(r => r.json())
-        .then(txs => setTransactions(txs))
-        .catch(() => {});
-    }, 6000);
-    return () => clearInterval(interval);
+    fetchInitialData();
   }, []);
 
   useEffect(() => {
@@ -766,20 +751,29 @@ export default function App() {
                   </div>
                 ) : displayedProfiles.length === 0 ? (
                   <div className="text-center py-20 bg-slate-900/50 border border-slate-800 rounded-3xl p-8">
-                    <Search className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                    <h3 className="text-lg font-bold text-white mb-1">No Singles Match Selected Criteria</h3>
-                    <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
-                      Try resetting city, age range, children count, gender, or intent filters to view more singles.
+                    <Search className="w-12 h-12 text-amber-400 mx-auto mb-3" />
+                    <h3 className="text-lg font-bold text-white mb-1">No Profiles Added Yet</h3>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto mb-5">
+                      The site is configured for manual administration. Add new single profiles directly using the Bouncer Admin Panel.
                     </p>
-                    <button
-                      onClick={handleResetFilters}
-                      className="px-4 py-2 bg-rose-500 text-white rounded-xl text-xs font-bold"
-                    >
-                      Clear All Filters
-                    </button>
+                    <div className="flex items-center justify-center gap-3">
+                      <button
+                        onClick={() => setActiveTab('admin')}
+                        className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 font-extrabold rounded-xl text-xs shadow-lg hover:brightness-110 transition-all flex items-center gap-2"
+                      >
+                        <Shield className="w-4 h-4" />
+                        <span>Go to Admin Panel & Add Singles</span>
+                      </button>
+                      <button
+                        onClick={handleResetFilters}
+                        className="px-4 py-2.5 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-all"
+                      >
+                        Reset Filters
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
                     {displayedProfiles.map((profile) => (
                       <SingleCard
                         key={profile.id}

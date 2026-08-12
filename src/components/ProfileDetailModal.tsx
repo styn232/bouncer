@@ -17,6 +17,8 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
   profile,
   isOpen,
   onClose,
+  isInCart,
+  onAddToCart,
   currentUser,
   onOpenAuth
 }) => {
@@ -421,18 +423,44 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
               </div>
             </div>
 
-            {/* Bottom Direct Contact CTA */}
-            <div className="pt-4 border-t border-slate-200">
-              {currentUser ? (
+            {/* Bottom Direct Contact & Choose Single CTA Bar */}
+            <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row gap-2">
+              {onAddToCart && (
+                <button
+                  type="button"
+                  onClick={() => onAddToCart(profile)}
+                  className={`flex-1 py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md active:scale-95 ${
+                    isInCart
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 ring-2 ring-amber-300'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  }`}
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>{isInCart ? '✓ Single Chosen' : 'Choose Single'}</span>
+                </button>
+              )}
+
+              {profile.whatsappNumber ? (
                 <a
-                  href={`https://wa.me/${(profile.whatsappNumber || '263771234567').replace(/[^0-9]/g, '')}?text=Hi%20${encodeURIComponent(profile.name.split(' ')[0])},%20I%20found%20your%20profile%20on%20Dating%20With%20Bouncer!`}
+                  href={`https://wa.me/${profile.whatsappNumber.replace(/[^0-9]/g, '')}?text=Hi%20${encodeURIComponent(profile.name.split(' ')[0])},%20I%20found%20your%20profile%20on%20Dating%20With%20Bouncer!`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full py-3.5 px-6 rounded-2xl font-extrabold text-xs uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 shadow-md"
+                  className="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider bg-emerald-700 hover:bg-emerald-600 text-white transition-all flex items-center justify-center gap-2 shadow-md"
                 >
-                  <MessageCircle className="w-5 h-5 text-white" />
-                  <span>Chat on WhatsApp with {profile.name.split(' ')[0]}</span>
+                  <MessageCircle className="w-4 h-4 text-white" />
+                  <span>Chat on WhatsApp</span>
                 </a>
+              ) : currentUser ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onAddToCart) onAddToCart(profile);
+                  }}
+                  className="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center justify-center gap-2 shadow-md"
+                >
+                  <Lock className="w-4 h-4 text-slate-950" />
+                  <span>Unlock Number via Paynow</span>
+                </button>
               ) : (
                 <button
                   type="button"
@@ -440,10 +468,10 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                     onClose();
                     if (onOpenAuth) onOpenAuth();
                   }}
-                  className="w-full py-3.5 px-6 rounded-2xl font-extrabold text-xs uppercase tracking-wider bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 transition-all flex items-center justify-center gap-2 shadow-md"
+                  className="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 transition-all flex items-center justify-center gap-2 shadow-md"
                 >
-                  <Lock className="w-5 h-5 text-slate-950" />
-                  <span>Sign Up to Select {profile.name.split(' ')[0]}</span>
+                  <Lock className="w-4 h-4 text-slate-950" />
+                  <span>Sign Up to Select</span>
                 </button>
               )}
             </div>

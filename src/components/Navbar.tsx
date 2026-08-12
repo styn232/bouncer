@@ -87,27 +87,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Desktop Navigation Tabs */}
           <nav className="hidden md:flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shadow-inner">
             <button
-              onClick={() => setActiveTab('discover')}
+              onClick={() => setActiveTab('home')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                activeTab === 'discover' || activeTab === 'home'
+                activeTab === 'home'
                   ? 'bg-gradient-to-r from-rose-600 to-amber-500 text-white shadow-md shadow-rose-950/50'
                   : 'text-slate-300 hover:text-white hover:bg-slate-800'
               }`}
             >
               <Flame className="w-4 h-4 text-amber-300" />
-              <span>Discover Singles</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('wholikedme')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                activeTab === 'wholikedme'
-                  ? 'bg-gradient-to-r from-rose-600 to-amber-500 text-white shadow-md shadow-rose-950/50'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <Heart className="w-4 h-4 text-rose-400" />
-              <span>Who Liked Me</span>
+              <span>Singles</span>
             </button>
 
             <button
@@ -187,7 +175,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         )}
                       </div>
                       <div className="text-[10px] text-amber-300 font-bold capitalize">
-                        {currentUser.subscriptionPlan ? currentUser.subscriptionPlan.replace('_', ' ') : 'Free'} Member
+                        {currentUser.subscriptionPlan ? currentUser.subscriptionPlan.replace('_', ' ') : 'Verified'} Member
                       </div>
                     </div>
                   </button>
@@ -210,23 +198,23 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Fixed Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800 py-2.5 px-4 flex items-center justify-around shadow-2xl">
         <button
-          onClick={() => setActiveTab('discover')}
-          className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-all ${
-            activeTab === 'discover' || activeTab === 'home' ? 'text-amber-400 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-200'
+          onClick={() => setActiveTab('admin')}
+          className={`flex flex-col items-center gap-1 text-[10px] font-extrabold transition-all ${
+            activeTab === 'admin' ? 'text-amber-400 font-extrabold scale-105' : 'text-amber-300/70 hover:text-amber-300'
           }`}
         >
-          <Flame className="w-5 h-5" />
-          <span>Discover</span>
+          <ShieldCheck className="w-5 h-5 text-amber-400" />
+          <span>Admin Panel</span>
         </button>
 
         <button
-          onClick={() => setActiveTab('wholikedme')}
+          onClick={() => setActiveTab('home')}
           className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-all ${
-            activeTab === 'wholikedme' ? 'text-rose-400 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-200'
+            activeTab === 'home' ? 'text-rose-400 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Heart className="w-5 h-5" />
-          <span>Who Liked</span>
+          <Flame className="w-5 h-5" />
+          <span>Singles</span>
         </button>
 
         <button
@@ -236,7 +224,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           }`}
         >
           <UserIcon className="w-5 h-5" />
-          <span>Profile</span>
+          <span>My Profile</span>
         </button>
       </nav>
     </>

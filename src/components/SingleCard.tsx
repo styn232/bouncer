@@ -13,6 +13,8 @@ interface SingleCardProps {
 
 export const SingleCard: React.FC<SingleCardProps> = ({
   profile,
+  isInCart,
+  onAddToCart,
   onViewDetails,
   currentUser
 }) => {
@@ -167,14 +169,32 @@ export const SingleCard: React.FC<SingleCardProps> = ({
           </div>
         </div>
 
-        {/* Action Button: View Profile */}
-        <div className="pt-2 sm:pt-3 border-t border-emerald-100">
+        {/* Action Buttons: Choose Single & View Profile */}
+        <div className="pt-2 sm:pt-3 border-t border-emerald-100 flex gap-2">
+          {onAddToCart && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToCart(profile);
+              }}
+              className={`flex-1 py-2.5 sm:py-3 px-2 sm:px-3 rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-[0.98] ${
+                isInCart
+                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 ring-2 ring-amber-400'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              {isInCart ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <UserCheck className="w-3.5 h-3.5" />}
+              <span className="truncate">{isInCart ? '✓ Single Chosen' : 'Choose Single'}</span>
+            </button>
+          )}
           <button
+            type="button"
             onClick={() => onViewDetails(profile)}
-            className="w-full py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md active:scale-[0.98]"
+            className={`${onAddToCart ? 'px-3 sm:px-4' : 'w-full'} py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md active:scale-[0.98] shrink-0`}
           >
-            <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-            <span>View Profile</span>
+            <Eye className="w-3.5 h-3.5 text-amber-400" />
+            <span>View</span>
           </button>
         </div>
 

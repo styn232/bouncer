@@ -17,13 +17,49 @@ import {
   INITIAL_VERIFICATIONS
 } from './src/data/mockData';
 import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, VerificationSubmission, ReportItem, AdCampaign, NotificationItem, SiteSettings } from './src/types';
+import { Paynow } from 'paynow';
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = 3000;
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+  const paynow = new Paynow(
+    process.env.PAYNOW_INTEGRATION_ID || '25938',
+    process.env.PAYNOW_INTEGRATION_KEY || 'd20d903a-d31a-47f1-8a65-5f9c9d3f0c07'
+  );
+  paynow.resultUrl = 'https://datingwithbouncer.com/api/paynow/result';
+  paynow.returnUrl = process.env.PAYNOW_RETURN_URL || 'https://datingwithbouncer.com/payment-success';
+
+  function activateUserSubscription(tx: PaymentTransaction) {
+    tx.status = 'succeeded';
+    const targetUser = users.find(u => u.id === tx.userId || (u.email && tx.userEmail && u.email.toLowerCase() === tx.userEmail.toLowerCase()));
+    if (targetUser) {
+      targetUser.subscriptionPlan = tx.planId as SubscriptionPlanId;
+      targetUser.subscriptionStatus = 'active';
+      targetUser.subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      targetUser.bouncerVerified = true;
+
+      if (currentUser && currentUser.id === targetUser.id) {
+        currentUser = { ...targetUser };
+      }
+    }
+
+    const existingNotif = notifications.find(n => n.userId === tx.userId && n.title.includes('Payment Approved'));
+    if (!existingNotif) {
+      notifications.unshift({
+        id: `notif_${Date.now()}`,
+        userId: tx.userId,
+        title: '🎉 Payment Approved!',
+        message: `Your payment of $${tx.amount} for ${tx.planName} has been verified & approved! VIP features activated.`,
+        type: 'system',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    }
+  }
 
   // In-memory persistent database states
   let siteSettings: SiteSettings = {
@@ -32,13 +68,9 @@ async function startServer() {
     logoUrl: '',
     iconUrl: ''
   };
-  let profiles: SingleProfile[] = INITIAL_PROFILES.map((p, i) => ({
-    ...p,
-    viewsCount: p.viewsCount || Math.floor((i + 1) * 27 + 14),
-    isOnline: i % 2 === 0
-  }));
+  let profiles: SingleProfile[] = [];
   let users: User[] = [MOCK_ADMIN_USER, MOCK_DEMO_USER];
-  let currentUser: User | null = MOCK_DEMO_USER;
+  let currentUser: User | null = MOCK_ADMIN_USER;
   let transactions: PaymentTransaction[] = [...MOCK_TRANSACTIONS];
   let matchOrders: MatchOrder[] = [...MOCK_MATCH_ORDERS];
 
@@ -46,37 +78,16 @@ async function startServer() {
   let stories: StoryItem[] = [...INITIAL_STORIES];
   let posts: FeedPost[] = [...INITIAL_POSTS];
   let conversations: Conversation[] = [...INITIAL_CONVERSATIONS];
-  let messages: DirectMessage[] = [
-    {
-      id: 'm1',
-      conversationId: 'conv_p1',
-      senderId: 'usr_demo',
-      senderName: 'Kudzai Mugo',
-      senderAvatar: MOCK_DEMO_USER.avatar,
-      text: 'Hi Chiedza! Loved your profile.',
-      read: true,
-      createdAt: '2026-08-10T10:30:00Z'
-    },
-    {
-      id: 'm2',
-      conversationId: 'conv_p1',
-      senderId: 'p1',
-      senderName: 'Chiedza Moyo',
-      senderAvatar: INITIAL_PROFILES[0].photos[0],
-      text: 'I loved reading your profile! Are you free for a coffee in Borrowdale this weekend?',
-      read: false,
-      createdAt: '2026-08-10T10:42:00Z'
-    }
-  ];
+  let messages: DirectMessage[] = [];
   let notifications: NotificationItem[] = [...INITIAL_NOTIFICATIONS];
   let ads: AdCampaign[] = [...INITIAL_ADS];
   let verifications: VerificationSubmission[] = [...INITIAL_VERIFICATIONS];
   let reports: ReportItem[] = [];
   let userLikes: Record<string, string[]> = {
-    'usr_demo': ['p1'] // Kudzai liked Chiedza
+    'usr_demo': ['p_tendai']
   };
   let userMatches: Record<string, string[]> = {
-    'usr_demo': ['p1'] // Kudzai matched with Chiedza
+    'usr_demo': ['p_tendai']
   };
 
   // API ROUTE 1: Health Check & Site Settings
@@ -410,7 +421,19 @@ async function startServer() {
       result = result.filter(p => p.intent === intent);
     }
 
-    res.json(result);
+    // Mask/hide WhatsApp contact numbers from public API response unless caller is Admin
+    const sanitizedResult = result.map(p => {
+      if (currentUser && currentUser.role === 'admin') {
+        return p;
+      }
+      const { whatsappNumber, ...rest } = p;
+      return {
+        ...rest,
+        whatsappNumber: undefined
+      };
+    });
+
+    res.json(sanitizedResult);
   });
 
   app.get('/api/profiles/:id', (req, res) => {
@@ -418,7 +441,14 @@ async function startServer() {
     if (!profile) {
       return res.status(404).json({ error: 'Profile not found' });
     }
-    res.json(profile);
+    if (currentUser && currentUser.role === 'admin') {
+      return res.json(profile);
+    }
+    const { whatsappNumber, ...rest } = profile;
+    res.json({
+      ...rest,
+      whatsappNumber: undefined
+    });
   });
 
   // Post a review on a single profile
@@ -606,62 +636,265 @@ async function startServer() {
     res.json({ success: true, message: 'User and single profile deleted successfully from Bouncer system.' });
   });
 
-  // API ROUTE 4: Subscriptions & Payment Gateway Processing
+  // API ROUTE 4: Subscriptions & Paynow Payment Gateway Processing
   app.get('/api/subscriptions/plans', (_req, res) => {
     res.json(SUBSCRIPTION_PLANS);
   });
 
-  app.post('/api/payment/subscribe', (req, res) => {
-    const { planId, cardHolderName, cardNumber, expDate, cvc, zipCode } = req.body;
+  // POST /api/payment/subscribe - Paynow Initiation Endpoint
+  app.post('/api/payment/subscribe', async (req, res) => {
+    try {
+      const { planId, profileIds } = req.body;
 
-    if (!planId || !cardNumber || !cvc) {
-      return res.status(400).json({ error: 'Payment details incomplete' });
+      if (!planId) {
+        return res.status(400).json({ error: 'Subscription plan is required' });
+      }
+
+      const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
+      if (!plan) {
+        return res.status(400).json({ error: 'Invalid subscription plan selected' });
+      }
+
+      const userEmail = currentUser ? currentUser.email : 'guest@bouncer.date';
+      const userName = currentUser ? currentUser.name : 'Valued Single';
+      const userId = currentUser ? currentUser.id : 'usr_guest';
+
+      const reference = `BOUNCER-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const payment = paynow.createPayment(reference, userEmail);
+      payment.add(plan.name, plan.price);
+
+      const response = await paynow.send(payment);
+
+      if (!response || !response.success) {
+        const errorMsg = response?.error || 'Failed to initiate Paynow transaction';
+        console.error('Paynow initiation failed:', errorMsg);
+        return res.status(500).json({ success: false, error: errorMsg });
+      }
+
+      const transaction: PaymentTransaction = {
+        id: `tx_${Date.now()}`,
+        reference,
+        paynowReference: '',
+        userId,
+        userName,
+        userEmail,
+        amount: plan.price,
+        planId: plan.id,
+        planName: plan.name,
+        profileIds: Array.isArray(profileIds) ? profileIds : [],
+        cardLast4: '',
+        cardBrand: 'Paynow',
+        status: 'pending',
+        pollUrl: response.pollUrl || '',
+        date: new Date().toISOString()
+      };
+
+      transactions.unshift(transaction);
+
+      notifications.unshift({
+        id: `notif_${Date.now()}`,
+        userId: 'usr_admin',
+        title: '💳 Paynow Payment Initiated',
+        message: `New Paynow transaction of $${plan.price} initiated by ${userName} (${userEmail}) for ${plan.name} [Ref: ${reference}].`,
+        type: 'system',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+
+      return res.json({
+        success: true,
+        reference,
+        transaction,
+        redirectUrl: response.redirectUrl,
+        pollUrl: response.pollUrl
+      });
+    } catch (err: any) {
+      console.error('Error initiating Paynow payment:', err?.message || err);
+      return res.status(500).json({ success: false, error: 'Internal server error processing payment initiation' });
     }
+  });
 
-    const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
-    if (!plan) {
-      return res.status(400).json({ error: 'Invalid subscription plan selected' });
+  // POST /api/payment/verify-and-get-numbers - Returns WhatsApp contact numbers ONLY after Paynow confirms Paid
+  app.post('/api/payment/verify-and-get-numbers', async (req, res) => {
+    try {
+      const { reference, profileIds } = req.body;
+
+      if (!reference) {
+        return res.status(400).json({ success: false, paid: false, error: 'Reference parameter is required' });
+      }
+
+      const tx = transactions.find(t => t.reference === reference || t.id === reference);
+      if (!tx) {
+        return res.status(404).json({ success: false, paid: false, error: 'Transaction reference not found' });
+      }
+
+      // If transaction is not marked succeeded yet, poll Paynow directly
+      if (tx.status !== 'succeeded' && tx.pollUrl) {
+        try {
+          const pollResult = await paynow.pollTransaction(tx.pollUrl);
+          if (pollResult) {
+            if (pollResult.paynowReference) {
+              tx.paynowReference = pollResult.paynowReference;
+            }
+            const statusStr = (pollResult.status || '').toString().toLowerCase();
+            if (statusStr === 'paid' || statusStr === 'awaiting delivery' || statusStr === 'delivered') {
+              activateUserSubscription(tx);
+            } else if (statusStr === 'cancelled' || statusStr === 'failed') {
+              tx.status = 'failed';
+            }
+          }
+        } catch (pollErr: any) {
+          console.error(`Paynow live poll error for ref ${reference}:`, pollErr?.message || pollErr);
+        }
+      }
+
+      // STRICT GATE: Check if status is Paid / succeeded
+      if (tx.status !== 'succeeded') {
+        return res.status(200).json({
+          success: false,
+          paid: false,
+          status: tx.status,
+          error: `Payment has not been confirmed as Paid by Paynow yet. Current Paynow status: ${tx.status}`,
+          unlockedContacts: []
+        });
+      }
+
+      // Payment confirmed Paid by Paynow! Retrieve requested profile WhatsApp numbers
+      const targetIds: string[] = (tx.profileIds && tx.profileIds.length > 0)
+        ? tx.profileIds
+        : (Array.isArray(profileIds) ? profileIds : []);
+
+      const unlockedContacts = targetIds.map(pid => {
+        const prof = profiles.find(p => p.id === pid);
+        if (!prof) return null;
+        return {
+          profileId: prof.id,
+          name: prof.name,
+          age: prof.age,
+          location: prof.location,
+          city: prof.city,
+          photos: prof.photos,
+          whatsappNumber: prof.whatsappNumber || '+263 71 578 6859'
+        };
+      }).filter(Boolean);
+
+      return res.json({
+        success: true,
+        paid: true,
+        status: 'succeeded',
+        reference: tx.reference,
+        paynowReference: tx.paynowReference,
+        unlockedContacts
+      });
+    } catch (err: any) {
+      console.error('Error verifying Paynow payment:', err?.message || err);
+      return res.status(500).json({ success: false, paid: false, error: 'Server error verifying Paynow transaction' });
     }
+  });
 
-    // Mask card digits
-    const cleanCard = cardNumber.replace(/\D/g, '');
-    const last4 = cleanCard.slice(-4) || '4242';
-    const cardBrand = cleanCard.startsWith('5') ? 'Mastercard' : cleanCard.startsWith('3') ? 'Amex' : 'Visa';
+  // POST /api/paynow/result - Paynow Async Result/Callback Endpoint
+  app.post('/api/paynow/result', async (req, res) => {
+    try {
+      const data = req.body || {};
+      const ref = data.reference || data.merchantreference || req.query.reference;
 
-    // Record Payment Transaction with status: 'pending_approval'
-    const transaction: PaymentTransaction = {
-      id: `tx_${Date.now()}`,
-      userId: currentUser ? currentUser.id : 'usr_guest',
-      userName: cardHolderName || (currentUser ? currentUser.name : 'Valued Single'),
-      userEmail: currentUser ? currentUser.email : 'guest@bouncer.date',
-      amount: plan.price,
-      planId: plan.id,
-      planName: plan.name,
-      cardLast4: last4,
-      cardBrand,
-      status: 'pending_approval',
-      date: new Date().toISOString()
-    };
+      if (!ref) {
+        return res.status(400).json({ error: 'Missing reference in callback' });
+      }
 
-    transactions.unshift(transaction);
+      const tx = transactions.find(t => t.reference === ref || t.id === ref);
+      if (!tx) {
+        console.warn(`Paynow callback received for unknown transaction reference: ${ref}`);
+        return res.status(200).json({ status: 'ok', message: 'Transaction reference not found' });
+      }
 
-    // Notify Admin of pending payment
-    notifications.unshift({
-      id: `notif_${Date.now()}`,
-      userId: 'usr_admin',
-      title: '💳 Payment Awaiting Approval',
-      message: `New payment of $${plan.price} from ${transaction.userName} (${transaction.userEmail}) for ${plan.name} is waiting for admin verification.`,
-      type: 'system',
-      read: false,
-      createdAt: new Date().toISOString()
-    });
+      if (tx.status === 'succeeded') {
+        return res.status(200).json({ status: 'ok', message: 'Transaction already succeeded' });
+      }
 
-    res.json({
-      success: true,
-      message: `Payment submitted successfully! Awaiting Bouncer Admin verification for ${plan.name}.`,
-      transaction,
-      user: currentUser
-    });
+      let isPaid = false;
+
+      if (tx.pollUrl) {
+        try {
+          const pollResult = await paynow.pollTransaction(tx.pollUrl);
+          if (pollResult) {
+            if (pollResult.paynowReference) {
+              tx.paynowReference = pollResult.paynowReference;
+            }
+            const statusStr = (pollResult.status || '').toString().toLowerCase();
+            if (statusStr === 'paid' || statusStr === 'awaiting delivery' || statusStr === 'delivered') {
+              isPaid = true;
+            } else if (statusStr === 'cancelled' || statusStr === 'failed') {
+              tx.status = 'failed';
+            }
+          }
+        } catch (pollErr: any) {
+          console.error(`Paynow poll error for ref ${ref}:`, pollErr?.message || pollErr);
+        }
+      }
+
+      if (!isPaid && data.status) {
+        const rawStatus = data.status.toString().toLowerCase();
+        if (rawStatus === 'paid' || rawStatus === 'awaiting delivery' || rawStatus === 'delivered') {
+          isPaid = true;
+        }
+      }
+
+      if (isPaid) {
+        activateUserSubscription(tx);
+        return res.status(200).json({ status: 'ok', message: 'Payment confirmed & subscription activated' });
+      }
+
+      return res.status(200).json({ status: 'ok', message: 'Callback received, payment pending' });
+    } catch (err: any) {
+      console.error('Error handling Paynow result callback:', err?.message || err);
+      return res.status(500).json({ error: 'Server error processing callback' });
+    }
+  });
+
+  // GET /api/payment/status/:reference - Payment Status Verification Endpoint
+  app.get('/api/payment/status/:reference', async (req, res) => {
+    try {
+      const ref = req.params.reference;
+      const tx = transactions.find(t => t.reference === ref || t.id === ref);
+
+      if (!tx) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+
+      if (tx.status === 'succeeded') {
+        return res.json({ success: true, status: tx.status, transaction: tx });
+      }
+
+      if (tx.pollUrl) {
+        try {
+          const pollResult = await paynow.pollTransaction(tx.pollUrl);
+          if (pollResult) {
+            if (pollResult.paynowReference) {
+              tx.paynowReference = pollResult.paynowReference;
+            }
+            const statusStr = (pollResult.status || '').toString().toLowerCase();
+            if (statusStr === 'paid' || statusStr === 'awaiting delivery' || statusStr === 'delivered') {
+              activateUserSubscription(tx);
+            } else if (statusStr === 'cancelled' || statusStr === 'failed') {
+              tx.status = 'failed';
+            }
+          }
+        } catch (pollErr: any) {
+          console.error(`Status polling error for ref ${ref}:`, pollErr?.message || pollErr);
+        }
+      }
+
+      return res.json({
+        success: true,
+        status: tx.status,
+        transaction: tx
+      });
+    } catch (err: any) {
+      console.error('Error fetching payment status:', err?.message || err);
+      return res.status(500).json({ error: 'Failed to retrieve payment status' });
+    }
   });
 
   // Admin Payment Approval & Rejection Routes

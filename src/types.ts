@@ -128,8 +128,12 @@ export interface PaymentTransaction {
   planName: string;
   cardLast4: string;
   cardBrand: string;
-  status: 'pending_approval' | 'succeeded' | 'processing' | 'failed' | 'rejected';
+  status: 'pending_approval' | 'succeeded' | 'processing' | 'failed' | 'rejected' | 'pending';
   date: string;
+  reference?: string;
+  pollUrl?: string;
+  paynowReference?: string;
+  profileIds?: string[];
 }
 
 export interface AdminStats {
