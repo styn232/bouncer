@@ -1,4 +1,4 @@
-import { SingleProfile, SubscriptionPlan, User, PaymentTransaction, MatchOrder, SiteSettings } from '../types';
+import { SingleProfile, SubscriptionPlan, User, PaymentTransaction, MatchOrder, SiteSettings, ReelItem, StoryItem, FeedPost, Conversation, NotificationItem } from '../types';
 
 export const INITIAL_SITE_SETTINGS: SiteSettings = {
   siteName: 'DATING WITH BOUNCER',

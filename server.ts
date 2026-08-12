@@ -30,7 +30,7 @@ async function startServer() {
     process.env.PAYNOW_INTEGRATION_ID || '25938',
     process.env.PAYNOW_INTEGRATION_KEY || 'd20d903a-d31a-47f1-8a65-5f9c9d3f0c07'
   );
-  paynow.resultUrl = 'https://datingwithbouncer.com/api/paynow/result';
+  paynow.resultUrl = process.env.PAYNOW_RESULT_URL || 'https://datingwithbouncer.com/api/paynow/result';
   paynow.returnUrl = process.env.PAYNOW_RETURN_URL || 'https://datingwithbouncer.com/payment-success';
 
   function activateUserSubscription(tx: PaymentTransaction) {
