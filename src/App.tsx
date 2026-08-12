@@ -25,12 +25,14 @@ import { ReportModal } from './components/ReportModal';
 import { MatchQuizModal } from './components/MatchQuizModal';
 
 export default function App() {
-  // Navigation & Tabs state - Default to Admin mode
-  const [activeTab, setActiveTab] = useState<MainTabType>('admin');
+  // Navigation & Tabs state - Default to Home tab
+  const [activeTab, setActiveTab] = useState<MainTabType>('home');
 
   // Check URL pathname for /admin
   useEffect(() => {
-    setActiveTab('admin');
+    if (window.location.pathname === '/admin') {
+      setActiveTab('admin');
+    }
   }, []);
 
   // Site Settings state
@@ -79,21 +81,7 @@ export default function App() {
   const [likers, setLikers] = useState<SingleProfile[]>([]);
 
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
-  const [currentUser, setCurrentUser] = useState<User | null>({
-    id: 'usr_admin',
-    email: 'admin@bouncer.date',
-    name: 'Bouncer Chief Admin',
-    age: 35,
-    location: 'Harare HQ, Zimbabwe',
-    city: 'Harare',
-    role: 'admin',
-    subscriptionPlan: 'ultimate_access',
-    subscriptionStatus: 'active',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-    bio: 'Head Bouncer and Dating Platform Administrator.',
-    bouncerVerified: true,
-    createdAt: new Date().toISOString()
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -685,24 +673,6 @@ export default function App() {
       {/* Main Body View Switching */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 space-y-6">
         
-        {/* Admin Session Security Alert (Only visible to Admin) */}
-        {currentUser?.role === 'admin' && (
-          <div className="flex items-center justify-between bg-emerald-950/80 border border-emerald-500/40 rounded-2xl px-4 py-2.5 text-xs text-emerald-300 shadow-md">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>Active Staff Session: <strong className="text-white">{currentUser.name}</strong></span>
-            </div>
-
-            <button
-              onClick={() => setActiveTab('admin')}
-              className="text-emerald-400 hover:text-white font-extrabold flex items-center gap-1 hover:underline"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              Open Staff Control Panel
-            </button>
-          </div>
-        )}
-
         {/* DISCOVER & HOME TAB: DIRECT SINGLES DIRECTORY */}
         {(activeTab === 'discover' || activeTab === 'home') && (
           <div className="space-y-6">

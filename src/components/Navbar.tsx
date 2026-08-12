@@ -197,15 +197,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Fixed Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800 py-2.5 px-4 flex items-center justify-around shadow-2xl">
-        <button
-          onClick={() => setActiveTab('admin')}
-          className={`flex flex-col items-center gap-1 text-[10px] font-extrabold transition-all ${
-            activeTab === 'admin' ? 'text-amber-400 font-extrabold scale-105' : 'text-amber-300/70 hover:text-amber-300'
-          }`}
-        >
-          <ShieldCheck className="w-5 h-5 text-amber-400" />
-          <span>Admin Panel</span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab('admin')}
+            className={`flex flex-col items-center gap-1 text-[10px] font-extrabold transition-all ${
+              activeTab === 'admin' ? 'text-amber-400 font-extrabold scale-105' : 'text-amber-300/70 hover:text-amber-300'
+            }`}
+          >
+            <ShieldCheck className="w-5 h-5 text-amber-400" />
+            <span>Admin Panel</span>
+          </button>
+        )}
 
         <button
           onClick={() => setActiveTab('home')}
