@@ -24,6 +24,7 @@ import { VerificationModal } from './components/VerificationModal';
 import { SafetyCenterModal } from './components/SafetyCenterModal';
 import { ReportModal } from './components/ReportModal';
 import { MatchQuizModal } from './components/MatchQuizModal';
+import { auth, onAuthStateChanged, signOut, db, doc, getDoc } from './lib/firebase';
 
 export default function App() {
   // Navigation & Tabs state - Default to Home tab
@@ -222,19 +223,73 @@ export default function App() {
     }
   }, [activeConvId]);
 
+  // Firebase Auth & Session Synchronization
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        try {
+          let userRole: 'user' | 'admin' = 
+            (fbUser.email && (fbUser.email.toLowerCase() === 'admin@bouncer.date' || fbUser.email.toLowerCase() === 'jobsatespace@gmail.com')) 
+              ? 'admin' 
+              : 'user';
+
+          let userData: any = {
+            id: fbUser.uid,
+            uid: fbUser.uid,
+            email: fbUser.email || '',
+            name: fbUser.displayName || (userRole === 'admin' ? 'Bouncer Admin' : 'Member'),
+            avatar: fbUser.photoURL || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80`,
+            role: userRole,
+            subscriptionPlan: userRole === 'admin' ? 'vip_15_singles' : 'free',
+            bouncerVerified: userRole === 'admin'
+          };
+
+          try {
+            const userSnap = await getDoc(doc(db, 'users', fbUser.uid));
+            if (userSnap.exists()) {
+              const docData = userSnap.data();
+              userData = { ...userData, ...docData };
+            }
+          } catch (e) {
+            console.warn('Could not read user doc from Firestore:', e);
+          }
+
+          setCurrentUser(userData);
+          localStorage.setItem('bouncer_logged_user', JSON.stringify(userData));
+
+          // Sync with backend
+          fetch('/api/auth/firebase-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              uid: fbUser.uid,
+              email: fbUser.email,
+              name: userData.name,
+              role: userData.role,
+              avatar: userData.avatar
+            })
+          });
+        } catch (err) {
+          console.error('Firebase onAuthStateChanged sync error:', err);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // Fetch Auth & Admin Data
   const fetchInitialData = async () => {
     try {
-      // 1. Session Persistence Check - Ensure visitors are NEVER automatically logged in as admin
+      // 1. Session Persistence Check
       const savedUserStr = localStorage.getItem('bouncer_logged_user');
+      let currentSessionUser: User | null = null;
+
       if (savedUserStr) {
         try {
           const savedUser = JSON.parse(savedUserStr);
-          if (savedUser && savedUser.role === 'admin') {
-            // Clear any lingering or default admin sessions so new visitors start as guests
-            localStorage.removeItem('bouncer_logged_user');
-            setCurrentUser(null);
-          } else if (savedUser && savedUser.id) {
+          if (savedUser && (savedUser.id || savedUser.email)) {
+            currentSessionUser = savedUser;
             setCurrentUser(savedUser);
             // Sync with server
             fetch('/api/auth/sync', {
@@ -246,17 +301,15 @@ export default function App() {
         } catch (e) {
           console.error('Error parsing stored user session:', e);
           localStorage.removeItem('bouncer_logged_user');
-          setCurrentUser(null);
         }
       } else {
         const meRes = await fetch('/api/auth/me');
         if (meRes.ok) {
           const data = await meRes.json();
-          if (data.user && data.user.role !== 'admin') {
+          if (data.user && (data.user.id || data.user.email)) {
+            currentSessionUser = data.user;
             setCurrentUser(data.user);
             localStorage.setItem('bouncer_logged_user', JSON.stringify(data.user));
-          } else {
-            setCurrentUser(null);
           }
         }
       }
@@ -277,16 +330,26 @@ export default function App() {
         setSubscriptionPlans(plans);
       }
 
-      // Fetch admin data only if logged in as admin
-      const isUserAdmin = (savedUserStr && JSON.parse(savedUserStr)?.role === 'admin');
+      // Fetch admin data if current user is admin
+      const isUserAdmin = currentSessionUser?.role === 'admin' || (currentUser?.role === 'admin');
       if (isUserAdmin) {
-        const statsRes = await fetch('/api/admin/stats');
+        const statsRes = await fetch('/api/admin/stats', {
+          headers: {
+            'x-user-role': 'admin',
+            'x-user-email': currentSessionUser?.email || currentUser?.email || 'admin@bouncer.date'
+          }
+        });
         if (statsRes.ok) {
           const stats = await statsRes.json();
           setAdminStats(stats);
         }
 
-        const subRes = await fetch('/api/admin/subscriptions');
+        const subRes = await fetch('/api/admin/subscriptions', {
+          headers: {
+            'x-user-role': 'admin',
+            'x-user-email': currentSessionUser?.email || currentUser?.email || 'admin@bouncer.date'
+          }
+        });
         if (subRes.ok) {
           const subs = await subRes.json();
           setUserSubscriptions(subs.userSubscriptions || []);
@@ -569,6 +632,11 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.warn('Firebase signout note:', e);
+    }
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch (err) {
@@ -1258,12 +1326,16 @@ export default function App() {
             <span>•</span>
             <button
               onClick={() => {
-                setAuthModalInitialMode('admin');
-                setIsAuthModalOpen(true);
+                if (currentUser?.role === 'admin') {
+                  setActiveTab('admin');
+                } else {
+                  setAuthModalInitialMode('admin');
+                  setIsAuthModalOpen(true);
+                }
               }}
               className="text-rose-400 font-bold hover:underline"
             >
-              Staff Admin Portal
+              {currentUser?.role === 'admin' ? 'Open Admin Panel' : 'Staff Admin Portal'}
             </button>
           </div>
         </div>
