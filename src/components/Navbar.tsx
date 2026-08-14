@@ -77,9 +77,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="font-extrabold text-base sm:text-xl tracking-tight bg-gradient-to-r from-white via-rose-200 to-amber-200 bg-clip-text text-transparent font-serif uppercase">
                   DATING WITH BOUNCER
                 </span>
-                <span className="hidden sm:inline-block bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[9px] uppercase font-black px-1.5 py-0.5 rounded-full">
-                  2.0
-                </span>
               </div>
               <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium hidden sm:block">
                 {tagline}
@@ -200,7 +197,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       )}
                     </div>
                     <div className="text-[10px] text-amber-300 font-bold capitalize">
-                      {currentUser.role === 'admin' ? 'Admin' : `${(currentUser.subscriptionPlan || 'free').replace('_', ' ')} Member`}
+                      {currentUser?.role === 'admin' ? 'Admin' : `${(currentUser?.subscriptionPlan || 'free').replace('_', ' ')} Member`}
                     </div>
                   </div>
                 </button>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye } from 'lucide-react';
+import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye, RefreshCw } from 'lucide-react';
 import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage } from './types';
 import { Navbar, MainTabType } from './components/Navbar';
 import { SinglesFilterBar } from './components/SinglesFilterBar';
@@ -13,7 +13,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
 import { ToastNotification, Toast } from './components/ToastNotification';
 
-// Dating with Bouncer 2.0 Components
+// Dating with Bouncer Components
 import { HeroSection } from './components/HeroSection';
 import { DiscoverDeck } from './components/DiscoverDeck';
 import { BouncerReels } from './components/BouncerReels';
@@ -28,13 +28,14 @@ import { MatchQuizModal } from './components/MatchQuizModal';
 export default function App() {
   // Navigation & Tabs state - Default to Home tab
   const [activeTab, setActiveTab] = useState<MainTabType>('home');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Check URL pathname for /admin
+  // Check URL pathname for /admin - only if authenticated as admin
   useEffect(() => {
-    if (window.location.pathname === '/admin') {
+    if (window.location.pathname === '/admin' && currentUser?.role === 'admin') {
       setActiveTab('admin');
     }
-  }, []);
+  }, [currentUser]);
 
   // Site Settings state
   const [siteSettings, setSiteSettings] = useState<{ siteName: string; tagline: string; logoUrl: string; iconUrl: string }>({
@@ -82,7 +83,6 @@ export default function App() {
   const [likers, setLikers] = useState<SingleProfile[]>([]);
 
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -225,28 +225,38 @@ export default function App() {
   // Fetch Auth & Admin Data
   const fetchInitialData = async () => {
     try {
-      // 1. Session Persistence Check
+      // 1. Session Persistence Check - Ensure visitors are NEVER automatically logged in as admin
       const savedUserStr = localStorage.getItem('bouncer_logged_user');
       if (savedUserStr) {
         try {
           const savedUser = JSON.parse(savedUserStr);
-          setCurrentUser(savedUser);
-          // Sync with server
-          fetch('/api/auth/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user: savedUser })
-          });
+          if (savedUser && savedUser.role === 'admin') {
+            // Clear any lingering or default admin sessions so new visitors start as guests
+            localStorage.removeItem('bouncer_logged_user');
+            setCurrentUser(null);
+          } else if (savedUser && savedUser.id) {
+            setCurrentUser(savedUser);
+            // Sync with server
+            fetch('/api/auth/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ user: savedUser })
+            });
+          }
         } catch (e) {
           console.error('Error parsing stored user session:', e);
+          localStorage.removeItem('bouncer_logged_user');
+          setCurrentUser(null);
         }
       } else {
         const meRes = await fetch('/api/auth/me');
         if (meRes.ok) {
           const data = await meRes.json();
-          if (data.user) {
+          if (data.user && data.user.role !== 'admin') {
             setCurrentUser(data.user);
             localStorage.setItem('bouncer_logged_user', JSON.stringify(data.user));
+          } else {
+            setCurrentUser(null);
           }
         }
       }
@@ -267,22 +277,26 @@ export default function App() {
         setSubscriptionPlans(plans);
       }
 
-      const statsRes = await fetch('/api/admin/stats');
-      if (statsRes.ok) {
-        const stats = await statsRes.json();
-        setAdminStats(stats);
+      // Fetch admin data only if logged in as admin
+      const isUserAdmin = (savedUserStr && JSON.parse(savedUserStr)?.role === 'admin');
+      if (isUserAdmin) {
+        const statsRes = await fetch('/api/admin/stats');
+        if (statsRes.ok) {
+          const stats = await statsRes.json();
+          setAdminStats(stats);
+        }
+
+        const subRes = await fetch('/api/admin/subscriptions');
+        if (subRes.ok) {
+          const subs = await subRes.json();
+          setUserSubscriptions(subs.userSubscriptions || []);
+        }
       }
 
       const txRes = await fetch('/api/payment/transactions');
       if (txRes.ok) {
         const txs = await txRes.json();
         setTransactions(txs);
-      }
-
-      const subRes = await fetch('/api/admin/subscriptions');
-      if (subRes.ok) {
-        const subs = await subRes.json();
-        setUserSubscriptions(subs.userSubscriptions || []);
       }
 
       const matchRes = await fetch('/api/matches');
@@ -740,23 +754,17 @@ export default function App() {
                 ) : displayedProfiles.length === 0 ? (
                   <div className="text-center py-20 bg-slate-900/50 border border-slate-800 rounded-3xl p-8">
                     <Search className="w-12 h-12 text-amber-400 mx-auto mb-3" />
-                    <h3 className="text-lg font-bold text-white mb-1">No Profiles Added Yet</h3>
+                    <h3 className="text-lg font-bold text-white mb-1">No Profiles Matching Filters</h3>
                     <p className="text-xs text-slate-400 max-w-sm mx-auto mb-5">
-                      The site is configured for manual administration. Add new single profiles directly using the Bouncer Admin Panel.
+                      Try adjusting or resetting your search criteria to discover more verified singles.
                     </p>
                     <div className="flex items-center justify-center gap-3">
                       <button
-                        onClick={() => setActiveTab('admin')}
+                        onClick={handleResetFilters}
                         className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 font-extrabold rounded-xl text-xs shadow-lg hover:brightness-110 transition-all flex items-center gap-2"
                       >
-                        <Shield className="w-4 h-4" />
-                        <span>Go to Admin Panel & Add Singles</span>
-                      </button>
-                      <button
-                        onClick={handleResetFilters}
-                        className="px-4 py-2.5 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition-all"
-                      >
-                        Reset Filters
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Reset All Filters</span>
                       </button>
                     </div>
                   </div>
@@ -939,7 +947,7 @@ export default function App() {
                     <Lock className="w-3.5 h-3.5 text-amber-400" />
                     <span>Profile Details Locked</span>
                   </div>
-                  {currentUser.role === 'admin' && (
+                  {currentUser?.role === 'admin' && (
                     <button
                       onClick={() => setIsUserModalOpen(true)}
                       className="text-[11px] text-amber-400 hover:underline font-bold"
@@ -1182,7 +1190,7 @@ export default function App() {
         onLoginSuccess={(user) => {
           setCurrentUser(user);
           localStorage.setItem('bouncer_logged_user', JSON.stringify(user));
-          if (user.role === 'admin') {
+          if (user?.role === 'admin') {
             setActiveTab('admin');
             addToast('Welcome Admin 🛡️', 'Authenticated to Bouncer Admin Backend.', 'bouncer');
           } else {
@@ -1231,7 +1239,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-amber-500" />
-            <span className="font-bold text-slate-300 font-serif">DATING WITH BOUNCER 2.0</span>
+            <span className="font-bold text-slate-300 font-serif">DATING WITH BOUNCER</span>
             <span>• Vetted Zimbabwe Singles Platform</span>
           </div>
 

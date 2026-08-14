@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "User": {
+      "collection": "users",
+      "fields": {
+        "id": { "type": "string", "description": "Unique user ID / UID" },
+        "email": { "type": "string", "description": "User email address" },
+        "name": { "type": "string", "description": "User display name" },
+        "role": { "type": "string", "description": "User role: admin or user" },
+        "age": { "type": "number", "description": "User age" },
+        "gender": { "type": "string", "description": "User gender" },
+        "location": { "type": "string", "description": "User location" },
+        "city": { "type": "string", "description": "User city" },
+        "subLocation": { "type": "string", "description": "User sub-location" },
+        "intent": { "type": "string", "description": "Dating intent" },
+        "whatsappNumber": { "type": "string", "description": "WhatsApp contact number" },
+        "avatar": { "type": "string", "description": "User profile avatar image URL" },
+        "subscriptionPlan": { "type": "string", "description": "Subscription tier" },
+        "bouncerVerified": { "type": "boolean", "description": "Whether ID is verified by bouncer" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "AdminAccount": {
+      "collection": "admin_accounts",
+      "fields": {
+        "uid": { "type": "string", "description": "Admin UID" },
+        "email": { "type": "string", "description": "Admin email address" },
+        "name": { "type": "string", "description": "Admin name" },
+        "role": { "type": "string", "description": "Fixed as admin" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" }
+      }
+    },
+    "SiteSettings": {
+      "collection": "site_settings",
+      "fields": {
+        "siteName": { "type": "string", "description": "Platform brand name" },
+        "tagline": { "type": "string", "description": "Tagline" },
+        "logoUrl": { "type": "string", "description": "Logo URL" },
+        "iconUrl": { "type": "string", "description": "Icon URL" }
+      }
+    }
+  }
+}

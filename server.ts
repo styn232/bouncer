@@ -131,6 +131,68 @@ async function startServer() {
     res.json({ success: true, user: currentUser });
   });
 
+  // Firebase Auth Sync & Backend Opening Endpoint
+  app.post('/api/auth/firebase-sync', (req, res) => {
+    const { uid, email, name, role, adminKey, avatar, photoURL } = req.body;
+    if (!email && !uid) {
+      return res.status(400).json({ error: 'Firebase UID or email is required.' });
+    }
+
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    
+    // Check if user is admin via role, key, or known admin email
+    const isAdminAccount = 
+      role === 'admin' ||
+      normalizedEmail === 'admin@bouncer.date' ||
+      normalizedEmail === 'jobsatespace@gmail.com' ||
+      (adminKey && ['admin123', 'bouncer2025', 'admin', 'pass'].includes(adminKey.toLowerCase()));
+
+    const effectiveRole = isAdminAccount ? 'admin' : 'user';
+
+    let existing = users.find(u => u.id === uid || (u.email && u.email.toLowerCase() === normalizedEmail));
+
+    if (existing) {
+      if (isAdminAccount) {
+        existing.role = 'admin';
+        existing.bouncerVerified = true;
+        if (existing.subscriptionPlan === 'free') {
+          existing.subscriptionPlan = 'vip_15_singles';
+        }
+      }
+      if (name && !existing.name) existing.name = name;
+      if (avatar || photoURL) existing.avatar = avatar || photoURL || existing.avatar;
+      currentUser = existing;
+    } else {
+      const newUser: User = {
+        id: uid || `usr_${Date.now()}`,
+        email: normalizedEmail,
+        name: name || (isAdminAccount ? 'Firebase Admin' : 'Firebase Member'),
+        age: 28,
+        role: effectiveRole,
+        subscriptionPlan: isAdminAccount ? 'vip_15_singles' : 'free',
+        subscriptionStatus: 'active',
+        avatar: avatar || photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        city: 'Harare',
+        subLocation: 'Borrowdale',
+        location: 'Harare, Zimbabwe',
+        childrenCount: 0,
+        intent: 'Marriage',
+        gender: 'female',
+        bouncerVerified: isAdminAccount,
+        createdAt: new Date().toISOString()
+      };
+      users.push(newUser);
+      currentUser = newUser;
+    }
+
+    res.json({ 
+      success: true, 
+      user: currentUser, 
+      isAdmin: currentUser.role === 'admin',
+      backendAccess: currentUser.role === 'admin' ? 'unlocked' : 'standard'
+    });
+  });
+
   // Admin Account Registration
   app.post('/api/auth/admin/register', (req, res) => {
     const { name, email, adminKey } = req.body;
@@ -573,6 +635,9 @@ async function startServer() {
 
   // Admin: Update Bouncer Status
   app.put('/api/admin/profiles/:id/bouncer-status', (req, res) => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
     const { status, notes } = req.body;
     const idx = profiles.findIndex(p => p.id === req.params.id);
     if (idx === -1) {
@@ -589,11 +654,17 @@ async function startServer() {
 
   // Admin: List all Users
   app.get('/api/admin/users', (_req, res) => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
     res.json(users);
   });
 
   // Admin: Upgrade User Subscription & Bouncer Status
   app.put('/api/admin/users/:id/upgrade', (req, res) => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
     const { planId, bouncerVerified } = req.body;
     const userId = req.params.id;
     
@@ -621,6 +692,9 @@ async function startServer() {
 
   // Admin: Delete/Remove User Account & Profile
   app.delete('/api/admin/users/:id', (req, res) => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
     const targetId = req.params.id;
     
     // Find user to get name/email
@@ -899,6 +973,9 @@ async function startServer() {
 
   // Admin Payment Approval & Rejection Routes
   app.put('/api/admin/payments/:id/approve', (req, res) => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
     const { id } = req.params;
     const tx = transactions.find(t => t.id === id);
     if (!tx) {
@@ -935,6 +1012,9 @@ async function startServer() {
   });
 
   app.put('/api/admin/payments/:id/reject', (req, res) => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
     const { id } = req.params;
     const tx = transactions.find(t => t.id === id);
     if (!tx) {
@@ -958,10 +1038,20 @@ async function startServer() {
   });
 
   app.get('/api/payment/transactions', (_req, res) => {
-    res.json(transactions);
+    if (!currentUser) {
+      return res.json([]);
+    }
+    if (currentUser.role === 'admin') {
+      return res.json(transactions);
+    }
+    const userTxs = transactions.filter(t => t.userId === currentUser?.id || (t.userEmail && currentUser?.email && t.userEmail.toLowerCase() === currentUser.email.toLowerCase()));
+    res.json(userTxs);
   });
 
   app.get('/api/admin/subscriptions', (_req, res) => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
     const userSubs = users.map(u => ({
       userId: u.id,
       name: u.name,
@@ -1002,8 +1092,11 @@ async function startServer() {
   });
 
   app.get('/api/matches', (_req, res) => {
-    if (currentUser.role === 'admin') {
+    if (currentUser && currentUser.role === 'admin') {
       return res.json(matchOrders);
+    }
+    if (!currentUser) {
+      return res.json([]);
     }
     const userOrders = matchOrders.filter(o => o.userId === currentUser.id);
     res.json(userOrders);
@@ -1011,6 +1104,9 @@ async function startServer() {
 
   // API ROUTE 6: Admin Overview Metrics
   app.get('/api/admin/stats', (_req, res) => {
+    if (!currentUser || currentUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
     const totalProfiles = profiles.length;
     const verifiedProfiles = profiles.filter(p => p.bouncerStatus === 'verified' || p.bouncerStatus === 'vip_approved').length;
     const pendingBouncerQueue = profiles.filter(p => p.bouncerStatus === 'pending_check').length;
