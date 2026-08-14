@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import {
   INITIAL_PROFILES,
@@ -19,10 +20,209 @@ import {
 import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, VerificationSubmission, ReportItem, AdCampaign, NotificationItem, SiteSettings } from './src/types';
 import { Paynow } from 'paynow';
 
+const DEFAULT_STARTER_PROFILES: SingleProfile[] = [
+  {
+    id: 'p_chiedza',
+    name: 'Chiedza Moyo',
+    age: 26,
+    city: 'Harare',
+    subLocation: 'Avondale',
+    location: 'Harare (Avondale), Zimbabwe',
+    childrenCount: 0,
+    intent: 'Marriage',
+    gender: 'female',
+    seeking: 'male',
+    whatsappNumber: '+263 77 234 5678',
+    bio: 'Software engineer passionate about family, faith, culture and good coffee. Looking for someone genuine and intentional.',
+    photos: [
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=800'
+    ],
+    interests: ['Tech', 'Faith', 'Coffee', 'Travel'],
+    bouncerStatus: 'verified',
+    bouncerNotes: 'Physical ID & selfie cross-verified by Bouncer Team.',
+    compatibilityScore: 97,
+    height: "5'7\"",
+    relationshipGoal: 'Marriage & Building a Family',
+    isOnline: true,
+    isFeatured: true,
+    averageRating: 5.0,
+    reviews: [
+      {
+        id: 'rev_1',
+        reviewerName: 'Tendai C.',
+        rating: 5,
+        comment: 'Very polite, genuine, and authentic person. Bouncer clearance gave me total peace of mind.',
+        createdAt: new Date().toISOString()
+      }
+    ],
+    viewsCount: 142,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'p_tendai',
+    name: 'Tendai Chiweshe',
+    age: 29,
+    city: 'Harare',
+    subLocation: 'Borrowdale',
+    location: 'Harare (Borrowdale), Zimbabwe',
+    childrenCount: 0,
+    intent: 'Marriage',
+    gender: 'male',
+    seeking: 'female',
+    whatsappNumber: '+263 78 345 6789',
+    bio: 'Architect & entrepreneur who values meaningful conversation, fitness, and family foundations. Ready for true long-term love.',
+    photos: [
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=800'
+    ],
+    interests: ['Architecture', 'Fitness', 'Fine Dining', 'Business'],
+    bouncerStatus: 'vip_approved',
+    bouncerNotes: 'VIP Verified member. Identity, profession & background confirmed.',
+    compatibilityScore: 95,
+    height: "6'1\"",
+    relationshipGoal: 'Marriage',
+    isOnline: true,
+    isFeatured: true,
+    averageRating: 5.0,
+    reviews: [],
+    viewsCount: 189,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'p_tariro',
+    name: 'Tariro Ndlovu',
+    age: 24,
+    city: 'Bulawayo',
+    subLocation: 'Kumalo',
+    location: 'Bulawayo (Kumalo), Zimbabwe',
+    childrenCount: 0,
+    intent: 'Marriage',
+    gender: 'female',
+    seeking: 'male',
+    whatsappNumber: '+263 71 456 7890',
+    bio: 'Chartered accountant with a love for literature, acoustic music, and laughter. Looking for my best friend and partner.',
+    photos: [
+      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&q=80&w=800'
+    ],
+    interests: ['Reading', 'Acoustic Music', 'Baking', 'Finance'],
+    bouncerStatus: 'verified',
+    bouncerNotes: 'Bouncer verified with photo & live verification.',
+    compatibilityScore: 93,
+    height: "5'6\"",
+    relationshipGoal: 'Serious Relationship leading to Marriage',
+    isOnline: false,
+    isFeatured: false,
+    averageRating: 4.9,
+    reviews: [],
+    viewsCount: 98,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'p_farai',
+    name: 'Farai Mukamuri',
+    age: 31,
+    city: 'Harare',
+    subLocation: 'Mount Pleasant',
+    location: 'Harare (Mount Pleasant), Zimbabwe',
+    childrenCount: 1,
+    intent: 'Marriage',
+    gender: 'male',
+    seeking: 'female',
+    whatsappNumber: '+263 77 567 8901',
+    bio: 'Dedicated pediatrician and loving father of one. Looking for a compassionate partner with deep family values.',
+    photos: [
+      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=800'
+    ],
+    interests: ['Medicine', 'Cooking', 'Outdoors', 'Jazz'],
+    bouncerStatus: 'verified',
+    bouncerNotes: 'Medical professional credentials & identity verified.',
+    compatibilityScore: 91,
+    height: "5'11\"",
+    relationshipGoal: 'Marriage',
+    isOnline: true,
+    isFeatured: false,
+    averageRating: 5.0,
+    reviews: [],
+    viewsCount: 76,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'p_ruvarashe',
+    name: 'Ruvarashe Gumbo',
+    age: 27,
+    city: 'Mutare',
+    subLocation: 'Morningside',
+    location: 'Mutare (Morningside), Zimbabwe',
+    childrenCount: 0,
+    intent: 'Funny',
+    gender: 'female',
+    seeking: 'male',
+    whatsappNumber: '+263 78 678 9012',
+    bio: 'Graphic designer who loves spontaneous road trips, humor, photography, and good vibes!',
+    photos: [
+      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=800'
+    ],
+    interests: ['Graphic Design', 'Photography', 'Travel', 'Comedy'],
+    bouncerStatus: 'verified',
+    bouncerNotes: 'Verified Single by Bouncer security check.',
+    compatibilityScore: 94,
+    height: "5'5\"",
+    relationshipGoal: 'Genuine connections & good vibes',
+    isOnline: false,
+    isFeatured: false,
+    averageRating: 4.8,
+    reviews: [],
+    viewsCount: 115,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'p_takudzwa',
+    name: 'Takudzwa Sibanda',
+    age: 30,
+    city: 'Victoria Falls',
+    subLocation: 'Chinotimba',
+    location: 'Victoria Falls (Chinotimba), Zimbabwe',
+    childrenCount: 0,
+    intent: 'Marriage',
+    gender: 'male',
+    seeking: 'female',
+    whatsappNumber: '+263 77 789 0123',
+    bio: 'Eco-tourism specialist & safari guide. Love nature, fitness, and building a peaceful, grounded life with someone special.',
+    photos: [
+      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=800'
+    ],
+    interests: ['Eco-tourism', 'Wildlife', 'Hiking', 'Cooking'],
+    bouncerStatus: 'verified',
+    bouncerNotes: 'Bouncer identity verified & cleared.',
+    compatibilityScore: 96,
+    height: "6'0\"",
+    relationshipGoal: 'Marriage',
+    isOnline: true,
+    isFeatured: true,
+    averageRating: 5.0,
+    reviews: [],
+    viewsCount: 130,
+    createdAt: new Date().toISOString()
+  }
+];
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  const STORAGE_FILE = path.join(process.cwd(), 'data_storage.json');
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    try {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    } catch (e) {
+      console.warn('Could not create uploads directory:', e);
+    }
+  }
+
+  app.use('/uploads', express.static(uploadsDir));
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -32,6 +232,101 @@ async function startServer() {
   );
   paynow.resultUrl = process.env.PAYNOW_RESULT_URL || 'https://datingwithbouncer.com/api/paynow/result';
   paynow.returnUrl = process.env.PAYNOW_RETURN_URL || 'https://datingwithbouncer.com/payment-success';
+
+  // In-memory persistent database states
+  let siteSettings: SiteSettings = {
+    siteName: 'DATING WITH BOUNCER',
+    tagline: 'Real People. Real Connections. Real Possibilities.',
+    logoUrl: '',
+    iconUrl: ''
+  };
+  let profiles: SingleProfile[] = [...DEFAULT_STARTER_PROFILES];
+  let users: User[] = [MOCK_ADMIN_USER, MOCK_DEMO_USER];
+  let currentUser: User | null = null;
+  let transactions: PaymentTransaction[] = [...MOCK_TRANSACTIONS];
+  let matchOrders: MatchOrder[] = [...MOCK_MATCH_ORDERS];
+
+  let reels: ReelItem[] = [...INITIAL_REELS];
+  let stories: StoryItem[] = [...INITIAL_STORIES];
+  let posts: FeedPost[] = [...INITIAL_POSTS];
+  let conversations: Conversation[] = [...INITIAL_CONVERSATIONS];
+  let messages: DirectMessage[] = [];
+  let notifications: NotificationItem[] = [...INITIAL_NOTIFICATIONS];
+  let ads: AdCampaign[] = [...INITIAL_ADS];
+  let verifications: VerificationSubmission[] = [...INITIAL_VERIFICATIONS];
+  let reports: ReportItem[] = [];
+  let userLikes: Record<string, string[]> = {
+    'usr_demo': ['p_tendai']
+  };
+  let userMatches: Record<string, string[]> = {
+    'usr_demo': ['p_tendai']
+  };
+
+  function loadPersistentData() {
+    try {
+      if (fs.existsSync(STORAGE_FILE)) {
+        const raw = fs.readFileSync(STORAGE_FILE, 'utf-8');
+        const data = JSON.parse(raw);
+        if (Array.isArray(data.profiles) && data.profiles.length > 0) {
+          profiles = data.profiles;
+        }
+        if (data.siteSettings && data.siteSettings.siteName) {
+          siteSettings = { ...siteSettings, ...data.siteSettings };
+        }
+        if (Array.isArray(data.users) && data.users.length > 0) {
+          users = data.users;
+        }
+        if (Array.isArray(data.transactions)) transactions = data.transactions;
+        if (Array.isArray(data.matchOrders)) matchOrders = data.matchOrders;
+        if (Array.isArray(data.reels)) reels = data.reels;
+        if (Array.isArray(data.stories)) stories = data.stories;
+        if (Array.isArray(data.posts)) posts = data.posts;
+        if (Array.isArray(data.conversations)) conversations = data.conversations;
+        if (Array.isArray(data.messages)) messages = data.messages;
+        if (Array.isArray(data.notifications)) notifications = data.notifications;
+        if (Array.isArray(data.verifications)) verifications = data.verifications;
+        if (Array.isArray(data.ads)) ads = data.ads;
+        if (Array.isArray(data.reports)) reports = data.reports;
+        if (data.userLikes) userLikes = data.userLikes;
+        if (data.userMatches) userMatches = data.userMatches;
+        console.log(`[Storage] Loaded persistent state from disk. ${profiles.length} profiles, ${users.length} users.`);
+      } else {
+        saveAppData();
+      }
+    } catch (err) {
+      console.error('[Storage] Error loading persistent storage:', err);
+    }
+  }
+
+  function saveAppData() {
+    try {
+      const payload = {
+        siteSettings,
+        profiles,
+        users,
+        transactions,
+        matchOrders,
+        reels,
+        stories,
+        posts,
+        conversations,
+        messages,
+        notifications,
+        verifications,
+        ads,
+        reports,
+        userLikes,
+        userMatches,
+        lastUpdated: new Date().toISOString()
+      };
+      fs.writeFileSync(STORAGE_FILE, JSON.stringify(payload, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('[Storage] Error saving persistent storage:', err);
+    }
+  }
+
+  // Load persistent storage on boot
+  loadPersistentData();
 
   function activateUserSubscription(tx: PaymentTransaction) {
     tx.status = 'succeeded';
@@ -59,36 +354,8 @@ async function startServer() {
         createdAt: new Date().toISOString()
       });
     }
+    saveAppData();
   }
-
-  // In-memory persistent database states
-  let siteSettings: SiteSettings = {
-    siteName: 'DATING WITH BOUNCER',
-    tagline: 'Real People. Real Connections. Real Possibilities.',
-    logoUrl: '',
-    iconUrl: ''
-  };
-  let profiles: SingleProfile[] = [];
-  let users: User[] = [MOCK_ADMIN_USER, MOCK_DEMO_USER];
-  let currentUser: User | null = null;
-  let transactions: PaymentTransaction[] = [...MOCK_TRANSACTIONS];
-  let matchOrders: MatchOrder[] = [...MOCK_MATCH_ORDERS];
-
-  let reels: ReelItem[] = [...INITIAL_REELS];
-  let stories: StoryItem[] = [...INITIAL_STORIES];
-  let posts: FeedPost[] = [...INITIAL_POSTS];
-  let conversations: Conversation[] = [...INITIAL_CONVERSATIONS];
-  let messages: DirectMessage[] = [];
-  let notifications: NotificationItem[] = [...INITIAL_NOTIFICATIONS];
-  let ads: AdCampaign[] = [...INITIAL_ADS];
-  let verifications: VerificationSubmission[] = [...INITIAL_VERIFICATIONS];
-  let reports: ReportItem[] = [];
-  let userLikes: Record<string, string[]> = {
-    'usr_demo': ['p_tendai']
-  };
-  let userMatches: Record<string, string[]> = {
-    'usr_demo': ['p_tendai']
-  };
 
   // API ROUTE 1: Health Check & Site Settings
   app.get('/api/health', (_req, res) => {
@@ -108,7 +375,38 @@ async function startServer() {
       ...(iconUrl !== undefined && { iconUrl }),
       ...(tagline && { tagline })
     };
+    saveAppData();
     res.json({ success: true, siteSettings });
+  });
+
+  // Media / Photo Upload Endpoint
+  app.post('/api/upload', (req, res) => {
+    try {
+      const { image, name } = req.body;
+      if (!image) {
+        return res.status(400).json({ error: 'No image data provided' });
+      }
+
+      if (typeof image === 'string' && image.startsWith('data:image/')) {
+        const matches = image.match(/^data:image\/([a-zA-Z0-9.+]+);base64,(.+)$/);
+        if (matches) {
+          const rawExt = matches[1].toLowerCase();
+          const ext = rawExt === 'jpeg' ? 'jpg' : rawExt === 'svg+xml' ? 'svg' : rawExt;
+          const cleanName = (name || 'upload').replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 20);
+          const filename = `${cleanName}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+          const filePath = path.join(uploadsDir, filename);
+          const buffer = Buffer.from(matches[2], 'base64');
+          fs.writeFileSync(filePath, buffer);
+          const fileUrl = `/uploads/${filename}`;
+          return res.json({ success: true, url: fileUrl, dataUrl: image });
+        }
+      }
+
+      return res.json({ success: true, url: image, dataUrl: image });
+    } catch (err) {
+      console.error('Error handling upload:', err);
+      return res.status(500).json({ error: 'Failed to process file upload' });
+    }
   });
 
   // API ROUTE 2: Auth Endpoints
@@ -128,6 +426,7 @@ async function startServer() {
       users.push(user);
       currentUser = user;
     }
+    saveAppData();
     res.json({ success: true, user: currentUser });
   });
 
@@ -185,6 +484,8 @@ async function startServer() {
       currentUser = newUser;
     }
 
+    saveAppData();
+
     res.json({ 
       success: true, 
       user: currentUser, 
@@ -223,6 +524,7 @@ async function startServer() {
 
     users.push(newAdmin);
     currentUser = newAdmin;
+    saveAppData();
     res.json({ success: true, user: currentUser, token: 'admin_session_token' });
   });
 
@@ -332,6 +634,7 @@ async function startServer() {
       createdAt: new Date().toISOString()
     };
     notifications.unshift(newNotif);
+    saveAppData();
 
     res.json({ success: true, user: currentUser, profile: newProfile });
   });
@@ -416,6 +719,7 @@ async function startServer() {
       profiles.unshift(newProf);
     }
 
+    saveAppData();
     res.json({ success: true, user: currentUser });
   });
 
@@ -535,13 +839,14 @@ async function startServer() {
 
     profiles[idx].reviews = updatedRevs;
     profiles[idx].averageRating = parseFloat(avg.toFixed(1));
+    saveAppData();
 
     res.json({ success: true, profile: profiles[idx], review: newRev });
   });
 
   // Admin / User Add Profile
   app.post('/api/profiles', (req, res) => {
-    const { name, age, location, city, subLocation, childrenCount, intent, bio, photos, interests, gender, seeking, height, relationshipGoal, bouncerStatus, bouncerNotes } = req.body;
+    const { name, age, location, city, subLocation, childrenCount, intent, bio, photos, interests, gender, seeking, height, relationshipGoal, bouncerStatus, bouncerNotes, whatsappNumber } = req.body;
     if (!name || !age || !location) {
       return res.status(400).json({ error: 'Name, Age, and Location are required.' });
     }
@@ -562,6 +867,7 @@ async function startServer() {
       interests: Array.isArray(interests) ? interests : ['Fine Dining', 'Travel', 'Art'],
       gender: gender || 'female',
       seeking: seeking || 'male',
+      whatsappNumber: whatsappNumber || '+263 77 123 4567',
       bouncerStatus: (bouncerStatus as BouncerStatus) || 'verified',
       bouncerNotes: bouncerNotes || 'Approved by Bouncer Admin.',
       compatibilityScore: Math.floor(Math.random() * 10) + 90,
@@ -585,6 +891,7 @@ async function startServer() {
       createdAt: new Date().toISOString()
     };
     notifications.unshift(newNotif);
+    saveAppData();
 
     res.json({ success: true, profile: newProfile });
   });
@@ -611,6 +918,7 @@ async function startServer() {
     };
 
     notifications.unshift(newNotif);
+    saveAppData();
 
     res.json({
       success: true,
@@ -625,11 +933,13 @@ async function startServer() {
       return res.status(404).json({ error: 'Profile not found' });
     }
     profiles[idx] = { ...profiles[idx], ...req.body };
+    saveAppData();
     res.json({ success: true, profile: profiles[idx] });
   });
 
   app.delete('/api/profiles/:id', (req, res) => {
     profiles = profiles.filter(p => p.id !== req.params.id);
+    saveAppData();
     res.json({ success: true, message: 'Profile deleted successfully' });
   });
 
@@ -648,6 +958,7 @@ async function startServer() {
     if (notes) {
       profiles[idx].bouncerNotes = notes;
     }
+    saveAppData();
 
     res.json({ success: true, profile: profiles[idx] });
   });
@@ -687,6 +998,7 @@ async function startServer() {
       currentUser = users[uIdx];
     }
 
+    saveAppData();
     res.json({ success: true, user: users[uIdx], message: `Successfully upgraded user ${users[uIdx].name} to ${users[uIdx].subscriptionPlan}` });
   });
 
@@ -707,6 +1019,7 @@ async function startServer() {
     // Filter out profile by profile id or matching name
     profiles = profiles.filter(p => p.id !== targetId && p.name.toLowerCase() !== targetName.toLowerCase());
 
+    saveAppData();
     res.json({ success: true, message: 'User and single profile deleted successfully from Bouncer system.' });
   });
 
@@ -1083,6 +1396,7 @@ async function startServer() {
     };
 
     matchOrders.unshift(order);
+    saveAppData();
 
     res.json({
       success: true,
@@ -1183,6 +1497,8 @@ async function startServer() {
       }
     }
 
+    saveAppData();
+
     res.json({
       success: true,
       isMatch,
@@ -1228,6 +1544,7 @@ async function startServer() {
     };
 
     reels.unshift(newReel);
+    saveAppData();
     res.json({ success: true, reel: newReel });
   });
 
@@ -1236,6 +1553,7 @@ async function startServer() {
     if (!reel) return res.status(404).json({ error: 'Reel not found' });
     reel.isLiked = !reel.isLiked;
     reel.likesCount += reel.isLiked ? 1 : -1;
+    saveAppData();
     res.json({ success: true, likesCount: reel.likesCount, isLiked: reel.isLiked });
   });
 
@@ -1265,6 +1583,7 @@ async function startServer() {
     };
 
     stories.unshift(newStory);
+    saveAppData();
     res.json({ success: true, story: newStory });
   });
 
@@ -1296,6 +1615,7 @@ async function startServer() {
     };
 
     posts.unshift(newPost);
+    saveAppData();
     res.json({ success: true, post: newPost });
   });
 
@@ -1304,6 +1624,7 @@ async function startServer() {
     if (!post) return res.status(404).json({ error: 'Post not found' });
     post.isLiked = !post.isLiked;
     post.likesCount += post.isLiked ? 1 : -1;
+    saveAppData();
     res.json({ success: true, likesCount: post.likesCount, isLiked: post.isLiked });
   });
 
@@ -1324,6 +1645,7 @@ async function startServer() {
     };
 
     post.comments.push(comment);
+    saveAppData();
     res.json({ success: true, comment });
   });
 
@@ -1365,6 +1687,7 @@ async function startServer() {
       conversations[convIdx].lastMessageTime = 'Just now';
     }
 
+    saveAppData();
     res.json({ success: true, message: newMsg });
   });
 
@@ -1378,6 +1701,7 @@ async function startServer() {
   app.post('/api/notifications/:id/read', (req, res) => {
     const notif = notifications.find(n => n.id === req.params.id);
     if (notif) notif.read = true;
+    saveAppData();
     res.json({ success: true });
   });
 
@@ -1401,6 +1725,7 @@ async function startServer() {
     };
 
     verifications.unshift(newVerif);
+    saveAppData();
     res.json({ success: true, verification: newVerif });
   });
 
@@ -1423,6 +1748,7 @@ async function startServer() {
       if (p) p.bouncerStatus = 'verified';
     }
 
+    saveAppData();
     res.json({ success: true, verification: verif });
   });
 
@@ -1444,6 +1770,7 @@ async function startServer() {
     };
 
     reports.unshift(newReport);
+    saveAppData();
     res.json({ success: true, report: newReport });
   });
 
@@ -1472,6 +1799,7 @@ async function startServer() {
       active: true
     };
     ads.unshift(newAd);
+    saveAppData();
     res.json({ success: true, ad: newAd });
   });
 
@@ -1482,6 +1810,7 @@ async function startServer() {
       profiles[pIdx].isBoosted = true;
       profiles[pIdx].boostExpiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     }
+    saveAppData();
     res.json({ success: true, message: 'Your profile is now Boosted for 30 minutes! 🔥' });
   });
 
