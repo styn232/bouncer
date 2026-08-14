@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, User as UserIcon, Flame, Heart, MessageSquare, Video, Newspaper, Shield, Bell, Sparkles, Home, LogOut } from 'lucide-react';
+import { ShieldCheck, User as UserIcon, Flame, Heart, MessageSquare, Video, Newspaper, Shield, Bell, Sparkles, Home, LogOut, ShoppingBag } from 'lucide-react';
 import { User, SiteSettings } from '../types';
 
 export type MainTabType = 'home' | 'discover' | 'reels' | 'feed' | 'wholikedme' | 'profile' | 'admin' | 'safety' | 'pricing';
@@ -17,6 +17,7 @@ interface NavbarProps {
   onOpenLogin: () => void;
   onOpenRegister: () => void;
   onOpenSafety?: () => void;
+  onOpenCart?: () => void;
   onLogout?: () => void;
   onOpenPayment?: () => void;
 }
@@ -24,13 +25,15 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
+  cartCount = 0,
   currentUser,
   siteSettings,
-  isLoggedIn = true,
+  isLoggedIn = false,
   onOpenAuth,
   onOpenLogin,
   onOpenRegister,
   onOpenSafety,
+  onOpenCart,
   onLogout
 }) => {
   const displaySiteName = siteSettings?.siteName || 'DATING WITH BOUNCER';
@@ -89,7 +92,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={() => setActiveTab('home')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                activeTab === 'home'
+                activeTab === 'home' || activeTab === 'discover'
                   ? 'bg-gradient-to-r from-rose-600 to-amber-500 text-white shadow-md shadow-rose-950/50'
                   : 'text-slate-300 hover:text-white hover:bg-slate-800'
               }`}
@@ -98,17 +101,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Singles</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                activeTab === 'profile'
-                  ? 'bg-gradient-to-r from-rose-600 to-amber-500 text-white shadow-md shadow-rose-950/50'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <UserIcon className="w-4 h-4 text-slate-300" />
-              <span>My Profile</span>
-            </button>
+            {currentUser && (
+              <button
+                onClick={() => setActiveTab('profile')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                  activeTab === 'profile'
+                    ? 'bg-gradient-to-r from-rose-600 to-amber-500 text-white shadow-md shadow-rose-950/50'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <UserIcon className="w-4 h-4 text-slate-300" />
+                <span>My Profile</span>
+              </button>
+            )}
 
             {isAdmin && (
               <button
@@ -127,17 +132,38 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* User Right Action Panel */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Cart / Chosen Singles Button */}
+            {onOpenCart && (
+              <button
+                onClick={onOpenCart}
+                className={`relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold transition-all ${
+                  cartCount > 0
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-950/40 ring-1 ring-emerald-400'
+                    : 'bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300'
+                }`}
+                title="View Chosen Singles & Pay via Paynow"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span className="hidden sm:inline">Singles Cart</span>
+                {cartCount > 0 && (
+                  <span className="bg-amber-400 text-slate-950 text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-sm shrink-0">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             {/* Safety Button */}
             <button
               onClick={onOpenSafety}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all"
               title="Bouncer Dating Safety Guidelines"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               <span>Safety</span>
             </button>
 
-            {!isLoggedIn ? (
+            {!isLoggedIn || !currentUser ? (
               <>
                 <button
                   onClick={onOpenLogin}
@@ -150,36 +176,34 @@ export const Navbar: React.FC<NavbarProps> = ({
                   onClick={onOpenRegister}
                   className="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white shadow-lg transition-all"
                 >
-                  Find Your Match ❤️
+                  Create Account
                 </button>
               </>
             ) : (
               <>
-                {currentUser && (
-                  <button
-                    onClick={onOpenAuth}
-                    className="flex items-center gap-2 p-1.5 sm:pr-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition-colors shadow-inner"
-                    title="Account Settings & Verification"
-                  >
-                    <img
-                      src={currentUser.avatar}
-                      alt={currentUser.name}
-                      referrerPolicy="no-referrer"
-                      className="w-8 h-8 rounded-xl object-cover ring-2 ring-rose-500/60"
-                    />
-                    <div className="text-left hidden md:block">
-                      <div className="text-xs font-bold flex items-center gap-1 text-white">
-                        {currentUser.name}
-                        {currentUser.bouncerVerified && (
-                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 inline" />
-                        )}
-                      </div>
-                      <div className="text-[10px] text-amber-300 font-bold capitalize">
-                        {currentUser.subscriptionPlan ? currentUser.subscriptionPlan.replace('_', ' ') : 'Verified'} Member
-                      </div>
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className="flex items-center gap-2 p-1.5 sm:pr-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 transition-colors shadow-inner"
+                  title="View My Profile"
+                >
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    referrerPolicy="no-referrer"
+                    className="w-8 h-8 rounded-xl object-cover ring-2 ring-rose-500/60"
+                  />
+                  <div className="text-left hidden md:block">
+                    <div className="text-xs font-bold flex items-center gap-1 text-white">
+                      {currentUser.name}
+                      {currentUser.bouncerVerified && (
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 inline" />
+                      )}
                     </div>
-                  </button>
-                )}
+                    <div className="text-[10px] text-amber-300 font-bold capitalize">
+                      {currentUser.role === 'admin' ? 'Admin' : `${(currentUser.subscriptionPlan || 'free').replace('_', ' ')} Member`}
+                    </div>
+                  </div>
+                </button>
 
                 <button
                   onClick={onLogout}
@@ -197,6 +221,45 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Fixed Bottom Navigation Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800 py-2.5 px-4 flex items-center justify-around shadow-2xl">
+        <button
+          onClick={() => setActiveTab('home')}
+          className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-all ${
+            activeTab === 'home' || activeTab === 'discover' ? 'text-rose-400 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Flame className="w-5 h-5" />
+          <span>Singles</span>
+        </button>
+
+        {onOpenCart && (
+          <button
+            onClick={onOpenCart}
+            className="relative flex flex-col items-center gap-1 text-[10px] font-bold text-emerald-400 transition-all active:scale-105"
+          >
+            <div className="relative">
+              <ShoppingBag className="w-5 h-5" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-2 bg-amber-400 text-slate-950 text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </div>
+            <span>Cart ({cartCount})</span>
+          </button>
+        )}
+
+        {currentUser && (
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-all ${
+              activeTab === 'profile' ? 'text-white font-extrabold scale-105' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <UserIcon className="w-5 h-5" />
+            <span>Profile</span>
+          </button>
+        )}
+
         {isAdmin && (
           <button
             onClick={() => setActiveTab('admin')}
@@ -205,32 +268,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <ShieldCheck className="w-5 h-5 text-amber-400" />
-            <span>Admin Panel</span>
+            <span>Admin</span>
           </button>
         )}
-
-        <button
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-all ${
-            activeTab === 'home' ? 'text-rose-400 font-extrabold scale-105' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Flame className="w-5 h-5" />
-          <span>Singles</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('profile')}
-          className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-all ${
-            activeTab === 'profile' ? 'text-white font-extrabold scale-105' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <UserIcon className="w-5 h-5" />
-          <span>My Profile</span>
-        </button>
       </nav>
     </>
   );
 };
+
 
 

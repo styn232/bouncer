@@ -5,6 +5,7 @@ import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTrans
 import { Navbar, MainTabType } from './components/Navbar';
 import { SinglesFilterBar } from './components/SinglesFilterBar';
 import { SingleCard } from './components/SingleCard';
+import { CartDrawer } from './components/CartDrawer';
 import { ProfileDetailModal } from './components/ProfileDetailModal';
 import { PaymentModal } from './components/PaymentModal';
 import { UserProfileEditorModal } from './components/UserProfileEditorModal';
@@ -97,6 +98,15 @@ export default function App() {
 
   // Cart State
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  // Dynamic Tiered Pricing: 1-3 = $6, 4-10 = $10, 11+ = $15
+  const calculateSinglesFee = (count: number) => {
+    if (count === 0) return 0;
+    if (count <= 3) return 6;
+    if (count <= 10) return 10;
+    return 15;
+  };
 
   // Modals state
   const [selectedProfileModal, setSelectedProfileModal] = useState<SingleProfile | null>(null);
@@ -655,17 +665,25 @@ export default function App() {
         siteSettings={siteSettings}
         isLoggedIn={!!currentUser}
         onLogout={handleLogout}
+        onOpenCart={() => setIsCartOpen(true)}
+        onOpenSafety={() => setIsSafetyModalOpen(true)}
         onOpenAuth={() => {
-          setAuthModalInitialMode('user');
-          setIsAuthModalOpen(true);
+          if (!currentUser) {
+            setAuthModalInitialMode('user');
+            setIsAuthModalOpen(true);
+          }
         }}
         onOpenLogin={() => {
-          setAuthModalInitialMode('user');
-          setIsAuthModalOpen(true);
+          if (!currentUser) {
+            setAuthModalInitialMode('user');
+            setIsAuthModalOpen(true);
+          }
         }}
         onOpenRegister={() => {
-          setAuthModalInitialMode('user');
-          setIsAuthModalOpen(true);
+          if (!currentUser) {
+            setAuthModalInitialMode('user');
+            setIsAuthModalOpen(true);
+          }
         }}
         onOpenPayment={() => setIsPaymentModalOpen(true)}
       />
@@ -749,6 +767,8 @@ export default function App() {
                         key={profile.id}
                         profile={profile}
                         currentUser={currentUser}
+                        isInCart={cartItems.some((item) => item.profileId === profile.id)}
+                        onAddToCart={handleAddToCart}
                         onViewDetails={(p) => {
                           setSelectedProfileModal(p);
                           if (currentUser && currentUser.id !== p.id) {
@@ -1071,13 +1091,66 @@ export default function App() {
 
       </main>
 
+      {/* Floating Sticky Bottom Cart Checkout Bar when Singles are Chosen */}
+      {cartItems.length > 0 && (
+        <aside
+          aria-label="Singles Cart Bar"
+          className="fixed bottom-16 md:bottom-6 left-3 right-3 sm:left-auto sm:right-6 z-40 max-w-lg bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-900 text-white p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl shadow-2xl border-2 border-emerald-400 backdrop-blur-md flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/30 border border-emerald-400/50 flex items-center justify-center shrink-0">
+              <ShoppingBag className="w-5 h-5 text-amber-300" />
+            </div>
+            <div className="truncate">
+              <div className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 truncate">
+                <span>{cartItems.length} Single{cartItems.length > 1 ? 's' : ''} Chosen</span>
+                <span className="bg-amber-400 text-slate-950 text-[10px] px-2 py-0.5 rounded-full font-black">
+                  ${calculateSinglesFee(cartItems.length)}.00 Flat
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-200 truncate">
+                Pay via Paynow & unlock WhatsApp numbers
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsCartOpen(true)}
+            className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shrink-0 flex items-center gap-1.5 transition-transform active:scale-95"
+          >
+            <span>Singles Cart</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </aside>
+      )}
+
+      {/* Chosen Singles Cart Drawer Modal */}
+      <CartDrawer
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cartItems={cartItems}
+        onRemoveFromCart={handleRemoveFromCart}
+        onUpdateCartItem={handleUpdateCartItem}
+        onCheckout={handleCartCheckoutSubmit}
+        currentUser={currentUser}
+        onOpenPayment={() => setIsPaymentModalOpen(true)}
+      />
+
       {/* Quick View Profile Detail Modal */}
       <ProfileDetailModal
         profile={selectedProfileModal}
         isOpen={!!selectedProfileModal}
         currentUser={currentUser}
+        isInCart={selectedProfileModal ? cartItems.some((item) => item.profileId === selectedProfileModal.id) : false}
+        onAddToCart={handleAddToCart}
         onClose={() => setSelectedProfileModal(null)}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenAuth={() => {
+          if (!currentUser) {
+            setAuthModalInitialMode('user');
+            setIsAuthModalOpen(true);
+          }
+        }}
       />
 
       {/* Payment Gateway Modal */}

@@ -70,7 +70,7 @@ async function startServer() {
   };
   let profiles: SingleProfile[] = [];
   let users: User[] = [MOCK_ADMIN_USER, MOCK_DEMO_USER];
-  let currentUser: User | null = MOCK_ADMIN_USER;
+  let currentUser: User | null = null;
   let transactions: PaymentTransaction[] = [...MOCK_TRANSACTIONS];
   let matchOrders: MatchOrder[] = [...MOCK_MATCH_ORDERS];
 
