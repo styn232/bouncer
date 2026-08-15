@@ -433,7 +433,6 @@ export default function App() {
     const exists = cartItems.some((item) => item.profileId === profile.id);
     if (exists) {
       setCartItems((prev) => prev.filter((item) => item.profileId !== profile.id));
-      addToast('Removed from Cart', `${profile.name} removed from your Singles Cart.`, 'info');
     } else {
       const newItem: CartItem = {
         profileId: profile.id,
@@ -444,7 +443,6 @@ export default function App() {
         addedAt: new Date().toISOString()
       };
       setCartItems((prev) => [...prev, newItem]);
-      addToast('Added to Singles Cart! 🛒', `${profile.name}, ${profile.age} (${profile.location}) added to your Date Cart!`, 'cart');
     }
   };
 
@@ -847,9 +845,6 @@ export default function App() {
                         onAddToCart={handleAddToCart}
                         onViewDetails={(p) => {
                           setSelectedProfileModal(p);
-                          if (currentUser && currentUser.id !== p.id) {
-                            addToast('👀 Profile Viewed', `${currentUser.name} viewed ${p.name}'s profile. Notification sent to profile owner!`, 'info');
-                          }
                         }}
                       />
                     ))}

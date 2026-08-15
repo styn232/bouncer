@@ -268,6 +268,97 @@
   ],
   "transactions": [
     {
+      "id": "tx_1786815979468",
+      "reference": "BOUNCER-1786815979263-8257",
+      "paynowReference": "",
+      "userId": "usr_admin",
+      "userName": "Bouncer Chief Admin",
+      "userEmail": "admin@bouncer.date",
+      "amount": 15,
+      "planId": "vip_30_singles",
+      "planName": "VIP Access (30+ Singles)",
+      "profileIds": [],
+      "cardLast4": "",
+      "cardBrand": "Paynow (Test/Live)",
+      "status": "pending",
+      "pollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=4c04686a-edb9-4af8-ad3a-8c39783febc7",
+      "date": "2026-08-15T17:46:19.468Z"
+    },
+    {
+      "id": "tx_1786815979246",
+      "reference": "BOUNCER-1786815979041-6586",
+      "paynowReference": "",
+      "userId": "usr_admin",
+      "userName": "Bouncer Chief Admin",
+      "userEmail": "admin@bouncer.date",
+      "amount": 10,
+      "planId": "starter_10_singles",
+      "planName": "4 to 10 Singles Bundle",
+      "profileIds": [],
+      "cardLast4": "",
+      "cardBrand": "Paynow (Test/Live)",
+      "status": "pending",
+      "pollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=f37498ee-ef62-48e0-9822-278a31f8ec2c",
+      "date": "2026-08-15T17:46:19.246Z"
+    },
+    {
+      "id": "tx_1786815979024",
+      "reference": "BOUNCER-1786815978818-8998",
+      "paynowReference": "",
+      "userId": "usr_admin",
+      "userName": "Bouncer Chief Admin",
+      "userEmail": "admin@bouncer.date",
+      "amount": 15,
+      "planId": "vip_30_singles",
+      "planName": "VIP Access (30+ Singles)",
+      "profileIds": [],
+      "cardLast4": "",
+      "cardBrand": "Paynow (Test/Live)",
+      "status": "pending",
+      "pollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=7070f2eb-0344-492b-abae-1afd0fe3fdb3",
+      "date": "2026-08-15T17:46:19.024Z"
+    },
+    {
+      "id": "tx_1786815978803",
+      "reference": "BOUNCER-1786815978206-4076",
+      "paynowReference": "",
+      "userId": "usr_admin",
+      "userName": "Bouncer Chief Admin",
+      "userEmail": "admin@bouncer.date",
+      "amount": 10,
+      "planId": "starter_10_singles",
+      "planName": "4 to 10 Singles Bundle",
+      "profileIds": [],
+      "cardLast4": "",
+      "cardBrand": "Paynow (Test/Live)",
+      "status": "pending",
+      "pollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=98d773c6-be65-4328-85e9-e336533b6e10",
+      "date": "2026-08-15T17:46:18.803Z"
+    },
+    {
+      "id": "tx_1786814592289",
+      "reference": "BOUNCER-1786814591495-9412",
+      "paynowReference": "",
+      "userId": "usr_admin",
+      "userName": "Bouncer Chief Admin",
+      "userEmail": "admin@bouncer.date",
+      "amount": 10,
+      "planId": "starter_10_singles",
+      "planName": "4 to 10 Singles Bundle",
+      "profileIds": [
+        "p_tariro",
+        "p_ruvarashe",
+        "p_takudzwa",
+        "p_farai",
+        "p_chiedza"
+      ],
+      "cardLast4": "",
+      "cardBrand": "Paynow (Test/Live)",
+      "status": "pending",
+      "pollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=80f247a4-9d40-4f4d-bd4e-dee040739571",
+      "date": "2026-08-15T17:23:12.289Z"
+    },
+    {
       "id": "tx_1786814530494",
       "reference": "BOUNCER-1786814530289-4758",
       "paynowReference": "",
@@ -389,6 +480,51 @@
   "messages": [],
   "notifications": [
     {
+      "id": "notif_1786815979468",
+      "userId": "usr_admin",
+      "title": "💳 Paynow Payment Initiated",
+      "message": "New Paynow transaction of $15 initiated by Bouncer Chief Admin (admin@bouncer.date) for VIP Access (30+ Singles) [Ref: BOUNCER-1786815979263-8257].",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-15T17:46:19.468Z"
+    },
+    {
+      "id": "notif_1786815979246",
+      "userId": "usr_admin",
+      "title": "💳 Paynow Payment Initiated",
+      "message": "New Paynow transaction of $10 initiated by Bouncer Chief Admin (admin@bouncer.date) for 4 to 10 Singles Bundle [Ref: BOUNCER-1786815979041-6586].",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-15T17:46:19.246Z"
+    },
+    {
+      "id": "notif_1786815979024",
+      "userId": "usr_admin",
+      "title": "💳 Paynow Payment Initiated",
+      "message": "New Paynow transaction of $15 initiated by Bouncer Chief Admin (admin@bouncer.date) for VIP Access (30+ Singles) [Ref: BOUNCER-1786815978818-8998].",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-15T17:46:19.024Z"
+    },
+    {
+      "id": "notif_1786815978803",
+      "userId": "usr_admin",
+      "title": "💳 Paynow Payment Initiated",
+      "message": "New Paynow transaction of $10 initiated by Bouncer Chief Admin (admin@bouncer.date) for 4 to 10 Singles Bundle [Ref: BOUNCER-1786815978206-4076].",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-15T17:46:18.803Z"
+    },
+    {
+      "id": "notif_1786814592289",
+      "userId": "usr_admin",
+      "title": "💳 Paynow Payment Initiated",
+      "message": "New Paynow transaction of $10 initiated by Bouncer Chief Admin (admin@bouncer.date) for 4 to 10 Singles Bundle [Ref: BOUNCER-1786814591495-9412].",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-15T17:23:12.289Z"
+    },
+    {
       "id": "notif_1786814530494",
       "userId": "usr_admin",
       "title": "💳 Paynow Payment Initiated",
@@ -474,5 +610,5 @@
       "p_tendai"
     ]
   },
-  "lastUpdated": "2026-08-15T17:22:10.494Z"
+  "lastUpdated": "2026-08-15T17:46:19.468Z"
 }

@@ -1034,14 +1034,24 @@ async function startServer() {
     try {
       const { planId, profileIds, mobileNumber, paymentMethod, guestEmail, guestPhone } = req.body;
 
-      if (!planId) {
-        return res.status(400).json({ error: 'Subscription plan is required' });
+      // Auto resolve plan if not explicitly passed or if a tier alias / amount is passed
+      let effectivePlanId = planId || 'starter_3_or_4';
+      if (typeof effectivePlanId === 'number' || effectivePlanId === '6' || effectivePlanId === '10' || effectivePlanId === '15') {
+        const num = Number(effectivePlanId);
+        if (num <= 6) effectivePlanId = 'starter_3_or_4';
+        else if (num <= 10) effectivePlanId = 'starter_10_singles';
+        else effectivePlanId = 'vip_30_singles';
       }
 
-      let plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
+      let plan = SUBSCRIPTION_PLANS.find(p => p.id === effectivePlanId);
       if (!plan) {
         // Robust alias fallback for all $6, $10, and $15 packages
-        if (planId === 'starter_10_singles' || planId === 'bundle_5_to_10' || planId === 'bundle_10_singles' || planId === '10' || planId === 'package_10') {
+        const normalizedId = String(effectivePlanId).toLowerCase();
+        if (
+          normalizedId.includes('10') ||
+          normalizedId.includes('bundle') ||
+          normalizedId === 'starter_10_singles'
+        ) {
           plan = SUBSCRIPTION_PLANS.find(p => p.price === 10 || p.id === 'starter_10_singles') || {
             id: 'starter_10_singles',
             name: '4 to 10 Singles Bundle',
@@ -1052,7 +1062,13 @@ async function startServer() {
             popular: false,
             features: ['Select 4 to 10 Singles for $10', 'Unlock Direct WhatsApp Phone Numbers']
           };
-        } else if (planId === 'vip_30_singles' || planId === 'vip_15_singles' || planId === 'vip_monthly' || planId === 'vip_unlimited' || planId === '15' || planId === 'package_15') {
+        } else if (
+          normalizedId.includes('15') ||
+          normalizedId.includes('30') ||
+          normalizedId.includes('vip') ||
+          normalizedId.includes('unlimited') ||
+          normalizedId === 'vip_30_singles'
+        ) {
           plan = SUBSCRIPTION_PLANS.find(p => p.price === 15 || p.id === 'vip_30_singles') || {
             id: 'vip_30_singles',
             name: 'VIP Access (30+ Singles)',
@@ -1063,13 +1079,13 @@ async function startServer() {
             popular: true,
             features: ['Unlock MORE THAN 30 Singles for $15', 'Direct WhatsApp Contact Numbers', 'VIP Gold Access Badge']
           };
-        } else if (planId === 'starter_3_or_4' || planId === '6' || planId === 'starter_6' || planId === 'package_6') {
+        } else {
           plan = SUBSCRIPTION_PLANS.find(p => p.price === 6 || p.id === 'starter_3_or_4') || SUBSCRIPTION_PLANS[0];
         }
       }
 
       if (!plan) {
-        return res.status(400).json({ error: 'Invalid subscription plan selected' });
+        plan = SUBSCRIPTION_PLANS[0];
       }
 
       const userEmail = currentUser ? currentUser.email : (guestEmail || 'test@datingwithbouncer.com');
