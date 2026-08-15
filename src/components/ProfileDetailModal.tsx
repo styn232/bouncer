@@ -30,6 +30,9 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
   const isUnlocked =
     currentUser?.role === 'admin' ||
     currentUser?.purchasedProfileIds?.includes(profile.id) ||
+    (currentUser?.subscriptionStatus === 'active' && currentUser?.subscriptionPlan && currentUser?.subscriptionPlan !== 'free') ||
+    currentUser?.subscriptionPlan === 'vip_30_singles' ||
+    currentUser?.subscriptionPlan === 'starter_10_singles' ||
     currentUser?.subscriptionPlan === 'vip_15_singles' ||
     currentUser?.subscriptionPlan === 'starter_3_or_4';
 

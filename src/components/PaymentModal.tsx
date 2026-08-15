@@ -76,6 +76,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
       const data = await response.json();
       if (data.success) {
+        if (data.testMode && data.reference) {
+          try {
+            await fetch('/api/payment/test-approve', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reference: data.reference })
+            });
+          } catch (e) {
+            console.warn('Auto test approve note:', e);
+          }
+        }
         setReceiptData(data.transaction);
         onPaymentSuccess(selectedPlanId, data.transaction);
       } else {

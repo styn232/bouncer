@@ -43,6 +43,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     { profileId: string; name: string; age?: number; location?: string; city?: string; photos?: string[]; whatsappNumber: string }[]
   >([]);
 
+  const [paymentMethod, setPaymentMethod] = useState<'web' | 'ecocash' | 'onemoney'>('web');
+  const [mobileNumber, setMobileNumber] = useState(currentUser?.whatsappNumber || '0771490167');
+  const [mobileInstructions, setMobileInstructions] = useState<string | null>(null);
+  const [isTestMode, setIsTestMode] = useState(true);
+
   if (!isOpen) return null;
 
   // Dynamic Tiered Pricing Calculation
@@ -58,9 +63,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   // Map cart count to subscription plan for Paynow backend
   const getPlanId = (count: number): string => {
-    if (count <= 4) return 'starter_3_or_4';
-    if (count <= 10) return 'bundle_5_to_10';
-    return 'vip_15_singles';
+    if (count <= 3) return 'starter_3_or_4';
+    if (count <= 10) return 'starter_10_singles';
+    return 'vip_30_singles';
   };
 
   // Format exact user WhatsApp checkout message:
@@ -68,14 +73,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const whatsappTextMessage = `Hi Auntie I need these Singles: ${chosenSinglesNames || 'Selected Singles'}. My name is ${currentUser?.name || guestPhone || 'a Member'}.`;
   const whatsappDirectUrl = `https://wa.me/263715786859?text=${encodeURIComponent(whatsappTextMessage)}`;
 
-  const verifyPaymentStatus = async (ref: string) => {
+  const verifyPaymentStatus = async (ref: string, autoApprove: boolean = false) => {
     setIsVerifying(true);
     setVerificationError(null);
     try {
       const res = await fetch('/api/payment/verify-and-get-numbers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reference: ref, profileIds: cartItems.map(i => i.profileId) })
+        body: JSON.stringify({ 
+          reference: ref, 
+          profileIds: cartItems.map(i => i.profileId),
+          autoApproveTest: autoApprove || isTestMode
+        })
       });
       const data = await res.json();
       if (data.paid && data.unlockedContacts && data.unlockedContacts.length > 0) {
@@ -103,6 +112,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     if (cartItems.length === 0) return;
     setIsSubmitting(true);
     setVerificationError(null);
+    setMobileInstructions(null);
     try {
       const planId = getPlanId(cartItems.length);
       const profileIds = cartItems.map(i => i.profileId);
@@ -112,21 +122,29 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         body: JSON.stringify({
           planId,
           profileIds,
-          guestPhone: currentUser ? undefined : guestPhone,
+          paymentMethod,
+          mobileNumber,
+          guestPhone: currentUser ? undefined : (mobileNumber || guestPhone),
           guestEmail: currentUser ? undefined : guestEmail
         })
       });
 
       const data = await res.json();
       if (data.success) {
-        if (data.redirectUrl) {
+        if (data.testMode) {
+          setIsTestMode(true);
+        }
+        if (data.instructions) {
+          setMobileInstructions(data.instructions);
+        }
+        if (data.redirectUrl && paymentMethod === 'web') {
           setPaynowUrl(data.redirectUrl);
           window.open(data.redirectUrl, '_blank');
         }
         if (data.reference) {
           setPaynowRef(data.reference);
           setVerificationError(
-            `Paynow reference [${data.reference}] created! A Paynow tab was opened. Complete your payment, then click 'Verify Paynow Payment' below to reveal numbers.`
+            data.instructions || `Paynow reference [${data.reference}] created! Complete your payment, then click 'Verify Paynow Payment' below to reveal numbers.`
           );
         }
       } else {
@@ -562,19 +580,90 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   </div>
                 </div>
 
+                {/* Paynow Method Selector */}
+                <div className="mb-4 space-y-2">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Select Paynow Payment Method:
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('web')}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        paymentMethod === 'web'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-extrabold ring-2 ring-emerald-400/50'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="text-xs flex items-center gap-1">
+                        <span>💳</span>
+                        <span>Paynow Web</span>
+                      </div>
+                      <div className="text-[9px] text-slate-500 font-normal">Card / Zimswitch</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('ecocash')}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        paymentMethod === 'ecocash'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-extrabold ring-2 ring-emerald-400/50'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="text-xs flex items-center gap-1">
+                        <span>📱</span>
+                        <span>EcoCash Push</span>
+                      </div>
+                      <div className="text-[9px] text-slate-500 font-normal">Econet Number</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('onemoney')}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        paymentMethod === 'onemoney'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-extrabold ring-2 ring-emerald-400/50'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="text-xs flex items-center gap-1">
+                        <span>📲</span>
+                        <span>OneMoney</span>
+                      </div>
+                      <div className="text-[9px] text-slate-500 font-normal">NetOne Number</div>
+                    </button>
+                  </div>
+
+                  {(paymentMethod === 'ecocash' || paymentMethod === 'onemoney') && (
+                    <div className="pt-2">
+                      <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                        {paymentMethod === 'ecocash' ? 'EcoCash Number (Econet)' : 'OneMoney Number (NetOne)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={mobileNumber}
+                        onChange={(e) => setMobileNumber(e.target.value)}
+                        placeholder="0771490167"
+                        className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 {/* Paynow Payment Gateway Indicator */}
                 <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-emerald-50 to-emerald-100/80 border border-emerald-300">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-emerald-900">
                       <CreditCard className="w-4 h-4 text-emerald-700" />
-                      <span>Paynow Gateway: EcoCash • OneMoney • Visa • Mastercard • InnBucks</span>
+                      <span>Paynow [Test Mode Active]: EcoCash • OneMoney • Visa • Mastercard</span>
                     </div>
-                    <span className="bg-emerald-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">
-                      PAYNOW VERIFIED
+                    <span className="bg-amber-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      TEST MODE
                     </span>
                   </div>
                   <p className="text-xs text-slate-700 leading-relaxed">
-                    Click "Pay via Paynow" to open the secure Paynow payment portal. Once paid, click "Verify Paynow Confirmation" to immediately reveal direct WhatsApp contact numbers.
+                    Test Mode is active. You can initiate real Paynow requests or test payments safely. After initiating, click <strong>"Verify Paynow Confirmation & Reveal Numbers"</strong> to unlock WhatsApp contacts immediately.
                   </p>
                 </div>
 

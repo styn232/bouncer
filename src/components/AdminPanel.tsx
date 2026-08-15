@@ -705,8 +705,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               className="bg-slate-50 border border-emerald-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             >
                               <option value="free">Free Pass ($0)</option>
-                              <option value="starter_3_or_4">$6 Starter (3-4 Singles)</option>
-                              <option value="vip_15_singles">$10 VIP Bundle (10 Singles)</option>
+                              <option value="starter_3_or_4">$6 Starter (1 to 3 Singles)</option>
+                              <option value="starter_10_singles">$10 Bundle (4 to 10 Singles)</option>
+                              <option value="vip_30_singles">$15 VIP Access (30+ Singles)</option>
                             </select>
 
                             <button

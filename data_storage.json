@@ -1,0 +1,478 @@
+{
+  "siteSettings": {
+    "siteName": "DATING WITH BOUNCER",
+    "tagline": "Real People. Real Connections. Real Possibilities.",
+    "logoUrl": "",
+    "iconUrl": ""
+  },
+  "profiles": [
+    {
+      "id": "p_chiedza",
+      "name": "Chiedza Moyo",
+      "age": 26,
+      "city": "Harare",
+      "subLocation": "Avondale",
+      "location": "Harare (Avondale), Zimbabwe",
+      "childrenCount": 0,
+      "intent": "Marriage",
+      "gender": "female",
+      "seeking": "male",
+      "whatsappNumber": "+263 77 234 5678",
+      "bio": "Software engineer passionate about family, faith, culture and good coffee. Looking for someone genuine and intentional.",
+      "photos": [
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=800"
+      ],
+      "interests": [
+        "Tech",
+        "Faith",
+        "Coffee",
+        "Travel"
+      ],
+      "bouncerStatus": "verified",
+      "bouncerNotes": "Physical ID & selfie cross-verified by Bouncer Team.",
+      "compatibilityScore": 97,
+      "height": "5'7\"",
+      "relationshipGoal": "Marriage & Building a Family",
+      "isOnline": true,
+      "isFeatured": true,
+      "averageRating": 5,
+      "reviews": [
+        {
+          "id": "rev_1",
+          "reviewerName": "Tendai C.",
+          "rating": 5,
+          "comment": "Very polite, genuine, and authentic person. Bouncer clearance gave me total peace of mind.",
+          "createdAt": "2026-08-15T16:24:01.420Z"
+        }
+      ],
+      "viewsCount": 142,
+      "createdAt": "2026-08-15T16:24:01.421Z"
+    },
+    {
+      "id": "p_tendai",
+      "name": "Tendai Chiweshe",
+      "age": 29,
+      "city": "Harare",
+      "subLocation": "Borrowdale",
+      "location": "Harare (Borrowdale), Zimbabwe",
+      "childrenCount": 0,
+      "intent": "Marriage",
+      "gender": "male",
+      "seeking": "female",
+      "whatsappNumber": "+263 78 345 6789",
+      "bio": "Architect & entrepreneur who values meaningful conversation, fitness, and family foundations. Ready for true long-term love.",
+      "photos": [
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=800"
+      ],
+      "interests": [
+        "Architecture",
+        "Fitness",
+        "Fine Dining",
+        "Business"
+      ],
+      "bouncerStatus": "vip_approved",
+      "bouncerNotes": "VIP Verified member. Identity, profession & background confirmed.",
+      "compatibilityScore": 95,
+      "height": "6'1\"",
+      "relationshipGoal": "Marriage",
+      "isOnline": true,
+      "isFeatured": true,
+      "averageRating": 5,
+      "reviews": [],
+      "viewsCount": 189,
+      "createdAt": "2026-08-15T16:24:01.421Z"
+    },
+    {
+      "id": "p_tariro",
+      "name": "Tariro Ndlovu",
+      "age": 24,
+      "city": "Bulawayo",
+      "subLocation": "Kumalo",
+      "location": "Bulawayo (Kumalo), Zimbabwe",
+      "childrenCount": 0,
+      "intent": "Marriage",
+      "gender": "female",
+      "seeking": "male",
+      "whatsappNumber": "+263 71 456 7890",
+      "bio": "Chartered accountant with a love for literature, acoustic music, and laughter. Looking for my best friend and partner.",
+      "photos": [
+        "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&q=80&w=800"
+      ],
+      "interests": [
+        "Reading",
+        "Acoustic Music",
+        "Baking",
+        "Finance"
+      ],
+      "bouncerStatus": "verified",
+      "bouncerNotes": "Bouncer verified with photo & live verification.",
+      "compatibilityScore": 93,
+      "height": "5'6\"",
+      "relationshipGoal": "Serious Relationship leading to Marriage",
+      "isOnline": false,
+      "isFeatured": false,
+      "averageRating": 4.9,
+      "reviews": [],
+      "viewsCount": 98,
+      "createdAt": "2026-08-15T16:24:01.421Z"
+    },
+    {
+      "id": "p_farai",
+      "name": "Farai Mukamuri",
+      "age": 31,
+      "city": "Harare",
+      "subLocation": "Mount Pleasant",
+      "location": "Harare (Mount Pleasant), Zimbabwe",
+      "childrenCount": 1,
+      "intent": "Marriage",
+      "gender": "male",
+      "seeking": "female",
+      "whatsappNumber": "+263 77 567 8901",
+      "bio": "Dedicated pediatrician and loving father of one. Looking for a compassionate partner with deep family values.",
+      "photos": [
+        "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=800"
+      ],
+      "interests": [
+        "Medicine",
+        "Cooking",
+        "Outdoors",
+        "Jazz"
+      ],
+      "bouncerStatus": "verified",
+      "bouncerNotes": "Medical professional credentials & identity verified.",
+      "compatibilityScore": 91,
+      "height": "5'11\"",
+      "relationshipGoal": "Marriage",
+      "isOnline": true,
+      "isFeatured": false,
+      "averageRating": 5,
+      "reviews": [],
+      "viewsCount": 76,
+      "createdAt": "2026-08-15T16:24:01.421Z"
+    },
+    {
+      "id": "p_ruvarashe",
+      "name": "Ruvarashe Gumbo",
+      "age": 27,
+      "city": "Mutare",
+      "subLocation": "Morningside",
+      "location": "Mutare (Morningside), Zimbabwe",
+      "childrenCount": 0,
+      "intent": "Funny",
+      "gender": "female",
+      "seeking": "male",
+      "whatsappNumber": "+263 78 678 9012",
+      "bio": "Graphic designer who loves spontaneous road trips, humor, photography, and good vibes!",
+      "photos": [
+        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=800"
+      ],
+      "interests": [
+        "Graphic Design",
+        "Photography",
+        "Travel",
+        "Comedy"
+      ],
+      "bouncerStatus": "verified",
+      "bouncerNotes": "Verified Single by Bouncer security check.",
+      "compatibilityScore": 94,
+      "height": "5'5\"",
+      "relationshipGoal": "Genuine connections & good vibes",
+      "isOnline": false,
+      "isFeatured": false,
+      "averageRating": 4.8,
+      "reviews": [],
+      "viewsCount": 115,
+      "createdAt": "2026-08-15T16:24:01.421Z"
+    },
+    {
+      "id": "p_takudzwa",
+      "name": "Takudzwa Sibanda",
+      "age": 30,
+      "city": "Victoria Falls",
+      "subLocation": "Chinotimba",
+      "location": "Victoria Falls (Chinotimba), Zimbabwe",
+      "childrenCount": 0,
+      "intent": "Marriage",
+      "gender": "male",
+      "seeking": "female",
+      "whatsappNumber": "+263 77 789 0123",
+      "bio": "Eco-tourism specialist & safari guide. Love nature, fitness, and building a peaceful, grounded life with someone special.",
+      "photos": [
+        "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=800"
+      ],
+      "interests": [
+        "Eco-tourism",
+        "Wildlife",
+        "Hiking",
+        "Cooking"
+      ],
+      "bouncerStatus": "verified",
+      "bouncerNotes": "Bouncer identity verified & cleared.",
+      "compatibilityScore": 96,
+      "height": "6'0\"",
+      "relationshipGoal": "Marriage",
+      "isOnline": true,
+      "isFeatured": true,
+      "averageRating": 5,
+      "reviews": [],
+      "viewsCount": 130,
+      "createdAt": "2026-08-15T16:24:01.421Z"
+    }
+  ],
+  "users": [
+    {
+      "id": "usr_admin",
+      "email": "admin@bouncer.date",
+      "name": "Bouncer Chief Admin",
+      "age": 35,
+      "location": "Harare HQ, Zimbabwe",
+      "city": "Harare",
+      "role": "admin",
+      "subscriptionPlan": "ultimate_access",
+      "subscriptionStatus": "active",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+      "bio": "Head Bouncer and Dating Platform Administrator.",
+      "bouncerVerified": true,
+      "createdAt": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "usr_demo",
+      "email": "single@bouncer.date",
+      "name": "Kudzai Mugo",
+      "age": 28,
+      "location": "Harare (Borrowdale), Zimbabwe",
+      "city": "Harare",
+      "subLocation": "Borrowdale",
+      "role": "user",
+      "childrenCount": 0,
+      "intent": "Marriage",
+      "subscriptionPlan": "vip_monthly",
+      "subscriptionStatus": "active",
+      "subscriptionExpiresAt": "2026-09-06T12:00:00Z",
+      "avatar": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=200",
+      "bio": "Lover of art, espresso, and good conversation. Verified VIP Single seeking marriage!",
+      "gender": "male",
+      "seeking": "female",
+      "interests": [
+        "Coffee",
+        "Art",
+        "Fitness",
+        "Travel"
+      ],
+      "bouncerVerified": true,
+      "createdAt": "2026-07-15T10:00:00Z"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "tx_1786814530494",
+      "reference": "BOUNCER-1786814530289-4758",
+      "paynowReference": "",
+      "userId": "usr_guest",
+      "userName": "Valued Single",
+      "userEmail": "test@datingwithbouncer.com",
+      "amount": 15,
+      "planId": "vip_30_singles",
+      "planName": "VIP Access (30+ Singles)",
+      "profileIds": [],
+      "cardLast4": "",
+      "cardBrand": "Paynow (Test/Live)",
+      "status": "pending",
+      "pollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=d7b7aec3-aa2d-4819-acd8-c29e42b9ec3c",
+      "date": "2026-08-15T17:22:10.494Z"
+    },
+    {
+      "id": "tx_1786814530274",
+      "reference": "BOUNCER-1786814530070-5247",
+      "paynowReference": "",
+      "userId": "usr_guest",
+      "userName": "Valued Single",
+      "userEmail": "test@datingwithbouncer.com",
+      "amount": 10,
+      "planId": "starter_10_singles",
+      "planName": "4 to 10 Singles Bundle",
+      "profileIds": [],
+      "cardLast4": "",
+      "cardBrand": "Paynow (Test/Live)",
+      "status": "pending",
+      "pollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=927f981d-bcec-4972-96e9-14fee1e980e7",
+      "date": "2026-08-15T17:22:10.274Z"
+    },
+    {
+      "id": "tx_1786814530052",
+      "reference": "BOUNCER-1786814529848-5118",
+      "paynowReference": "",
+      "userId": "usr_guest",
+      "userName": "Valued Single",
+      "userEmail": "test@datingwithbouncer.com",
+      "amount": 15,
+      "planId": "vip_30_singles",
+      "planName": "VIP Access (30+ Singles)",
+      "profileIds": [],
+      "cardLast4": "",
+      "cardBrand": "Paynow (Test/Live)",
+      "status": "pending",
+      "pollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=092a2876-1126-490d-9ca2-d2bee2cd46af",
+      "date": "2026-08-15T17:22:10.052Z"
+    },
+    {
+      "id": "tx_1786814529832",
+      "reference": "BOUNCER-1786814528856-8821",
+      "paynowReference": "",
+      "userId": "usr_guest",
+      "userName": "Valued Single",
+      "userEmail": "test@datingwithbouncer.com",
+      "amount": 10,
+      "planId": "starter_10_singles",
+      "planName": "4 to 10 Singles Bundle",
+      "profileIds": [],
+      "cardLast4": "",
+      "cardBrand": "Paynow (Test/Live)",
+      "status": "pending",
+      "pollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=18d1dacf-c848-4da4-b495-ec7b276240c0",
+      "date": "2026-08-15T17:22:09.833Z"
+    },
+    {
+      "id": "tx_101",
+      "userId": "usr_demo",
+      "userName": "Kudzai Mugo",
+      "userEmail": "single@bouncer.date",
+      "amount": 29.99,
+      "planId": "vip_monthly",
+      "planName": "VIP Lounge Monthly",
+      "cardLast4": "4242",
+      "cardBrand": "Visa",
+      "status": "succeeded",
+      "date": "2026-08-01T14:30:00Z"
+    },
+    {
+      "id": "tx_102",
+      "userId": "usr_882",
+      "userName": "Samantha Ray",
+      "userEmail": "samantha.r@gmail.com",
+      "amount": 14.99,
+      "planId": "bouncer_pass",
+      "planName": "Bouncer Fast-Pass",
+      "cardLast4": "8888",
+      "cardBrand": "Mastercard",
+      "status": "succeeded",
+      "date": "2026-08-03T09:12:00Z"
+    }
+  ],
+  "matchOrders": [
+    {
+      "id": "ord_501",
+      "userId": "usr_demo",
+      "userName": "Kudzai Mugo",
+      "items": [
+        {
+          "profileId": "p1",
+          "dateType": "vip_lounge",
+          "icebreakerMessage": "Hey Chiedza! Would love to meet for drinks in Borrowdale.",
+          "preferredTime": "This Friday at 7:30 PM",
+          "addedAt": "2026-08-05T20:00:00Z"
+        }
+      ],
+      "totalAmount": 0,
+      "paymentMethod": "VIP Membership Token",
+      "status": "pending_bouncer_approval",
+      "createdAt": "2026-08-05T20:05:00Z"
+    }
+  ],
+  "reels": [],
+  "stories": [],
+  "posts": [],
+  "conversations": [],
+  "messages": [],
+  "notifications": [
+    {
+      "id": "notif_1786814530494",
+      "userId": "usr_admin",
+      "title": "💳 Paynow Payment Initiated",
+      "message": "New Paynow transaction of $15 initiated by Valued Single (test@datingwithbouncer.com) for VIP Access (30+ Singles) [Ref: BOUNCER-1786814530289-4758].",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-15T17:22:10.494Z"
+    },
+    {
+      "id": "notif_1786814530274",
+      "userId": "usr_admin",
+      "title": "💳 Paynow Payment Initiated",
+      "message": "New Paynow transaction of $10 initiated by Valued Single (test@datingwithbouncer.com) for 4 to 10 Singles Bundle [Ref: BOUNCER-1786814530070-5247].",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-15T17:22:10.274Z"
+    },
+    {
+      "id": "notif_1786814530052",
+      "userId": "usr_admin",
+      "title": "💳 Paynow Payment Initiated",
+      "message": "New Paynow transaction of $15 initiated by Valued Single (test@datingwithbouncer.com) for VIP Access (30+ Singles) [Ref: BOUNCER-1786814529848-5118].",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-15T17:22:10.052Z"
+    },
+    {
+      "id": "notif_1786814529833",
+      "userId": "usr_admin",
+      "title": "💳 Paynow Payment Initiated",
+      "message": "New Paynow transaction of $10 initiated by Valued Single (test@datingwithbouncer.com) for 4 to 10 Singles Bundle [Ref: BOUNCER-1786814528856-8821].",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-15T17:22:09.833Z"
+    }
+  ],
+  "verifications": [
+    {
+      "id": "verif_101",
+      "userId": "usr_demo",
+      "userName": "Kudzai Mugo",
+      "userEmail": "single@bouncer.date",
+      "selfieUrl": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=400",
+      "idDocumentUrl": "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&q=80&w=400",
+      "phoneNumber": "+263 77 123 4567",
+      "status": "approved",
+      "submittedAt": "2026-08-07T10:00:00Z",
+      "notes": "National ID & selfie matched verified user."
+    }
+  ],
+  "ads": [
+    {
+      "id": "ad_1",
+      "title": "Borrowdale VIP Lounge & Restaurant",
+      "sponsorName": "Borrowdale VIP Lounge",
+      "imageUrl": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=800",
+      "linkUrl": "https://datingwithbouncer.com/vip-lounge",
+      "placement": "homepage",
+      "impressions": 1420,
+      "clicks": 184,
+      "active": true
+    },
+    {
+      "id": "ad_2",
+      "title": "Victoria Falls Luxury Sunset Cruises",
+      "sponsorName": "Vic Falls Safaris",
+      "imageUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=800",
+      "linkUrl": "https://datingwithbouncer.com/vic-falls",
+      "placement": "feed",
+      "impressions": 890,
+      "clicks": 92,
+      "active": true
+    }
+  ],
+  "reports": [],
+  "userLikes": {
+    "usr_demo": [
+      "p_tendai"
+    ]
+  },
+  "userMatches": {
+    "usr_demo": [
+      "p_tendai"
+    ]
+  },
+  "lastUpdated": "2026-08-15T17:22:10.494Z"
+}

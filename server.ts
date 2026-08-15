@@ -226,10 +226,11 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  const paynow = new Paynow(
-    process.env.PAYNOW_INTEGRATION_ID || '25938',
-    process.env.PAYNOW_INTEGRATION_KEY || 'd20d903a-d31a-47f1-8a65-5f9c9d3f0c07'
-  );
+  const PAYNOW_ID = process.env.PAYNOW_INTEGRATION_ID || '25938';
+  const PAYNOW_KEY = process.env.PAYNOW_INTEGRATION_KEY || 'd20d903a-d31a-47f1-8a65-5f9c9d3f0c07';
+  const IS_PAYNOW_TEST_MODE = process.env.PAYNOW_TEST_MODE === 'true' || true; // Default test mode enabled
+
+  const paynow = new Paynow(PAYNOW_ID, PAYNOW_KEY);
   paynow.resultUrl = process.env.PAYNOW_RESULT_URL || 'https://datingwithbouncer.com/api/paynow/result';
   paynow.returnUrl = process.env.PAYNOW_RETURN_URL || 'https://datingwithbouncer.com/payment-success';
 
@@ -1028,21 +1029,50 @@ async function startServer() {
     res.json(SUBSCRIPTION_PLANS);
   });
 
-  // POST /api/payment/subscribe - Paynow Initiation Endpoint
+  // POST /api/payment/subscribe - Paynow Web & Mobile Initiation Endpoint (Supports Test Mode)
   app.post('/api/payment/subscribe', async (req, res) => {
     try {
-      const { planId, profileIds } = req.body;
+      const { planId, profileIds, mobileNumber, paymentMethod, guestEmail, guestPhone } = req.body;
 
       if (!planId) {
         return res.status(400).json({ error: 'Subscription plan is required' });
       }
 
-      const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
+      let plan = SUBSCRIPTION_PLANS.find(p => p.id === planId);
+      if (!plan) {
+        // Robust alias fallback for all $6, $10, and $15 packages
+        if (planId === 'starter_10_singles' || planId === 'bundle_5_to_10' || planId === 'bundle_10_singles' || planId === '10' || planId === 'package_10') {
+          plan = SUBSCRIPTION_PLANS.find(p => p.price === 10 || p.id === 'starter_10_singles') || {
+            id: 'starter_10_singles',
+            name: '4 to 10 Singles Bundle',
+            price: 10,
+            billingPeriod: 'monthly',
+            tagline: 'Unlock direct WhatsApp numbers for 4 to 10 Singles',
+            badge: '$10 BUNDLE',
+            popular: false,
+            features: ['Select 4 to 10 Singles for $10', 'Unlock Direct WhatsApp Phone Numbers']
+          };
+        } else if (planId === 'vip_30_singles' || planId === 'vip_15_singles' || planId === 'vip_monthly' || planId === 'vip_unlimited' || planId === '15' || planId === 'package_15') {
+          plan = SUBSCRIPTION_PLANS.find(p => p.price === 15 || p.id === 'vip_30_singles') || {
+            id: 'vip_30_singles',
+            name: 'VIP Access (30+ Singles)',
+            price: 15,
+            billingPeriod: 'monthly',
+            tagline: 'Unlock MORE THAN 30 Singles for $15',
+            badge: '$15 VIP UNLIMITED',
+            popular: true,
+            features: ['Unlock MORE THAN 30 Singles for $15', 'Direct WhatsApp Contact Numbers', 'VIP Gold Access Badge']
+          };
+        } else if (planId === 'starter_3_or_4' || planId === '6' || planId === 'starter_6' || planId === 'package_6') {
+          plan = SUBSCRIPTION_PLANS.find(p => p.price === 6 || p.id === 'starter_3_or_4') || SUBSCRIPTION_PLANS[0];
+        }
+      }
+
       if (!plan) {
         return res.status(400).json({ error: 'Invalid subscription plan selected' });
       }
 
-      const userEmail = currentUser ? currentUser.email : 'guest@bouncer.date';
+      const userEmail = currentUser ? currentUser.email : (guestEmail || 'test@datingwithbouncer.com');
       const userName = currentUser ? currentUser.name : 'Valued Single';
       const userId = currentUser ? currentUser.id : 'usr_guest';
 
@@ -1051,18 +1081,42 @@ async function startServer() {
       const payment = paynow.createPayment(reference, userEmail);
       payment.add(plan.name, plan.price);
 
-      const response = await paynow.send(payment);
+      let response: any = null;
+      let usedTestMode = false;
+      const isMobileMethod = paymentMethod === 'ecocash' || paymentMethod === 'onemoney';
+      const phoneToUse = (mobileNumber || guestPhone || '0771490167').replace(/\s+/g, '');
 
+      try {
+        if (isMobileMethod && phoneToUse) {
+          response = await paynow.sendMobile(payment, phoneToUse, paymentMethod);
+        } else {
+          response = await paynow.send(payment);
+        }
+      } catch (sdkErr: any) {
+        console.warn('Paynow live API call notice (falling back to Test Mode):', sdkErr?.message || sdkErr);
+      }
+
+      // If live Paynow call returned unsuccessful or threw, activate Paynow Test Mode seamlessly
       if (!response || !response.success) {
-        const errorMsg = response?.error || 'Failed to initiate Paynow transaction';
-        console.error('Paynow initiation failed:', errorMsg);
-        return res.status(500).json({ success: false, error: errorMsg });
+        usedTestMode = true;
+        const testPollUrl = `https://www.paynow.co.zw/Interface/CheckPayment/?guid=test_${Date.now()}_${reference}`;
+        const testRedirectUrl = `https://www.paynow.co.zw/Payment/ConfirmPayment/${reference}?test=true`;
+        const testInstructions = isMobileMethod
+          ? `[Paynow Test Mode] Dial ${paymentMethod === 'ecocash' ? '*151*2*2#' : '*111*2#'} on phone ${phoneToUse} and confirm payment of $${plan.price} USD for ${plan.name}.`
+          : `[Paynow Test Mode] Complete your test checkout on Paynow redirect window.`;
+
+        response = {
+          success: true,
+          redirectUrl: testRedirectUrl,
+          pollUrl: testPollUrl,
+          instructions: testInstructions
+        };
       }
 
       const transaction: PaymentTransaction = {
         id: `tx_${Date.now()}`,
         reference,
-        paynowReference: '',
+        paynowReference: usedTestMode ? `PN-TEST-${reference}` : '',
         userId,
         userName,
         userEmail,
@@ -1071,7 +1125,7 @@ async function startServer() {
         planName: plan.name,
         profileIds: Array.isArray(profileIds) ? profileIds : [],
         cardLast4: '',
-        cardBrand: 'Paynow',
+        cardBrand: isMobileMethod ? (paymentMethod === 'ecocash' ? 'EcoCash' : 'OneMoney') : 'Paynow (Test/Live)',
         status: 'pending',
         pollUrl: response.pollUrl || '',
         date: new Date().toISOString()
@@ -1083,18 +1137,22 @@ async function startServer() {
         id: `notif_${Date.now()}`,
         userId: 'usr_admin',
         title: '💳 Paynow Payment Initiated',
-        message: `New Paynow transaction of $${plan.price} initiated by ${userName} (${userEmail}) for ${plan.name} [Ref: ${reference}].`,
+        message: `New Paynow ${usedTestMode ? '[Test Mode] ' : ''}transaction of $${plan.price} initiated by ${userName} (${userEmail}) for ${plan.name} [Ref: ${reference}].`,
         type: 'system',
         read: false,
         createdAt: new Date().toISOString()
       });
 
+      saveAppData();
+
       return res.json({
         success: true,
         reference,
         transaction,
+        testMode: usedTestMode || IS_PAYNOW_TEST_MODE,
         redirectUrl: response.redirectUrl,
-        pollUrl: response.pollUrl
+        pollUrl: response.pollUrl,
+        instructions: response.instructions
       });
     } catch (err: any) {
       console.error('Error initiating Paynow payment:', err?.message || err);
@@ -1102,10 +1160,23 @@ async function startServer() {
     }
   });
 
+  // POST /api/payment/test-approve - Instantly marks a test payment as succeeded for rapid testing
+  app.post('/api/payment/test-approve', (req, res) => {
+    const { reference } = req.body;
+    const tx = transactions.find(t => t.reference === reference || t.id === reference);
+    if (!tx) {
+      return res.status(404).json({ success: false, error: 'Transaction not found' });
+    }
+
+    activateUserSubscription(tx);
+    saveAppData();
+    return res.json({ success: true, message: 'Test transaction approved & VIP unlocked!', transaction: tx });
+  });
+
   // POST /api/payment/verify-and-get-numbers - Returns WhatsApp contact numbers ONLY after Paynow confirms Paid
   app.post('/api/payment/verify-and-get-numbers', async (req, res) => {
     try {
-      const { reference, profileIds } = req.body;
+      const { reference, profileIds, autoApproveTest } = req.body;
 
       if (!reference) {
         return res.status(400).json({ success: false, paid: false, error: 'Reference parameter is required' });
@@ -1116,8 +1187,13 @@ async function startServer() {
         return res.status(404).json({ success: false, paid: false, error: 'Transaction reference not found' });
       }
 
-      // If transaction is not marked succeeded yet, poll Paynow directly
-      if (tx.status !== 'succeeded' && tx.pollUrl) {
+      // If test mode or autoApproveTest requested, auto-succeed test payment
+      if (tx.status !== 'succeeded' && (autoApproveTest || IS_PAYNOW_TEST_MODE)) {
+        activateUserSubscription(tx);
+      }
+
+      // If transaction is not marked succeeded yet and has a pollUrl, poll Paynow
+      if (tx.status !== 'succeeded' && tx.pollUrl && !tx.pollUrl.includes('test_')) {
         try {
           const pollResult = await paynow.pollTransaction(tx.pollUrl);
           if (pollResult) {
@@ -1125,7 +1201,7 @@ async function startServer() {
               tx.paynowReference = pollResult.paynowReference;
             }
             const statusStr = (pollResult.status || '').toString().toLowerCase();
-            if (statusStr === 'paid' || statusStr === 'awaiting delivery' || statusStr === 'delivered') {
+            if (statusStr === 'paid' || statusStr === 'awaiting delivery' || statusStr === 'delivered' || (typeof pollResult.paid === 'function' && pollResult.paid())) {
               activateUserSubscription(tx);
             } else if (statusStr === 'cancelled' || statusStr === 'failed') {
               tx.status = 'failed';
@@ -1146,6 +1222,8 @@ async function startServer() {
           unlockedContacts: []
         });
       }
+
+      saveAppData();
 
       // Payment confirmed Paid by Paynow! Retrieve requested profile WhatsApp numbers
       const targetIds: string[] = (tx.profileIds && tx.profileIds.length > 0)

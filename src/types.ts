@@ -42,7 +42,17 @@ export interface SingleProfile {
   createdAt: string;
 }
 
-export type SubscriptionPlanId = 'free' | 'starter_3_or_4' | 'vip_15_singles' | 'vip_monthly' | 'ultimate_access' | 'bouncer_pass' | string;
+export type SubscriptionPlanId =
+  | 'free'
+  | 'starter_3_or_4'
+  | 'starter_10_singles'
+  | 'bundle_5_to_10'
+  | 'vip_15_singles'
+  | 'vip_30_singles'
+  | 'vip_monthly'
+  | 'ultimate_access'
+  | 'bouncer_pass'
+  | string;
 
 export interface SiteSettings {
   siteName: string;
