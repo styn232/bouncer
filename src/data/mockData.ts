@@ -60,16 +60,16 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
 
 export const MOCK_ADMIN_USER: User = {
   id: 'usr_admin',
-  email: 'admin@bouncer.date',
+  email: 'jobsatespace@gmail.com',
   name: 'Bouncer Chief Admin',
   age: 35,
   location: 'Harare HQ, Zimbabwe',
   city: 'Harare',
   role: 'admin',
-  subscriptionPlan: 'ultimate_access',
+  subscriptionPlan: 'vip_15_singles',
   subscriptionStatus: 'active',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-  bio: 'Head Bouncer and Dating Platform Administrator.',
+  bio: 'Head Bouncer and Dating Platform Administrator (jobsatespace@gmail.com).',
   bouncerVerified: true,
   createdAt: '2026-01-01T00:00:00Z'
 };

@@ -7,7 +7,7 @@ import { compressImageFile } from '../utils/imageCompressor';
 import { 
   auth, 
   db, 
-  googleProvider, 
+  GoogleAuthProvider, 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signInWithPopup, 
@@ -63,7 +63,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMsg('');
     setIsSubmitting(true);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      if (!auth) {
+        throw new Error('Authentication is currently initializing, please try again.');
+      }
+      if (typeof GoogleAuthProvider !== 'function') {
+        throw new Error('Google Sign-In is unavailable in this environment.');
+      }
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
       const fbUser = result.user;
       const isAdminMode = mode === 'admin_login' || mode === 'admin_register';
 
@@ -73,33 +80,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         userRole = 'admin';
       }
 
-      const userDocRef = doc(db, 'users', fbUser.uid);
-      const userSnap = await getDoc(userDocRef);
+      if (db) {
+        try {
+          const userDocRef = doc(db, 'users', fbUser.uid);
+          const userSnap = await getDoc(userDocRef);
 
-      if (userSnap.exists()) {
-        const data = userSnap.data();
-        if (data.role === 'admin') userRole = 'admin';
-      } else {
-        await setDoc(userDocRef, {
-          id: fbUser.uid,
-          uid: fbUser.uid,
-          email: fbUser.email,
-          name: fbUser.displayName || (userRole === 'admin' ? 'Bouncer Admin' : 'Member'),
-          role: userRole,
-          avatar: fbUser.photoURL || avatar,
-          subscriptionPlan: userRole === 'admin' ? 'vip_15_singles' : 'free',
-          bouncerVerified: userRole === 'admin',
-          createdAt: new Date().toISOString()
-        }, { merge: true });
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            if (data.role === 'admin') userRole = 'admin';
+          } else {
+            await setDoc(userDocRef, {
+              id: fbUser.uid,
+              uid: fbUser.uid,
+              email: fbUser.email,
+              name: fbUser.displayName || (userRole === 'admin' ? 'Bouncer Admin' : 'Member'),
+              role: userRole,
+              avatar: fbUser.photoURL || avatar,
+              subscriptionPlan: userRole === 'admin' ? 'vip_15_singles' : 'free',
+              bouncerVerified: userRole === 'admin',
+              createdAt: new Date().toISOString()
+            }, { merge: true });
 
-        if (userRole === 'admin') {
-          await setDoc(doc(db, 'admin_accounts', fbUser.uid), {
-            uid: fbUser.uid,
-            email: fbUser.email,
-            name: fbUser.displayName || 'Bouncer Admin',
-            role: 'admin',
-            createdAt: new Date().toISOString()
-          }, { merge: true });
+            if (userRole === 'admin') {
+              await setDoc(doc(db, 'admin_accounts', fbUser.uid), {
+                uid: fbUser.uid,
+                email: fbUser.email,
+                name: fbUser.displayName || 'Bouncer Admin',
+                role: 'admin',
+                createdAt: new Date().toISOString()
+              }, { merge: true });
+            }
+          }
+        } catch (dbErr) {
+          console.warn('Firestore user profile sync warning:', dbErr);
         }
       }
 
@@ -554,7 +567,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@bouncer.date"
+                      placeholder="jobsatespace@gmail.com"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white focus:outline-none focus:border-rose-500"
                     />
                   </div>
@@ -610,7 +623,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@bouncer.date"
+                      placeholder="jobsatespace@gmail.com"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white focus:outline-none focus:border-rose-500"
                     />
                   </div>
@@ -706,15 +719,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             if (file) {
                               try {
                                 const compressed = await compressImageFile(file, 1000, 0.82);
-                                setAvatar(compressed);
-                              } catch {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  if (typeof reader.result === 'string') {
-                                    setAvatar(reader.result);
-                                  }
-                                };
-                                reader.readAsDataURL(file);
+                                if (compressed) setAvatar(compressed);
+                              } catch (err) {
+                                console.warn('Avatar upload note:', err);
                               }
                             }
                           }}

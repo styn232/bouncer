@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, MessageSquare, Plus, Video, Volume2, VolumeX, ShieldCheck, Send, X, AlertTriangle } from 'lucide-react';
+import { Heart, MessageSquare, Plus, Video as VideoIcon, Volume2, VolumeX, ShieldCheck, Send, X, AlertTriangle } from 'lucide-react';
 import { ReelItem, User } from '../types';
 
 interface BouncerReelsProps {
@@ -41,7 +41,7 @@ export const BouncerReels: React.FC<BouncerReelsProps> = ({
   if (safeReels.length === 0) {
     return (
       <div className="h-[600px] rounded-3xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center p-8 text-center space-y-4 text-slate-400">
-        <Video className="w-12 h-12 text-rose-500" />
+        <VideoIcon className="w-12 h-12 text-rose-500" />
         <h3 className="text-lg font-bold text-white">No Video Reels Available</h3>
         <p className="text-xs">Be the first single to post a video reel on Dating With Bouncer!</p>
         <button

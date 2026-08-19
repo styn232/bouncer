@@ -13,8 +13,8 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'admin@bouncer.date' ||
         request.auth.token.email == 'jobsatespace@gmail.com' ||
+        request.auth.token.email == 'admin@bouncer.date' ||
         exists(/databases/$(database)/documents/admin_accounts/$(request.auth.uid)) ||
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
       );

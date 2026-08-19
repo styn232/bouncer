@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MessageSquare, Send, Image, ShieldCheck, Search, Phone, Video, MoreVertical, Sparkles } from 'lucide-react';
+import { MessageSquare, Send, Image as ImageIcon, ShieldCheck, Search, Phone, Video as VideoIcon, MoreVertical, Sparkles } from 'lucide-react';
 import { Conversation, DirectMessage, SingleProfile, User } from '../types';
 
 interface ChatSystemProps {
@@ -124,7 +124,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
                 <Phone className="w-4 h-4" />
               </button>
               <button className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300">
-                <Video className="w-4 h-4" />
+                <VideoIcon className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -196,7 +196,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
               onClick={() => setShowMediaBox(!showMediaBox)}
               className="p-2.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
             >
-              <Image className="w-4 h-4" />
+              <ImageIcon className="w-4 h-4" />
             </button>
 
             <input

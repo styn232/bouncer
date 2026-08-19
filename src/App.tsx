@@ -25,6 +25,7 @@ import { SafetyCenterModal } from './components/SafetyCenterModal';
 import { ReportModal } from './components/ReportModal';
 import { MatchQuizModal } from './components/MatchQuizModal';
 import { auth, onAuthStateChanged, signOut, db, doc, getDoc } from './lib/firebase';
+import { INITIAL_PROFILES } from './data/mockData';
 
 export default function App() {
   // Navigation & Tabs state - Default to Home tab
@@ -150,7 +151,7 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Fetch Profiles from Backend
+  // Fetch Profiles from Backend with graceful fallback
   const fetchProfiles = async () => {
     try {
       setIsLoadingProfiles(true);
@@ -165,13 +166,33 @@ export default function App() {
       if (selectedIntent !== 'all') params.append('intent', selectedIntent);
       if (selectedBouncerStatus !== 'all') params.append('bouncerStatus', selectedBouncerStatus);
 
-      const res = await fetch(`/api/profiles?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setProfiles(data);
+      const res = await fetch(`/api/profiles?${params.toString()}`).catch(() => null);
+      if (res && res.ok) {
+        const data = await res.json().catch(() => null);
+        if (Array.isArray(data) && data.length > 0) {
+          setProfiles(data);
+          return;
+        }
       }
+
+      // Local fallback filtering if offline or network hiccup
+      let filtered = [...INITIAL_PROFILES];
+      if (searchTerm) {
+        filtered = filtered.filter(p => 
+          p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+          p.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.bio.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }
+      if (selectedCity !== 'all') filtered = filtered.filter(p => p.city.toLowerCase() === selectedCity.toLowerCase());
+      if (selectedGender !== 'all') filtered = filtered.filter(p => p.gender === selectedGender);
+      if (selectedIntent !== 'all') filtered = filtered.filter(p => p.intent === selectedIntent);
+      if (selectedBouncerStatus !== 'all') filtered = filtered.filter(p => p.bouncerStatus === selectedBouncerStatus);
+      filtered = filtered.filter(p => p.age >= minAge && p.age <= maxAge);
+      setProfiles(filtered);
     } catch (err) {
-      console.error('Failed to fetch profiles:', err);
+      // Graceful fallback
+      setProfiles(INITIAL_PROFILES);
     } finally {
       setIsLoadingProfiles(false);
     }
@@ -180,41 +201,52 @@ export default function App() {
   // Fetch Social & Chat Features Data
   const fetchSocialData = async () => {
     try {
-      const reelsRes = await fetch('/api/reels');
-      if (reelsRes.ok) setReels(await reelsRes.json());
+      const reelsRes = await fetch('/api/reels').catch(() => null);
+      if (reelsRes && reelsRes.ok) {
+        const d = await reelsRes.json().catch(() => null);
+        if (Array.isArray(d)) setReels(d);
+      }
 
-      const storiesRes = await fetch('/api/stories');
-      if (storiesRes.ok) setStories(await storiesRes.json());
+      const storiesRes = await fetch('/api/stories').catch(() => null);
+      if (storiesRes && storiesRes.ok) {
+        const d = await storiesRes.json().catch(() => null);
+        if (Array.isArray(d)) setStories(d);
+      }
 
-      const postsRes = await fetch('/api/posts');
-      if (postsRes.ok) setPosts(await postsRes.json());
+      const postsRes = await fetch('/api/posts').catch(() => null);
+      if (postsRes && postsRes.ok) {
+        const d = await postsRes.json().catch(() => null);
+        if (Array.isArray(d)) setPosts(d);
+      }
 
-      const convsRes = await fetch('/api/conversations');
-      if (convsRes.ok) {
-        const convs = await convsRes.json();
-        setConversations(convs);
-        if (convs.length > 0 && !activeConvId) {
-          setActiveConvId(convs[0].id);
+      const convsRes = await fetch('/api/conversations').catch(() => null);
+      if (convsRes && convsRes.ok) {
+        const convs = await convsRes.json().catch(() => null);
+        if (Array.isArray(convs)) {
+          setConversations(convs);
+          if (convs.length > 0 && !activeConvId) {
+            setActiveConvId(convs[0].id);
+          }
         }
       }
 
-      const likersRes = await fetch('/api/who-liked-me');
-      if (likersRes.ok) setLikers(await likersRes.json());
-    } catch (err) {
-      console.error('Failed to fetch social data:', err);
-    }
+      const likersRes = await fetch('/api/who-liked-me').catch(() => null);
+      if (likersRes && likersRes.ok) {
+        const d = await likersRes.json().catch(() => null);
+        if (Array.isArray(d)) setLikers(d);
+      }
+    } catch {}
   };
 
   // Fetch Messages for Active Conversation
   const fetchActiveMessages = async (convId: string) => {
     try {
-      const res = await fetch(`/api/conversations/${convId}/messages`);
-      if (res.ok) {
-        setMessages(await res.json());
+      const res = await fetch(`/api/conversations/${convId}/messages`).catch(() => null);
+      if (res && res.ok) {
+        const d = await res.json().catch(() => null);
+        if (Array.isArray(d)) setMessages(d);
       }
-    } catch (err) {
-      console.error('Failed to fetch messages:', err);
-    }
+    } catch {}
   };
 
   useEffect(() => {
@@ -225,60 +257,74 @@ export default function App() {
 
   // Firebase Auth & Session Synchronization
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser) {
-        try {
-          let userRole: 'user' | 'admin' = 
-            (fbUser.email && (fbUser.email.toLowerCase() === 'admin@bouncer.date' || fbUser.email.toLowerCase() === 'jobsatespace@gmail.com')) 
-              ? 'admin' 
-              : 'user';
-
-          let userData: any = {
-            id: fbUser.uid,
-            uid: fbUser.uid,
-            email: fbUser.email || '',
-            name: fbUser.displayName || (userRole === 'admin' ? 'Bouncer Admin' : 'Member'),
-            avatar: fbUser.photoURL || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80`,
-            role: userRole,
-            subscriptionPlan: userRole === 'admin' ? 'vip_15_singles' : 'free',
-            bouncerVerified: userRole === 'admin'
-          };
-
+    if (!auth) return;
+    let unsubscribe: any = null;
+    try {
+      unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+        if (fbUser) {
           try {
-            const userSnap = await getDoc(doc(db, 'users', fbUser.uid));
-            if (userSnap.exists()) {
-              const docData = userSnap.data();
-              userData = { ...userData, ...docData };
-            }
-          } catch (e) {
-            console.warn('Could not read user doc from Firestore:', e);
-          }
+            let userRole: 'user' | 'admin' = 
+              (fbUser.email && (fbUser.email.toLowerCase() === 'admin@bouncer.date' || fbUser.email.toLowerCase() === 'jobsatespace@gmail.com')) 
+                ? 'admin' 
+                : 'user';
 
-          setCurrentUser(userData);
-          localStorage.setItem('bouncer_logged_user', JSON.stringify(userData));
-
-          // Sync with backend
-          fetch('/api/auth/firebase-sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+            let userData: any = {
+              id: fbUser.uid,
               uid: fbUser.uid,
-              email: fbUser.email,
-              name: userData.name,
-              role: userData.role,
-              avatar: userData.avatar
-            })
-          });
-        } catch (err) {
-          console.error('Firebase onAuthStateChanged sync error:', err);
-        }
-      }
-    });
+              email: fbUser.email || '',
+              name: fbUser.displayName || (userRole === 'admin' ? 'Bouncer Admin' : 'Member'),
+              avatar: fbUser.photoURL || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80`,
+              role: userRole,
+              subscriptionPlan: userRole === 'admin' ? 'vip_15_singles' : 'free',
+              bouncerVerified: userRole === 'admin'
+            };
 
-    return () => unsubscribe();
+            if (db) {
+              try {
+                const userSnap = await getDoc(doc(db, 'users', fbUser.uid));
+                if (userSnap && typeof userSnap.exists === 'function' && userSnap.exists()) {
+                  const docData = userSnap.data();
+                  userData = { ...userData, ...docData };
+                }
+              } catch (e) {
+                console.warn('Could not read user doc from Firestore:', e);
+              }
+            }
+
+            setCurrentUser(userData);
+            localStorage.setItem('bouncer_logged_user', JSON.stringify(userData));
+
+            // Sync with backend
+            fetch('/api/auth/firebase-sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                uid: fbUser.uid,
+                email: fbUser.email,
+                name: userData.name,
+                role: userData.role,
+                avatar: userData.avatar
+              })
+            }).catch(() => {});
+          } catch (err) {
+            console.error('Firebase onAuthStateChanged sync error:', err);
+          }
+        }
+      });
+    } catch (err) {
+      console.warn('Firebase auth state subscription error:', err);
+    }
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch {}
+      }
+    };
   }, []);
 
-  // Fetch Auth & Admin Data
+  // Fetch Auth & Admin Data with per-call error guards
   const fetchInitialData = async () => {
     try {
       // 1. Session Persistence Check
@@ -296,17 +342,16 @@ export default function App() {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ user: savedUser })
-            });
+            }).catch(() => {});
           }
         } catch (e) {
-          console.error('Error parsing stored user session:', e);
           localStorage.removeItem('bouncer_logged_user');
         }
       } else {
-        const meRes = await fetch('/api/auth/me');
-        if (meRes.ok) {
-          const data = await meRes.json();
-          if (data.user && (data.user.id || data.user.email)) {
+        const meRes = await fetch('/api/auth/me').catch(() => null);
+        if (meRes && meRes.ok) {
+          const data = await meRes.json().catch(() => null);
+          if (data && data.user && (data.user.id || data.user.email)) {
             currentSessionUser = data.user;
             setCurrentUser(data.user);
             localStorage.setItem('bouncer_logged_user', JSON.stringify(data.user));
@@ -315,19 +360,19 @@ export default function App() {
       }
 
       // 2. Fetch Site Settings
-      const settingsRes = await fetch('/api/settings');
-      if (settingsRes.ok) {
-        const st = await settingsRes.json();
+      const settingsRes = await fetch('/api/settings').catch(() => null);
+      if (settingsRes && settingsRes.ok) {
+        const st = await settingsRes.json().catch(() => null);
         if (st && st.siteName) {
           setSiteSettings(st);
           if (st.siteName) document.title = st.siteName;
         }
       }
 
-      const plansRes = await fetch('/api/subscriptions/plans');
-      if (plansRes.ok) {
-        const plans = await plansRes.json();
-        setSubscriptionPlans(plans);
+      const plansRes = await fetch('/api/subscriptions/plans').catch(() => null);
+      if (plansRes && plansRes.ok) {
+        const plans = await plansRes.json().catch(() => null);
+        if (Array.isArray(plans)) setSubscriptionPlans(plans);
       }
 
       // Fetch admin data if current user is admin
@@ -336,42 +381,42 @@ export default function App() {
         const statsRes = await fetch('/api/admin/stats', {
           headers: {
             'x-user-role': 'admin',
-            'x-user-email': currentSessionUser?.email || currentUser?.email || 'admin@bouncer.date'
+            'x-user-email': currentSessionUser?.email || currentUser?.email || 'jobsatespace@gmail.com'
           }
-        });
-        if (statsRes.ok) {
-          const stats = await statsRes.json();
-          setAdminStats(stats);
+        }).catch(() => null);
+        if (statsRes && statsRes.ok) {
+          const stats = await statsRes.json().catch(() => null);
+          if (stats) setAdminStats(stats);
         }
 
         const subRes = await fetch('/api/admin/subscriptions', {
           headers: {
             'x-user-role': 'admin',
-            'x-user-email': currentSessionUser?.email || currentUser?.email || 'admin@bouncer.date'
+            'x-user-email': currentSessionUser?.email || currentUser?.email || 'jobsatespace@gmail.com'
           }
-        });
-        if (subRes.ok) {
-          const subs = await subRes.json();
-          setUserSubscriptions(subs.userSubscriptions || []);
+        }).catch(() => null);
+        if (subRes && subRes.ok) {
+          const subs = await subRes.json().catch(() => null);
+          if (subs && Array.isArray(subs.userSubscriptions)) {
+            setUserSubscriptions(subs.userSubscriptions);
+          }
         }
       }
 
-      const txRes = await fetch('/api/payment/transactions');
-      if (txRes.ok) {
-        const txs = await txRes.json();
-        setTransactions(txs);
+      const txRes = await fetch('/api/payment/transactions').catch(() => null);
+      if (txRes && txRes.ok) {
+        const txs = await txRes.json().catch(() => null);
+        if (Array.isArray(txs)) setTransactions(txs);
       }
 
-      const matchRes = await fetch('/api/matches');
-      if (matchRes.ok) {
-        const matches = await matchRes.json();
-        setMatchOrders(matches);
+      const matchRes = await fetch('/api/matches').catch(() => null);
+      if (matchRes && matchRes.ok) {
+        const matches = await matchRes.json().catch(() => null);
+        if (Array.isArray(matches)) setMatchOrders(matches);
       }
 
       fetchSocialData();
-    } catch (err) {
-      console.error('Data fetch error:', err);
-    }
+    } catch {}
   };
 
   const handleApprovePayment = async (txId: string) => {

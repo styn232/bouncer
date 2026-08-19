@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, User as UserIcon, Flame, Heart, MessageSquare, Video, Newspaper, Shield, Bell, Sparkles, Home, LogOut, ShoppingBag } from 'lucide-react';
+import { ShieldCheck, User as UserIcon, Flame, Heart, MessageSquare, Newspaper, Shield, Bell, Sparkles, Home, LogOut, ShoppingBag } from 'lucide-react';
 import { User, SiteSettings } from '../types';
 
 export type MainTabType = 'home' | 'discover' | 'reels' | 'feed' | 'wholikedme' | 'profile' | 'admin' | 'safety' | 'pricing';
@@ -41,7 +41,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   const logoUrl = siteSettings?.logoUrl;
   const iconUrl = siteSettings?.iconUrl;
 
-  const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.email === 'admin@bouncer.date');
+  const isAdmin = currentUser && (
+    currentUser.role === 'admin' || 
+    currentUser.email?.toLowerCase() === 'jobsatespace@gmail.com' || 
+    currentUser.email?.toLowerCase() === 'admin@bouncer.date'
+  );
 
   return (
     <>

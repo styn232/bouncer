@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, ShieldCheck, Flame, Users, Sparkles, MessageSquare, Video, ArrowRight, UserPlus, Lock } from 'lucide-react';
+import { Heart, ShieldCheck, Flame, Users, Sparkles, MessageSquare, Video as VideoIcon, ArrowRight, UserPlus, Lock } from 'lucide-react';
 import { SingleProfile, ReelItem } from '../types';
 
 interface HeroSectionProps {
@@ -203,7 +203,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         <section className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Video className="w-5 h-5 text-rose-500" />
+              <VideoIcon className="w-5 h-5 text-rose-500" />
               <h2 className="text-lg font-black text-white font-serif">Bouncer Video Reels</h2>
             </div>
             <button onClick={onOpenReels} className="text-xs text-rose-400 font-bold hover:underline">

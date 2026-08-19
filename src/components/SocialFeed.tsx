@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, MessageSquare, Send, Image, ShieldCheck, Plus, AlertTriangle } from 'lucide-react';
+import { Heart, MessageSquare, Send, ShieldCheck, Plus, AlertTriangle } from 'lucide-react';
 import { FeedPost, User } from '../types';
 
 interface SocialFeedProps {

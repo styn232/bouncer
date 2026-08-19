@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database } from 'lucide-react';
+import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image as ImageIcon, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database } from 'lucide-react';
 import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings, DatingIntent } from '../types';
 import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -114,15 +114,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (file) {
       try {
         const compressed = await compressImageFile(file, 1000, 0.82);
-        setEditPhoto(compressed);
-      } catch {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          if (typeof reader.result === 'string') {
-            setEditPhoto(reader.result);
-          }
-        };
-        reader.readAsDataURL(file);
+        if (compressed) setEditPhoto(compressed);
+      } catch (err) {
+        console.warn('Edit image upload note:', err);
       }
     }
   };
@@ -1079,7 +1073,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
           <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-800">
             <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30">
-              <Image className="w-6 h-6" />
+              <ImageIcon className="w-6 h-6" />
             </div>
             <div>
               <h2 className="text-xl font-extrabold text-white font-serif">
@@ -1152,13 +1146,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       if (file) {
                         try {
                           const compressed = await compressImageFile(file, 800, 0.85);
-                          setLogoUrl(compressed);
-                        } catch {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setLogoUrl(reader.result as string);
-                          };
-                          reader.readAsDataURL(file);
+                          if (compressed) setLogoUrl(compressed);
+                        } catch (err) {
+                          console.warn('Logo upload note:', err);
                         }
                       }
                     }}
@@ -1212,13 +1202,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       if (file) {
                         try {
                           const compressed = await compressImageFile(file, 400, 0.85);
-                          setIconUrl(compressed);
-                        } catch {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setIconUrl(reader.result as string);
-                          };
-                          reader.readAsDataURL(file);
+                          if (compressed) setIconUrl(compressed);
+                        } catch (err) {
+                          console.warn('Icon upload note:', err);
                         }
                       }
                     }}
@@ -1274,7 +1260,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     const res = await fetch('/api/admin/stats', {
                       headers: {
                         'x-user-role': 'admin',
-                        'x-user-email': 'admin@bouncer.date'
+                        'x-user-email': 'jobsatespace@gmail.com'
                       }
                     });
                     if (res.ok) {
@@ -1363,27 +1349,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   }
 
                   // 2. Write admin account record in Firestore
-                  try {
-                    await setDoc(doc(db, 'users', fbUid), {
-                      id: fbUid,
-                      uid: fbUid,
-                      email: adminCreateEmail,
-                      name: adminCreateName,
-                      role: 'admin',
-                      subscriptionPlan: 'vip_15_singles',
-                      bouncerVerified: true,
-                      createdAt: new Date().toISOString()
-                    }, { merge: true });
+                  if (db) {
+                    try {
+                      await setDoc(doc(db, 'users', fbUid), {
+                        id: fbUid,
+                        uid: fbUid,
+                        email: adminCreateEmail,
+                        name: adminCreateName,
+                        role: 'admin',
+                        subscriptionPlan: 'vip_15_singles',
+                        bouncerVerified: true,
+                        createdAt: new Date().toISOString()
+                      }, { merge: true });
 
-                    await setDoc(doc(db, 'admin_accounts', fbUid), {
-                      uid: fbUid,
-                      email: adminCreateEmail,
-                      name: adminCreateName,
-                      role: 'admin',
-                      createdAt: new Date().toISOString()
-                    }, { merge: true });
-                  } catch (dbErr) {
-                    console.warn('Firestore doc error:', dbErr);
+                      await setDoc(doc(db, 'admin_accounts', fbUid), {
+                        uid: fbUid,
+                        email: adminCreateEmail,
+                        name: adminCreateName,
+                        role: 'admin',
+                        createdAt: new Date().toISOString()
+                      }, { merge: true });
+                    } catch (dbErr) {
+                      console.warn('Firestore doc error:', dbErr);
+                    }
                   }
 
                   // 3. Sync with Express backend to open backend permissions
@@ -1655,15 +1643,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         if (file) {
                           try {
                             const compressed = await compressImageFile(file, 1000, 0.82);
-                            setNewPhoto(compressed);
-                          } catch {
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              if (typeof reader.result === 'string') {
-                                setNewPhoto(reader.result);
-                              }
-                            };
-                            reader.readAsDataURL(file);
+                            if (compressed) setNewPhoto(compressed);
+                          } catch (err) {
+                            console.warn('New photo upload note:', err);
                           }
                         }
                       }}

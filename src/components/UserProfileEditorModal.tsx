@@ -48,19 +48,13 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   const handlePhotoUpload = async (index: 1 | 2 | 3, file: File) => {
     try {
       const compressed = await compressImageFile(file, 1000, 0.82);
-      if (index === 1) setPhoto1(compressed);
-      if (index === 2) setPhoto2(compressed);
-      if (index === 3) setPhoto3(compressed);
-    } catch {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          if (index === 1) setPhoto1(reader.result);
-          if (index === 2) setPhoto2(reader.result);
-          if (index === 3) setPhoto3(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      if (compressed) {
+        if (index === 1) setPhoto1(compressed);
+        if (index === 2) setPhoto2(compressed);
+        if (index === 3) setPhoto3(compressed);
+      }
+    } catch (err) {
+      console.warn('Photo processing note:', err);
     }
   };
 
