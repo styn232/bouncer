@@ -34,7 +34,8 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
     currentUser?.subscriptionPlan === 'vip_30_singles' ||
     currentUser?.subscriptionPlan === 'starter_10_singles' ||
     currentUser?.subscriptionPlan === 'vip_15_singles' ||
-    currentUser?.subscriptionPlan === 'starter_3_or_4';
+    currentUser?.subscriptionPlan === 'starter_3_or_4' ||
+    currentUser?.subscriptionPlan === 'test_1_single';
 
   // Reviews state
   const [localReviews, setLocalReviews] = useState<any[]>(profile?.reviews || []);

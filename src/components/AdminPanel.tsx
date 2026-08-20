@@ -4,6 +4,7 @@ import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3
 import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings, DatingIntent } from '../types';
 import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
+import { capitalizeName } from '../utils/format';
 import { auth, db, createUserWithEmailAndPassword, doc, setDoc } from '../lib/firebase';
 
 interface AdminPanelProps {
@@ -126,9 +127,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (!editingProfile || !editName) return;
 
     const fullLocation = `${editCity} (${editSubLocation}), Zimbabwe`;
+    const formattedName = capitalizeName(editName);
 
     onEditProfile(editingProfile.id, {
-      name: editName,
+      name: formattedName,
       age: Number(editAge),
       city: editCity,
       subLocation: editSubLocation,
@@ -164,9 +166,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (!newName || !newAge) return;
 
     const fullLocation = `${newCity} (${newSubLocation}), Zimbabwe`;
+    const formattedName = capitalizeName(newName);
 
     onAddProfile({
-      name: newName,
+      name: formattedName,
       age: Number(newAge),
       city: newCity,
       subLocation: newSubLocation,
@@ -203,6 +206,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
     } catch (err) {
       alert('Error connecting to server.');
+    }
+  };
+
+  const [fundInputState, setFundInputState] = useState<Record<string, string>>({});
+
+  const handleModifyFunds = async (userId: string, action: 'add' | 'remove' | 'set', amount: number) => {
+    if (isNaN(amount) || amount < 0) {
+      alert('Please enter a valid positive dollar amount.');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/funds`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, amount })
+      });
+      if (res.ok) {
+        onRefreshData();
+        setFundInputState(prev => ({ ...prev, [userId]: '' }));
+      } else {
+        const d = await res.json();
+        alert(d.error || 'Failed to update user funds.');
+      }
+    } catch (err) {
+      alert('Error updating user wallet funds.');
     }
   };
 
@@ -641,6 +669,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <th className="p-3">User & Contact</th>
                   <th className="p-3">Current Plan</th>
                   <th className="p-3">Bouncer Verified</th>
+                  <th className="p-3">Wallet Funds ($)</th>
                   <th className="p-3">Upgrade Membership</th>
                   <th className="p-3 text-right">Actions</th>
                 </tr>
@@ -658,6 +687,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   })
                   .map((u, idx) => {
                     const currentSelectedPlan = upgradePlanState[u.id] || u.plan || 'starter_3_or_4';
+                    const customAmountStr = fundInputState[u.id] || '';
+                    const customAmountNum = parseFloat(customAmountStr) || 0;
+                    const userBalance = u.walletBalance !== undefined ? u.walletBalance : 0;
+
                     return (
                       <tr key={u.id || idx} className="hover:bg-emerald-50/50">
                         <td className="p-3 font-semibold text-slate-900">
@@ -671,10 +704,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </td>
                         <td className="p-3">
                           <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] uppercase ${
-                            u.plan === 'vip_15_singles' || u.plan === 'vip_monthly'
+                            u.plan === 'vip_15_singles' || u.plan === 'vip_monthly' || u.plan === 'vip_30_singles'
                               ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : u.plan === 'starter_10_singles'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-300'
                               : u.plan === 'starter_3_or_4'
                               ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : u.plan === 'test_1_single'
+                              ? 'bg-teal-100 text-teal-800 border border-teal-300'
                               : 'bg-slate-100 text-slate-600'
                           }`}>
                             {u.plan ? u.plan.replace(/_/g, ' ') : 'Free Pass'}
@@ -691,6 +728,94 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             </span>
                           )}
                         </td>
+                        {/* Admin Add / Remove Funds Column */}
+                        <td className="p-3">
+                          <div className="space-y-1.5 min-w-[220px]">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-[11px] text-slate-500 font-medium">Balance:</span>
+                              <span className="font-mono font-extrabold text-emerald-700 text-sm bg-emerald-100/80 px-2 py-0.5 rounded-lg border border-emerald-200">
+                                ${Number(userBalance).toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleModifyFunds(u.id, 'add', 5)}
+                                className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-md shadow-xs"
+                                title="Add $5 to user wallet"
+                              >
+                                +$5
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleModifyFunds(u.id, 'add', 10)}
+                                className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-md shadow-xs"
+                                title="Add $10 to user wallet"
+                              >
+                                +$10
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleModifyFunds(u.id, 'add', 20)}
+                                className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-md shadow-xs"
+                                title="Add $20 to user wallet"
+                              >
+                                +$20
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleModifyFunds(u.id, 'remove', 5)}
+                                className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold rounded-md shadow-xs"
+                                title="Deduct $5 from user wallet"
+                              >
+                                -$5
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleModifyFunds(u.id, 'remove', 10)}
+                                className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold rounded-md shadow-xs"
+                                title="Deduct $10 from user wallet"
+                              >
+                                -$10
+                              </button>
+                            </div>
+                            {/* Custom amount */}
+                            <div className="flex items-center gap-1 pt-0.5">
+                              <input
+                                type="number"
+                                step="1"
+                                min="0"
+                                placeholder="$ Amount"
+                                value={customAmountStr}
+                                onChange={(e) => setFundInputState({ ...fundInputState, [u.id]: e.target.value })}
+                                className="w-18 px-1.5 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-800 focus:outline-none focus:border-emerald-500"
+                              />
+                              <button
+                                type="button"
+                                disabled={customAmountNum <= 0}
+                                onClick={() => handleModifyFunds(u.id, 'add', customAmountNum)}
+                                className="px-1.5 py-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white text-[9px] font-black uppercase rounded"
+                              >
+                                + Add
+                              </button>
+                              <button
+                                type="button"
+                                disabled={customAmountNum <= 0}
+                                onClick={() => handleModifyFunds(u.id, 'remove', customAmountNum)}
+                                className="px-1.5 py-1 bg-rose-700 hover:bg-rose-600 disabled:opacity-40 text-white text-[9px] font-black uppercase rounded"
+                              >
+                                - Cut
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleModifyFunds(u.id, 'set', customAmountNum)}
+                                className="px-1.5 py-1 bg-slate-700 hover:bg-slate-600 text-white text-[9px] font-black uppercase rounded"
+                              >
+                                Set
+                              </button>
+                            </div>
+                          </div>
+                        </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <select
@@ -699,6 +824,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               className="bg-slate-50 border border-emerald-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             >
                               <option value="free">Free Pass ($0)</option>
+                              <option value="test_1_single">$3 Test Pass (1 Single)</option>
                               <option value="starter_3_or_4">$6 Starter (1 to 3 Singles)</option>
                               <option value="starter_10_singles">$10 Bundle (4 to 10 Singles)</option>
                               <option value="vip_30_singles">$15 VIP Access (30+ Singles)</option>

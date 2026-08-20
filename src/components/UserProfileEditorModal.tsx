@@ -4,6 +4,7 @@ import { User as UserIcon, ShieldCheck, Camera, Sparkles, X, Check, Heart, MapPi
 import { User, DatingIntent } from '../types';
 import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
+import { capitalizeName } from '../utils/format';
 
 interface UserProfileEditorModalProps {
   isOpen: boolean;
@@ -62,8 +63,10 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
     e.preventDefault();
     const interests = interestsText.split(',').map(i => i.trim()).filter(Boolean);
     const fullLocation = `${city} (${subLocation}), Zimbabwe`;
+    const photos = [photo1, photo2, photo3].filter(Boolean);
+    const formattedName = capitalizeName(name);
     onSaveProfile({
-      name,
+      name: formattedName,
       email,
       age: Number(age),
       city,
@@ -75,7 +78,8 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
       whatsappNumber,
       gender: gender as any,
       seeking: seeking as any,
-      avatar: photo1,
+      avatar: photo1 || currentUser?.avatar,
+      photos: photos.length > 0 ? photos : [photo1 || currentUser?.avatar || ''],
       interests,
       bouncerVerified
     });

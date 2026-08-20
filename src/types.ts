@@ -44,6 +44,7 @@ export interface SingleProfile {
 
 export type SubscriptionPlanId =
   | 'free'
+  | 'test_1_single'
   | 'starter_3_or_4'
   | 'starter_10_singles'
   | 'bundle_5_to_10'
@@ -83,6 +84,7 @@ export interface User {
   interests?: string[];
   purchasedProfileIds?: string[]; // IDs of profile WhatsApp numbers unlocked after payment
   bouncerVerified: boolean;
+  walletBalance?: number; // Account funds balance in USD
   isOnline?: boolean;
   superLikesCount?: number;
   boostsCount?: number;

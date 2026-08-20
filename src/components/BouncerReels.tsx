@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, MessageSquare, Plus, Video as VideoIcon, Volume2, VolumeX, ShieldCheck, Send, X, AlertTriangle } from 'lucide-react';
+import { Heart, MessageSquare, Plus, Video as VideoIcon, Volume2, VolumeX, ShieldCheck, Send, X, AlertTriangle, Upload, Film } from 'lucide-react';
 import { ReelItem, User } from '../types';
 
 interface BouncerReelsProps {
@@ -25,9 +25,30 @@ export const BouncerReels: React.FC<BouncerReelsProps> = ({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [videoUrlInput, setVideoUrlInput] = useState('');
   const [captionInput, setCaptionInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
   const [showCommentsDrawer, setShowCommentsDrawer] = useState(false);
 
   const currentReel = safeReels[activeIndex] || null;
+
+  const handleVideoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setIsProcessing(true);
+      try {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setVideoUrlInput(event.target?.result as string);
+          setIsProcessing(false);
+        };
+        reader.readAsDataURL(file);
+      } catch {
+        if (typeof URL !== 'undefined' && URL.createObjectURL) {
+          setVideoUrlInput(URL.createObjectURL(file));
+        }
+        setIsProcessing(false);
+      }
+    }
+  };
 
   const handleUploadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,15 +215,29 @@ export const BouncerReels: React.FC<BouncerReelsProps> = ({
 
             <form onSubmit={handleUploadSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Video MP4 URL</label>
-                <input
-                  type="url"
-                  required
-                  placeholder="https://assets.mixkit.co/videos/..."
-                  value={videoUrlInput}
-                  onChange={e => setVideoUrlInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                />
+                <label className="block text-slate-300 font-bold mb-1">Select Video / Clip File (From Device)</label>
+                <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                  <div className="w-12 h-12 rounded-xl bg-slate-900 border border-dashed border-slate-700 flex items-center justify-center text-amber-400 shrink-0">
+                    <Film className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <label
+                      htmlFor="reel-video-upload"
+                      className="cursor-pointer inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-colors w-full shadow-sm"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>{videoUrlInput ? 'Change Video File' : 'Choose Video from Device'}</span>
+                    </label>
+                    <input
+                      id="reel-video-upload"
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={handleVideoFile}
+                    />
+                    <p className="text-[10px] text-slate-400">Select MP4, MOV, or WebM video file</p>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -218,9 +253,10 @@ export const BouncerReels: React.FC<BouncerReelsProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 text-white font-bold"
+                disabled={!videoUrlInput || isProcessing}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white font-bold disabled:opacity-50 transition-all"
               >
-                Publish Video Reel 🎬
+                {isProcessing ? 'Processing Video...' : 'Publish Video Reel 🎬'}
               </button>
             </form>
           </div>

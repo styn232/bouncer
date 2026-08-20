@@ -233,7 +233,7 @@
       "role": "admin",
       "subscriptionPlan": "vip_15_singles",
       "subscriptionStatus": "active",
-      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+      "avatar": "https://lh3.googleusercontent.com/a/ACg8ocLTLqINykDjWUZwlxDWx4zfS63kYB9t8B1VJVn3NF856LmMlVU=s96-c",
       "bio": "Super Administrator & Head Bouncer (jobsatespace@gmail.com).",
       "bouncerVerified": true,
       "createdAt": "2026-01-01T00:00:00Z"
@@ -267,6 +267,23 @@
     }
   ],
   "transactions": [
+    {
+      "id": "tx_1787166888776",
+      "reference": "BOUNCER-1787166888776-1550",
+      "paynowReference": "",
+      "userId": "usr_guest",
+      "userName": "Valued Single",
+      "userEmail": "testuser@example.com",
+      "amount": 6,
+      "planId": "starter_3_or_4",
+      "planName": "1 to 3 Singles Pass",
+      "profileIds": [],
+      "cardLast4": "",
+      "cardBrand": "Paynow",
+      "status": "succeeded",
+      "pollUrl": "https://www.paynow.co.zw/Interface/CheckPayment/?guid=9ffb41bb-b4fb-4b71-b18c-e289eee8e1bc",
+      "date": "2026-08-19T19:14:48.776Z"
+    },
     {
       "id": "tx_1786815979468",
       "reference": "BOUNCER-1786815979263-8257",
@@ -480,6 +497,24 @@
   "messages": [],
   "notifications": [
     {
+      "id": "notif_1787166892118",
+      "userId": "usr_guest",
+      "title": "🎉 Payment Approved!",
+      "message": "Your payment of $6 for 1 to 3 Singles Pass has been verified & approved! VIP features activated.",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-19T19:14:52.119Z"
+    },
+    {
+      "id": "notif_1787166889745",
+      "userId": "usr_admin",
+      "title": "💳 Paynow Payment Initiated",
+      "message": "New Paynow transaction of $6 initiated by Valued Single (testuser@example.com) for 1 to 3 Singles Pass [Ref: BOUNCER-1787166888776-1550].",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-19T19:14:49.745Z"
+    },
+    {
       "id": "notif_1786815979468",
       "userId": "usr_admin",
       "title": "💳 Paynow Payment Initiated",
@@ -610,5 +645,5 @@
       "p_tendai"
     ]
   },
-  "lastUpdated": "2026-08-19T14:34:23.911Z"
+  "lastUpdated": "2026-08-19T19:14:52.119Z"
 }

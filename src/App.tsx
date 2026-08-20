@@ -102,9 +102,10 @@ export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // Dynamic Tiered Pricing: 1-3 = $6, 4-10 = $10, 11+ = $15
+  // Dynamic Tiered Pricing: 1 = $3, 2-3 = $6, 4-10 = $10, 11+ = $15
   const calculateSinglesFee = (count: number) => {
     if (count === 0) return 0;
+    if (count === 1) return 3;
     if (count <= 3) return 6;
     if (count <= 10) return 10;
     return 15;
@@ -169,7 +170,7 @@ export default function App() {
       const res = await fetch(`/api/profiles?${params.toString()}`).catch(() => null);
       if (res && res.ok) {
         const data = await res.json().catch(() => null);
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setProfiles(data);
           return;
         }
@@ -792,6 +793,8 @@ export default function App() {
         onLogout={handleLogout}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenSafety={() => setIsSafetyModalOpen(true)}
+        onOpenVerification={() => setIsVerificationModalOpen(true)}
+        onOpenEditProfile={() => setIsUserModalOpen(true)}
         onOpenAuth={() => {
           if (!currentUser) {
             setAuthModalInitialMode('user');
@@ -1051,16 +1054,19 @@ export default function App() {
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 text-xs font-bold shadow-xs">
-                    <Lock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Profile Details Locked</span>
-                  </div>
+                  <button
+                    onClick={() => setIsUserModalOpen(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white text-xs font-bold rounded-xl shadow-lg transition-all"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Edit Profile & Photos</span>
+                  </button>
                   {currentUser?.role === 'admin' && (
                     <button
-                      onClick={() => setIsUserModalOpen(true)}
+                      onClick={() => setActiveTab('admin')}
                       className="text-[11px] text-amber-400 hover:underline font-bold"
                     >
-                      Admin Profile Edit
+                      Admin Operations Panel
                     </button>
                   )}
                 </div>

@@ -4,6 +4,7 @@ import { ShieldCheck, X, User as UserIcon, Lock, Mail, Sparkles, Check, Baby, Ma
 import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 import { DatingIntent } from '../types';
 import { compressImageFile } from '../utils/imageCompressor';
+import { capitalizeName } from '../utils/format';
 import { 
   auth, 
   db, 
@@ -328,12 +329,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const fullLocation = `${city} (${subLocation}), Zimbabwe`;
 
         // Save in Firestore
+        const formattedName = capitalizeName(name);
         try {
           await setDoc(doc(db, 'users', fbUid), {
             id: fbUid,
             uid: fbUid,
             email,
-            name,
+            name: formattedName,
             age: Number(age),
             gender,
             childrenCount: Number(childrenCount),
@@ -358,7 +360,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           body: JSON.stringify({
             id: fbUid,
             email,
-            name,
+            name: formattedName,
             age: Number(age),
             gender,
             childrenCount: Number(childrenCount),

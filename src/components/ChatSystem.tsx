@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { MessageSquare, Send, Image as ImageIcon, ShieldCheck, Search, Phone, Video as VideoIcon, MoreVertical, Sparkles } from 'lucide-react';
+import { MessageSquare, Send, Image as ImageIcon, ShieldCheck, Search, Phone, Video as VideoIcon, MoreVertical, Sparkles, Upload, X } from 'lucide-react';
 import { Conversation, DirectMessage, SingleProfile, User } from '../types';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface ChatSystemProps {
   conversations?: Conversation[];
@@ -23,9 +24,24 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
   const safeMessages = messages || [];
   const [textInput, setTextInput] = useState('');
   const [mediaInput, setMediaInput] = useState('');
-  const [showMediaBox, setShowMediaBox] = useState(false);
+  const [isProcessingMedia, setIsProcessingMedia] = useState(false);
 
   const selectedConv = safeConversations.find(c => c.id === activeConversationId) || safeConversations[0];
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setIsProcessingMedia(true);
+        const compressed = await compressImageFile(file, 1000, 0.85);
+        if (compressed) setMediaInput(compressed);
+      } catch (err) {
+        console.error('Chat image upload failed:', err);
+      } finally {
+        setIsProcessingMedia(false);
+      }
+    }
+  };
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +49,6 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
     if (onSendMessage) onSendMessage(selectedConv.id, textInput, mediaInput.trim() || undefined);
     setTextInput('');
     setMediaInput('');
-    setShowMediaBox(false);
   };
 
   const icebreakers = [
@@ -176,28 +191,39 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
             ))}
           </div>
 
-          {/* Media input toggle */}
-          {showMediaBox && (
-            <div className="px-4 py-2 bg-slate-900 border-t border-slate-800">
-              <input
-                type="url"
-                placeholder="Paste image URL attachment..."
-                value={mediaInput}
-                onChange={e => setMediaInput(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white"
-              />
+          {/* Attached Image Preview */}
+          {mediaInput && (
+            <div className="px-4 py-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <img src={mediaInput} alt="Attachment" className="w-10 h-10 rounded-lg object-cover ring-1 ring-amber-500" />
+                <span className="text-[11px] text-slate-300">Photo attached</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMediaInput('')}
+                className="p-1 rounded-full bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           )}
 
           {/* Message Input Box */}
           <form onSubmit={handleSend} className="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowMediaBox(!showMediaBox)}
-              className="p-2.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+            <label
+              htmlFor="chat-file-upload"
+              className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-400 cursor-pointer transition-colors"
+              title="Attach photo from device"
             >
               <ImageIcon className="w-4 h-4" />
-            </button>
+            </label>
+            <input
+              id="chat-file-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleMediaUpload}
+            />
 
             <input
               type="text"
@@ -209,7 +235,8 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
 
             <button
               type="submit"
-              className="px-4 py-2.5 bg-gradient-to-r from-rose-600 to-amber-500 text-white rounded-xl shadow-md hover:scale-105 transition-all"
+              disabled={isProcessingMedia || (!textInput.trim() && !mediaInput.trim())}
+              className="px-4 py-2.5 bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white rounded-xl shadow-md disabled:opacity-40 transition-all flex items-center justify-center"
             >
               <Send className="w-4 h-4" />
             </button>

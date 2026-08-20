@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Heart, MessageSquare, Send, ShieldCheck, Plus, AlertTriangle } from 'lucide-react';
+import { Heart, MessageSquare, Send, ShieldCheck, Plus, AlertTriangle, Image as ImageIcon, Upload, X } from 'lucide-react';
 import { FeedPost, User } from '../types';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface SocialFeedProps {
   posts?: FeedPost[];
@@ -22,12 +23,28 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({
   const safePosts = posts || [];
   const [newContent, setNewContent] = useState('');
   const [newMediaUrl, setNewMediaUrl] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [openCommentPostId, setOpenCommentPostId] = useState<string | null>(null);
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setIsProcessing(true);
+        const compressed = await compressImageFile(file, 1200, 0.85);
+        if (compressed) setNewMediaUrl(compressed);
+      } catch (err) {
+        console.error('Failed to process image:', err);
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
+
   const handleSubmitPost = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newContent.trim()) return;
+    if (!newContent.trim() && !newMediaUrl) return;
     if (onCreatePost) onCreatePost(newContent, newMediaUrl.trim() || undefined);
     setNewContent('');
     setNewMediaUrl('');
@@ -63,25 +80,42 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({
           />
 
           {newMediaUrl && (
-            <div className="relative rounded-xl overflow-hidden max-h-48 border border-slate-800">
+            <div className="relative rounded-xl overflow-hidden max-h-48 border border-slate-800 bg-black">
               <img src={newMediaUrl} alt="Preview" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setNewMediaUrl('')}
+                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 text-white hover:bg-rose-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           )}
 
           <div className="flex items-center justify-between pt-1">
-            <input
-              type="url"
-              placeholder="Photo URL (optional)..."
-              value={newMediaUrl}
-              onChange={e => setNewMediaUrl(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white w-2/3"
-            />
+            <div>
+              <label
+                htmlFor="feed-photo-upload"
+                className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors border border-slate-700"
+              >
+                <ImageIcon className="w-4 h-4 text-amber-400" />
+                <span>{newMediaUrl ? 'Change Photo' : 'Add Photo from Device'}</span>
+              </label>
+              <input
+                id="feed-photo-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+            </div>
 
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 text-white font-extrabold text-xs shadow-md hover:scale-105 transition-all"
+              disabled={isProcessing || (!newContent.trim() && !newMediaUrl)}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white font-extrabold text-xs shadow-md disabled:opacity-50 transition-all"
             >
-              Post to Feed
+              {isProcessing ? 'Processing...' : 'Post to Feed'}
             </button>
           </div>
         </form>

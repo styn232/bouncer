@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import {
   INITIAL_PROFILES,
   SUBSCRIPTION_PLANS,
@@ -19,6 +18,22 @@ import {
 } from './src/data/mockData';
 import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, VerificationSubmission, ReportItem, AdCampaign, NotificationItem, SiteSettings } from './src/types';
 import { Paynow } from 'paynow';
+
+function capitalizeName(str?: string): string {
+  if (!str) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word) => {
+      if (!word) return '';
+      return word
+        .split('-')
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join('-');
+    })
+    .join(' ');
+}
 
 const DEFAULT_STARTER_PROFILES: SingleProfile[] = [
   {
@@ -212,6 +227,32 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Strict Security Middleware: Block scans/exploits targeting sensitive files (.env, .git, proc, source files)
+  app.use((req, res, next) => {
+    const p = (req.path || '').toLowerCase();
+    if (
+      p.includes('/.env') ||
+      p.includes('/.git') ||
+      p.includes('/proc/') ||
+      p.includes('data_storage.json') ||
+      p.includes('server.ts') ||
+      p.includes('server.cjs') ||
+      p.endsWith('.env') ||
+      p.endsWith('.env.example') ||
+      p.endsWith('.backup') ||
+      p.endsWith('.sample') ||
+      p.endsWith('.bak') ||
+      p.endsWith('.conf') ||
+      p.endsWith('.ini') ||
+      p.endsWith('.sh') ||
+      p.startsWith('/var/') ||
+      p.startsWith('/etc/')
+    ) {
+      return res.status(404).send('Not Found');
+    }
+    next();
+  });
+
   const STORAGE_FILE = path.join(process.cwd(), 'data_storage.json');
   const uploadsDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadsDir)) {
@@ -228,11 +269,24 @@ async function startServer() {
 
   const PAYNOW_ID = process.env.PAYNOW_INTEGRATION_ID || '25938';
   const PAYNOW_KEY = process.env.PAYNOW_INTEGRATION_KEY || 'd20d903a-d31a-47f1-8a65-5f9c9d3f0c07';
-  const IS_PAYNOW_TEST_MODE = process.env.PAYNOW_TEST_MODE === 'true' || true; // Default test mode enabled
+  const PAYNOW_MERCHANT_EMAIL = process.env.PAYNOW_MERCHANT_EMAIL || 'francismugebe@gmail.com';
+  const IS_PAYNOW_TEST_MODE = process.env.PAYNOW_TEST_MODE === 'true';
 
   const paynow = new Paynow(PAYNOW_ID, PAYNOW_KEY);
   paynow.resultUrl = process.env.PAYNOW_RESULT_URL || 'https://datingwithbouncer.com/api/paynow/result';
   paynow.returnUrl = process.env.PAYNOW_RETURN_URL || 'https://datingwithbouncer.com/payment-success';
+
+  function getPaynowAuthEmail(customerEmail: string): string {
+    // In Paynow Test Mode, Paynow strictly enforces that authemail MUST match the merchant's registered email
+    if (IS_PAYNOW_TEST_MODE) {
+      return PAYNOW_MERCHANT_EMAIL;
+    }
+    // In Live/Production Mode, use customer email if valid, otherwise fallback to merchant email
+    if (customerEmail && customerEmail.includes('@') && !customerEmail.includes('example.com') && !customerEmail.includes('datingwithbouncer.com')) {
+      return customerEmail;
+    }
+    return PAYNOW_MERCHANT_EMAIL;
+  }
 
   // In-memory persistent database states
   let siteSettings: SiteSettings = {
@@ -324,6 +378,17 @@ async function startServer() {
     } catch (err) {
       console.error('[Storage] Error saving persistent storage:', err);
     }
+  }
+
+  function findTransaction(refQuery: string | undefined): PaymentTransaction | undefined {
+    if (!refQuery) return undefined;
+    const cleaned = String(refQuery).trim().toLowerCase();
+    return transactions.find(t => 
+      (t.reference && t.reference.trim().toLowerCase() === cleaned) ||
+      (t.id && t.id.trim().toLowerCase() === cleaned) ||
+      (t.paynowReference && t.paynowReference.trim().toLowerCase() === cleaned) ||
+      (t.pollUrl && t.pollUrl.toLowerCase().includes(cleaned))
+    );
   }
 
   // Load persistent storage on boot
@@ -510,8 +575,8 @@ async function startServer() {
     res.json({ 
       success: true, 
       user: currentUser, 
-      isAdmin: currentUser.role === 'admin',
-      backendAccess: currentUser.role === 'admin' ? 'unlocked' : 'standard'
+      isAdmin: currentUser ? currentUser.role === 'admin' : false,
+      backendAccess: (currentUser && currentUser.role === 'admin') ? 'unlocked' : 'standard'
     });
   });
 
@@ -590,10 +655,12 @@ async function startServer() {
       return res.status(400).json({ error: 'Name and email are required.' });
     }
 
+    const formattedName = capitalizeName(name);
+
     const newUser: User = {
       id: `usr_${Date.now()}`,
       email,
-      name,
+      name: formattedName,
       age: Number(age) || 25,
       city: city || 'Harare',
       subLocation: subLocation || 'Borrowdale',
@@ -609,6 +676,7 @@ async function startServer() {
       gender: gender || 'female',
       interests: ['Dating', 'Coffee', 'Music'],
       bouncerVerified: false,
+      walletBalance: 0,
       createdAt: new Date().toISOString()
     };
 
@@ -661,16 +729,18 @@ async function startServer() {
   });
 
   app.put('/api/auth/profile', (req, res) => {
-    const { name, email, whatsappNumber, age, city, subLocation, childrenCount, intent, location, bio, gender, seeking, interests, avatar, bouncerVerified } = req.body;
+    const { name, email, whatsappNumber, age, city, subLocation, childrenCount, intent, location, bio, gender, seeking, interests, avatar, photos, bouncerVerified } = req.body;
     if (!currentUser) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
     const fullLocation = location || (city && subLocation ? `${city} (${subLocation}), Zimbabwe` : currentUser.location);
+    const validPhotos = Array.isArray(photos) && photos.length > 0 ? photos : (avatar ? [avatar] : undefined);
+    const formattedName = name ? capitalizeName(name) : undefined;
 
     currentUser = {
       ...currentUser,
-      ...(name && { name }),
+      ...(formattedName && { name: formattedName }),
       ...(email && { email }),
       ...(whatsappNumber && { whatsappNumber }),
       ...(age && { age: Number(age) }),
@@ -696,6 +766,11 @@ async function startServer() {
     // Sync user's associated SingleProfile if exists or create if missing
     let pIdx = profiles.findIndex(p => p.id === currentUser.id || p.name.toLowerCase() === currentUser.name.toLowerCase());
     if (pIdx !== -1) {
+      const existingPhotos = profiles[pIdx].photos || [];
+      const updatedPhotos = validPhotos && validPhotos.length > 0
+        ? validPhotos 
+        : (avatar ? [avatar, ...existingPhotos.slice(1)] : existingPhotos);
+
       profiles[pIdx] = {
         ...profiles[pIdx],
         name: currentUser.name,
@@ -710,7 +785,7 @@ async function startServer() {
         gender: currentUser.gender || profiles[pIdx].gender,
         seeking: currentUser.seeking || profiles[pIdx].seeking,
         interests: currentUser.interests || profiles[pIdx].interests,
-        photos: avatar ? [avatar, ...profiles[pIdx].photos.slice(1)] : profiles[pIdx].photos,
+        photos: updatedPhotos.length > 0 ? updatedPhotos : [currentUser.avatar],
         bouncerStatus: currentUser.bouncerVerified ? 'verified' : profiles[pIdx].bouncerStatus
       };
     } else {
@@ -724,7 +799,7 @@ async function startServer() {
         childrenCount: currentUser.childrenCount || 0,
         intent: currentUser.intent || 'Marriage',
         bio: currentUser.bio || 'Single looking for love.',
-        photos: [currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'],
+        photos: validPhotos && validPhotos.length > 0 ? validPhotos : [currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'],
         interests: currentUser.interests || ['Coffee', 'Travel'],
         gender: currentUser.gender || 'female',
         seeking: currentUser.seeking || 'male',
@@ -992,6 +1067,47 @@ async function startServer() {
     res.json(users);
   });
 
+  // Admin: Add or Deduct Account Funds from User Balance
+  app.post('/api/admin/users/:id/funds', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const { amount, action } = req.body; // action: 'add' | 'remove' | 'set', amount: number
+    const userId = req.params.id;
+    
+    const uIdx = users.findIndex(u => u.id === userId || u.email.toLowerCase() === userId.toLowerCase());
+    if (uIdx === -1) {
+      return res.status(404).json({ error: 'User account not found' });
+    }
+
+    const numAmount = Number(amount) || 0;
+    const currentBal = Number(users[uIdx].walletBalance) || 0;
+    let newBal = currentBal;
+
+    if (action === 'add') {
+      newBal = currentBal + Math.abs(numAmount);
+    } else if (action === 'remove') {
+      newBal = Math.max(0, currentBal - Math.abs(numAmount));
+    } else if (action === 'set') {
+      newBal = Math.max(0, numAmount);
+    }
+
+    users[uIdx].walletBalance = Number(newBal.toFixed(2));
+
+    // Update currentUser if same
+    if (currentUser && currentUser.id === users[uIdx].id) {
+      currentUser.walletBalance = users[uIdx].walletBalance;
+    }
+
+    saveAppData();
+    res.json({
+      success: true,
+      user: users[uIdx],
+      newBalance: users[uIdx].walletBalance,
+      message: `Successfully ${action === 'add' ? 'added $' + numAmount.toFixed(2) : 'deducted $' + numAmount.toFixed(2)} ${action === 'add' ? 'to' : 'from'} ${users[uIdx].name}'s funds. New balance: $${users[uIdx].walletBalance.toFixed(2)}`
+    });
+  });
+
   // Admin: Upgrade User Subscription & Bouncer Status
   app.put('/api/admin/users/:id/upgrade', (req, res) => {
     if (!isAuthorizedAdmin(req)) {
@@ -1055,19 +1171,36 @@ async function startServer() {
       const { planId, profileIds, mobileNumber, paymentMethod, guestEmail, guestPhone } = req.body;
 
       // Auto resolve plan if not explicitly passed or if a tier alias / amount is passed
-      let effectivePlanId = planId || 'starter_3_or_4';
-      if (typeof effectivePlanId === 'number' || effectivePlanId === '6' || effectivePlanId === '10' || effectivePlanId === '15') {
+      let effectivePlanId = planId || (Array.isArray(profileIds) && profileIds.length === 1 ? 'test_1_single' : 'starter_3_or_4');
+      if (typeof effectivePlanId === 'number' || effectivePlanId === '3' || effectivePlanId === '6' || effectivePlanId === '10' || effectivePlanId === '15') {
         const num = Number(effectivePlanId);
-        if (num <= 6) effectivePlanId = 'starter_3_or_4';
+        if (num <= 3) effectivePlanId = 'test_1_single';
+        else if (num <= 6) effectivePlanId = 'starter_3_or_4';
         else if (num <= 10) effectivePlanId = 'starter_10_singles';
         else effectivePlanId = 'vip_30_singles';
       }
 
       let plan = SUBSCRIPTION_PLANS.find(p => p.id === effectivePlanId);
       if (!plan) {
-        // Robust alias fallback for all $6, $10, and $15 packages
+        // Robust alias fallback for all $3, $6, $10, and $15 packages
         const normalizedId = String(effectivePlanId).toLowerCase();
         if (
+          normalizedId.includes('test') ||
+          normalizedId.includes('1_single') ||
+          normalizedId === 'test_1_single' ||
+          normalizedId === '3'
+        ) {
+          plan = SUBSCRIPTION_PLANS.find(p => p.price === 3 || p.id === 'test_1_single') || {
+            id: 'test_1_single',
+            name: '1 Single Test Pass',
+            price: 3,
+            billingPeriod: 'monthly',
+            tagline: 'Test package: Unlock 1 Single WhatsApp contact number to see it working!',
+            badge: '$3 TEST PASS',
+            popular: false,
+            features: ['Select 1 Single for only $3', 'Unlock Direct WhatsApp Phone Number', 'Instant Real Connection Test']
+          };
+        } else if (
           normalizedId.includes('10') ||
           normalizedId.includes('bundle') ||
           normalizedId === 'starter_10_singles'
@@ -1113,14 +1246,39 @@ async function startServer() {
       const userId = currentUser ? currentUser.id : 'usr_guest';
 
       const reference = `BOUNCER-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const authEmail = getPaynowAuthEmail(userEmail);
 
-      const payment = paynow.createPayment(reference, userEmail);
+      const isMobileMethod = paymentMethod === 'ecocash' || paymentMethod === 'onemoney';
+      const phoneToUse = (mobileNumber || guestPhone || '0771490167').replace(/\s+/g, '');
+
+      // CREATE AND PERSIST TRANSACTION IMMEDIATELY BEFORE SENDING TO PAYNOW
+      // This guarantees that any instant Paynow callback or poll finds the record with zero race conditions
+      const transaction: PaymentTransaction = {
+        id: `tx_${Date.now()}`,
+        reference,
+        paynowReference: '',
+        userId,
+        userName,
+        userEmail,
+        amount: plan.price,
+        planId: plan.id,
+        planName: plan.name,
+        profileIds: Array.isArray(profileIds) ? profileIds : [],
+        cardLast4: '',
+        cardBrand: isMobileMethod ? (paymentMethod === 'ecocash' ? 'EcoCash' : 'OneMoney') : 'Paynow',
+        status: 'pending',
+        pollUrl: '',
+        date: new Date().toISOString()
+      };
+
+      transactions.unshift(transaction);
+      saveAppData();
+
+      const payment = paynow.createPayment(reference, authEmail);
       payment.add(plan.name, plan.price);
 
       let response: any = null;
       let usedTestMode = false;
-      const isMobileMethod = paymentMethod === 'ecocash' || paymentMethod === 'onemoney';
-      const phoneToUse = (mobileNumber || guestPhone || '0771490167').replace(/\s+/g, '');
 
       try {
         if (isMobileMethod && phoneToUse) {
@@ -1147,27 +1305,13 @@ async function startServer() {
           pollUrl: testPollUrl,
           instructions: testInstructions
         };
+
+        transaction.paynowReference = `PN-TEST-${reference}`;
+        transaction.pollUrl = testPollUrl;
+      } else {
+        if (response.pollUrl) transaction.pollUrl = response.pollUrl;
+        if (response.paynowReference) transaction.paynowReference = response.paynowReference;
       }
-
-      const transaction: PaymentTransaction = {
-        id: `tx_${Date.now()}`,
-        reference,
-        paynowReference: usedTestMode ? `PN-TEST-${reference}` : '',
-        userId,
-        userName,
-        userEmail,
-        amount: plan.price,
-        planId: plan.id,
-        planName: plan.name,
-        profileIds: Array.isArray(profileIds) ? profileIds : [],
-        cardLast4: '',
-        cardBrand: isMobileMethod ? (paymentMethod === 'ecocash' ? 'EcoCash' : 'OneMoney') : 'Paynow (Test/Live)',
-        status: 'pending',
-        pollUrl: response.pollUrl || '',
-        date: new Date().toISOString()
-      };
-
-      transactions.unshift(transaction);
 
       notifications.unshift({
         id: `notif_${Date.now()}`,
@@ -1298,13 +1442,19 @@ async function startServer() {
   app.post('/api/paynow/result', async (req, res) => {
     try {
       const data = req.body || {};
-      const ref = data.reference || data.merchantreference || req.query.reference;
+      const ref = (data.reference || data.merchantreference || data.Reference || data.MerchantReference || data.paynowreference || req.query.reference || req.query.merchantreference || '') as string;
 
       if (!ref) {
         return res.status(400).json({ error: 'Missing reference in callback' });
       }
 
-      const tx = transactions.find(t => t.reference === ref || t.id === ref);
+      let tx = findTransaction(ref);
+      if (!tx) {
+        // Reload from storage in case another cluster worker saved it
+        loadPersistentData();
+        tx = findTransaction(ref);
+      }
+
       if (!tx) {
         console.warn(`Paynow callback received for unknown transaction reference: ${ref}`);
         return res.status(200).json({ status: 'ok', message: 'Transaction reference not found' });
@@ -1316,7 +1466,13 @@ async function startServer() {
 
       let isPaid = false;
 
-      if (tx.pollUrl) {
+      // Check incoming status payload from Paynow
+      const incomingStatus = (data.status || req.query.status || '').toString().toLowerCase();
+      if (incomingStatus === 'paid' || incomingStatus === 'awaiting delivery' || incomingStatus === 'delivered') {
+        isPaid = true;
+      }
+
+      if (tx.pollUrl && !tx.pollUrl.includes('test_')) {
         try {
           const pollResult = await paynow.pollTransaction(tx.pollUrl);
           if (pollResult) {
@@ -1324,7 +1480,7 @@ async function startServer() {
               tx.paynowReference = pollResult.paynowReference;
             }
             const statusStr = (pollResult.status || '').toString().toLowerCase();
-            if (statusStr === 'paid' || statusStr === 'awaiting delivery' || statusStr === 'delivered') {
+            if (statusStr === 'paid' || statusStr === 'awaiting delivery' || statusStr === 'delivered' || (typeof pollResult.paid === 'function' && pollResult.paid())) {
               isPaid = true;
             } else if (statusStr === 'cancelled' || statusStr === 'failed') {
               tx.status = 'failed';
@@ -1335,18 +1491,12 @@ async function startServer() {
         }
       }
 
-      if (!isPaid && data.status) {
-        const rawStatus = data.status.toString().toLowerCase();
-        if (rawStatus === 'paid' || rawStatus === 'awaiting delivery' || rawStatus === 'delivered') {
-          isPaid = true;
-        }
-      }
-
       if (isPaid) {
         activateUserSubscription(tx);
         return res.status(200).json({ status: 'ok', message: 'Payment confirmed & subscription activated' });
       }
 
+      saveAppData();
       return res.status(200).json({ status: 'ok', message: 'Callback received, payment pending' });
     } catch (err: any) {
       console.error('Error handling Paynow result callback:', err?.message || err);
@@ -1930,6 +2080,7 @@ async function startServer() {
 
   // Vite middleware for development vs static serve for production
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa'
@@ -1937,7 +2088,7 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, { index: 'index.html', dotfiles: 'ignore' }));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });

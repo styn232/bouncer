@@ -51,9 +51,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   if (!isOpen) return null;
 
   // Dynamic Tiered Pricing Calculation
-  // 1 to 3 singles = $6 | 4 to 10 singles = $10 | More than 10 or 30+ Singles VIP = $15
+  // 1 single = $3 Test Package | 2 to 3 singles = $6 | 4 to 10 singles = $10 | More than 10 or 30+ Singles VIP = $15
   const calculateSinglesFee = (count: number) => {
     if (count === 0) return 0;
+    if (count === 1) return 3;
     if (count <= 3) return 6;
     if (count <= 10) return 10;
     return 15;
@@ -63,6 +64,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   // Map cart count to subscription plan for Paynow backend
   const getPlanId = (count: number): string => {
+    if (count === 1) return 'test_1_single';
     if (count <= 3) return 'starter_3_or_4';
     if (count <= 10) return 'starter_10_singles';
     return 'vip_30_singles';
@@ -217,25 +219,41 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 Total: ${calculatedFee}.00 Flat
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs">
               <div
-                className={`p-3 rounded-xl border transition-all ${
-                  cartItems.length >= 1 && cartItems.length <= 3
+                className={`p-2.5 rounded-xl border transition-all ${
+                  cartItems.length === 1
                     ? 'bg-white border-emerald-500 text-slate-900 font-bold ring-2 ring-emerald-500/30 shadow-md'
                     : 'bg-white/80 border-slate-200 text-slate-600'
                 }`}
               >
                 <div className="flex justify-between items-center">
-                  <span className="text-emerald-900 font-extrabold text-[11px]">1 to 3 Singles</span>
-                  <span className="text-emerald-700 font-black text-xs">$6.00 Flat</span>
+                  <span className="text-emerald-900 font-extrabold text-[11px]">🧪 1 Single Test</span>
+                  <span className="text-emerald-700 font-black text-xs">$3.00 Flat</span>
                 </div>
-                <p className="text-[10px] text-slate-600 mt-0.5">
-                  Pick 1 to 3 singles to unlock direct WhatsApp numbers & date scheduling.
+                <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                  Test & verify 1 single's WhatsApp number.
                 </p>
               </div>
 
               <div
-                className={`p-3 rounded-xl border transition-all ${
+                className={`p-2.5 rounded-xl border transition-all ${
+                  cartItems.length >= 2 && cartItems.length <= 3
+                    ? 'bg-white border-emerald-500 text-slate-900 font-bold ring-2 ring-emerald-500/30 shadow-md'
+                    : 'bg-white/80 border-slate-200 text-slate-600'
+                }`}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="text-emerald-900 font-extrabold text-[11px]">2 to 3 Singles</span>
+                  <span className="text-emerald-700 font-black text-xs">$6.00 Flat</span>
+                </div>
+                <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
+                  Unlock 2 to 3 singles & WhatsApp dates.
+                </p>
+              </div>
+
+              <div
+                className={`p-2.5 rounded-xl border transition-all ${
                   cartItems.length >= 4 && cartItems.length <= 10
                     ? 'bg-white border-emerald-500 text-slate-900 font-bold ring-2 ring-emerald-500/30 shadow-md'
                     : 'bg-white/80 border-slate-200 text-slate-600'
@@ -245,23 +263,23 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <span className="text-emerald-900 font-extrabold text-[11px]">4 to 10 Singles</span>
                   <span className="text-emerald-700 font-black text-xs">$10.00 Bundle</span>
                 </div>
-                <p className="text-[10px] text-slate-600 mt-0.5">
+                <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
                   Pick 4 to 10 singles for $10 flat rate bundle.
                 </p>
               </div>
 
               <div
-                className={`p-3 rounded-xl border transition-all ${
+                className={`p-2.5 rounded-xl border transition-all ${
                   cartItems.length > 10
                     ? 'bg-amber-50 border-amber-500 text-slate-900 font-bold ring-2 ring-amber-500/30 shadow-md'
                     : 'bg-white/80 border-slate-200 text-slate-600'
                 }`}
               >
                 <div className="flex justify-between items-center">
-                  <span className="text-amber-900 font-extrabold text-[11px]">VIP (11+ Singles)</span>
+                  <span className="text-amber-900 font-extrabold text-[11px]">👑 VIP (11+ Singles)</span>
                   <span className="text-amber-700 font-black text-xs">$15.00 VIP</span>
                 </div>
-                <p className="text-[10px] text-slate-600 mt-0.5">
+                <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
                   Pay $15 for unlimited VIP single unlocks.
                 </p>
               </div>

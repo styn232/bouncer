@@ -11,6 +11,21 @@ export const INITIAL_PROFILES: SingleProfile[] = [];
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
+    id: 'test_1_single',
+    name: '1 Single Test Pass',
+    price: 3,
+    billingPeriod: 'monthly',
+    tagline: 'Test package: Unlock 1 Single WhatsApp contact number to see it working!',
+    badge: '$3 TEST PASS',
+    popular: false,
+    features: [
+      'Select 1 Single for only $3',
+      'Unlock Direct WhatsApp Phone Number',
+      'Instant Live Test & Direct Connection',
+      'Fast Identity & Bouncer Clearance'
+    ]
+  },
+  {
     id: 'starter_3_or_4',
     name: '1 to 3 Singles Pass',
     price: 6,

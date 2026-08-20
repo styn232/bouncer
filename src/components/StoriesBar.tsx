@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, X, Eye } from 'lucide-react';
+import { Plus, X, Eye, Upload, Camera } from 'lucide-react';
 import { StoryItem, User } from '../types';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface StoriesBarProps {
   stories?: StoryItem[];
@@ -20,6 +21,22 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [mediaUrlInput, setMediaUrlInput] = useState('');
   const [captionInput, setCaptionInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setIsProcessing(true);
+        const compressed = await compressImageFile(file, 1080, 0.85);
+        if (compressed) setMediaUrlInput(compressed);
+      } catch (err) {
+        console.error('Story upload failed:', err);
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
 
   const handleUpload = (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,15 +149,37 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({
 
             <form onSubmit={handleUpload} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Image URL</label>
-                <input
-                  type="url"
-                  required
-                  placeholder="https://images.unsplash.com/..."
-                  value={mediaUrlInput}
-                  onChange={e => setMediaUrlInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
-                />
+                <label className="block text-slate-300 font-bold mb-1">Upload Story Photo / Video (From Device)</label>
+                <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                  {mediaUrlInput ? (
+                    <img
+                      src={mediaUrlInput}
+                      alt="Story preview"
+                      className="w-14 h-14 rounded-xl object-cover ring-2 ring-rose-500 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl bg-slate-900 border border-dashed border-slate-700 flex items-center justify-center text-slate-500 shrink-0">
+                      <Camera className="w-6 h-6" />
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-1">
+                    <label
+                      htmlFor="story-file-upload"
+                      className="cursor-pointer inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-colors w-full shadow-sm"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>{mediaUrlInput ? 'Change Media' : 'Choose File from Device'}</span>
+                    </label>
+                    <input
+                      id="story-file-upload"
+                      type="file"
+                      accept="image/*,video/*"
+                      className="hidden"
+                      onChange={handleMediaUpload}
+                    />
+                    <p className="text-[10px] text-slate-400">Select photo from gallery or camera</p>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -156,9 +195,10 @@ export const StoriesBar: React.FC<StoriesBarProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 text-white font-bold"
+                disabled={!mediaUrlInput || isProcessing}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white font-bold disabled:opacity-50 transition-all"
               >
-                Post Story
+                {isProcessing ? 'Processing Image...' : 'Post Story'}
               </button>
             </form>
           </div>
