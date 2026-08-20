@@ -6,6 +6,7 @@ import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
 import { capitalizeName } from '../utils/format';
 import { auth, db, createUserWithEmailAndPassword, doc, setDoc } from '../lib/firebase';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 interface AdminPanelProps {
   profiles: SingleProfile[];
@@ -1414,17 +1415,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Firebase Project ID</div>
-                <div className="text-sm font-mono text-amber-400 font-bold">abiding-ring-86pck</div>
+                <div className="text-sm font-mono text-amber-400 font-bold break-all">{firebaseConfig.projectId || 'Not Configured'}</div>
                 <div className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Cloud Provisioned
+                  <CheckCircle2 className="w-3 h-3" /> Cloud Connected
                 </div>
               </div>
 
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Firestore Database</div>
-                <div className="text-xs font-mono text-slate-300 truncate">ai-studio-datingwithbounce...</div>
+                <div className="text-xs font-mono text-slate-300 truncate">{firebaseConfig.firestoreDatabaseId || '(default)'}</div>
                 <div className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Security Rules Deployed
+                  <CheckCircle2 className="w-3 h-3" /> Configured & Active
                 </div>
               </div>
 

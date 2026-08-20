@@ -36,7 +36,10 @@ try {
         console.warn('Firebase Auth initialization note:', authErr);
       }
       try {
-        dbInstance = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+        const dbId = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)') 
+          ? firebaseConfig.firestoreDatabaseId 
+          : undefined;
+        dbInstance = dbId ? getFirestore(app, dbId) : getFirestore(app);
       } catch (dbErr) {
         console.warn('Firebase Firestore initialization note:', dbErr);
       }

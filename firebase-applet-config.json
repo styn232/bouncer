@@ -1,12 +1,12 @@
 {
-  "projectId": "abiding-ring-86pck",
-  "appId": "1:930402550798:web:28e1405d69be795087a85f",
-  "apiKey": "AIzaSyBJNkU9ZgQfzBjJBZzvjA6Ti86RQSPr7yo",
-  "authDomain": "abiding-ring-86pck.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-datingwithbounce-bc605d4b-31d4-4a71-ba00-7c8b2aff0c0b",
-  "storageBucket": "abiding-ring-86pck.firebasestorage.app",
-  "messagingSenderId": "930402550798",
+  "projectId": "gen-lang-client-0471277391",
+  "appId": "1:728441151130:web:5116099a5f3ca84f0c4923",
+  "apiKey": "AIzaSyBahb2yCIxDMP3oBw_a6F3biDfxPu3AF8M",
+  "authDomain": "gen-lang-client-0471277391.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "gen-lang-client-0471277391.firebasestorage.app",
+  "messagingSenderId": "728441151130",
   "measurementId": "",
-  "oAuthClientId": "930402550798-ngete5pa7iehh313tpvsrs5kn8slhttr.apps.googleusercontent.com",
+  "oAuthClientId": "",
   "recaptchaSiteKey": ""
 }
