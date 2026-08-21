@@ -67,7 +67,8 @@ export const DiscoverDeck: React.FC<DiscoverDeckProps> = ({
   const handleNextPhoto = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!currentProfile) return;
-    if (activePhotoIndex < currentProfile.photos.length - 1) {
+    const photoCount = currentProfile.photos?.length || 1;
+    if (activePhotoIndex < photoCount - 1) {
       setActivePhotoIndex(prev => prev + 1);
     } else {
       setActivePhotoIndex(0);
@@ -166,7 +167,7 @@ export const DiscoverDeck: React.FC<DiscoverDeckProps> = ({
         >
           {/* Photo Carousel */}
           <img
-            src={currentProfile.photos[activePhotoIndex] || currentProfile.photos[0]}
+            src={currentProfile.photos?.[activePhotoIndex] || currentProfile.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'}
             alt={currentProfile.name}
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover"
@@ -180,7 +181,7 @@ export const DiscoverDeck: React.FC<DiscoverDeckProps> = ({
 
           {/* Photo Index Indicators */}
           <div className="absolute top-3 left-3 right-3 flex gap-1 z-10">
-            {currentProfile.photos.map((_, i) => (
+            {(currentProfile.photos || []).map((_, i) => (
               <div
                 key={i}
                 className={`h-1 flex-1 rounded-full ${

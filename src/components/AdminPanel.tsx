@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image as ImageIcon, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database } from 'lucide-react';
+import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image as ImageIcon, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database, Wallet, ArrowUpRight, ArrowDownLeft, X, UserCheck } from 'lucide-react';
 import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings, DatingIntent } from '../types';
 import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -67,21 +67,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newWhatsapp, setNewWhatsapp] = useState('');
   const [newCity, setNewCity] = useState('Harare');
   const [newSubLocation, setNewSubLocation] = useState('Borrowdale');
-  const [newGender, setNewGender] = useState<'female' | 'male'>('female');
+  const [newGender, setNewGender] = useState<'female' | 'male' | 'non-binary'>('female');
   const [newChildrenCount, setNewChildrenCount] = useState(0);
   const [newIntent, setNewIntent] = useState<DatingIntent>('Marriage');
   const [newBio, setNewBio] = useState('');
   const [newPhoto, setNewPhoto] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
   const [newBouncerStatus, setNewBouncerStatus] = useState<BouncerStatus>('verified');
 
-  // Edit Profile Modal state
+  // Edit Single Profile Modal state
   const [editingProfile, setEditingProfile] = useState<SingleProfile | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAge, setEditAge] = useState(25);
   const [editCity, setEditCity] = useState('Harare');
   const [editSubLocation, setEditSubLocation] = useState('Borrowdale');
-  const [editGender, setEditGender] = useState<'female' | 'male'>('female');
+  const [editGender, setEditGender] = useState<'female' | 'male' | 'non-binary'>('female');
   const [editChildrenCount, setEditChildrenCount] = useState(0);
   const [editIntent, setEditIntent] = useState<DatingIntent>('Marriage');
   const [editWhatsapp, setEditWhatsapp] = useState('');
@@ -91,6 +91,92 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editBouncerNotes, setEditBouncerNotes] = useState('');
   const [editHeight, setEditHeight] = useState("5'7\"");
   const [editRelationshipGoal, setEditRelationshipGoal] = useState('Marriage / Long-term');
+
+  // Admin User Profile & Wallet Editor Modal state
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<any | null>(null);
+  const [isUserEditModalOpen, setIsUserEditModalOpen] = useState(false);
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserEmail, setEditUserEmail] = useState('');
+  const [editUserWhatsapp, setEditUserWhatsapp] = useState('');
+  const [editUserAge, setEditUserAge] = useState(25);
+  const [editUserGender, setEditUserGender] = useState<'female' | 'male' | 'non-binary'>('female');
+  const [editUserSeeking, setEditUserSeeking] = useState<'female' | 'male' | 'everyone'>('male');
+  const [editUserChildrenCount, setEditUserChildrenCount] = useState(0);
+  const [editUserCity, setEditUserCity] = useState('Harare');
+  const [editUserSubLocation, setEditUserSubLocation] = useState('Borrowdale');
+  const [editUserIntent, setEditUserIntent] = useState<DatingIntent>('Marriage');
+  const [editUserBio, setEditUserBio] = useState('');
+  const [editUserBouncerVerified, setEditUserBouncerVerified] = useState(false);
+  const [editUserSubscriptionPlan, setEditUserSubscriptionPlan] = useState<SubscriptionPlanId>('free');
+  const [editUserWalletBalance, setEditUserWalletBalance] = useState<number>(0);
+  const [editUserWalletAdjustmentReason, setEditUserWalletAdjustmentReason] = useState('');
+  const [isUserEditSubmitting, setIsUserEditSubmitting] = useState(false);
+
+  const handleOpenUserEditModal = (u: any) => {
+    setSelectedUserForEdit(u);
+    setEditUserName(u.name || '');
+    setEditUserEmail(u.email || '');
+    setEditUserWhatsapp(u.whatsappNumber || '+263 77 123 4567');
+    setEditUserAge(u.age || 25);
+    setEditUserGender(u.gender || 'female');
+    setEditUserSeeking(u.seeking || 'male');
+    setEditUserChildrenCount(u.childrenCount ?? 0);
+    setEditUserCity(u.city || 'Harare');
+    setEditUserSubLocation(u.subLocation || 'Borrowdale');
+    setEditUserIntent(u.intent || 'Marriage');
+    setEditUserBio(u.bio || '');
+    setEditUserBouncerVerified(Boolean(u.bouncerVerified));
+    setEditUserSubscriptionPlan(u.plan || u.subscriptionPlan || 'free');
+    setEditUserWalletBalance(Number(u.walletBalance || 0));
+    setEditUserWalletAdjustmentReason('');
+    setIsUserEditModalOpen(true);
+  };
+
+  const handleSaveUserEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForEdit) return;
+
+    try {
+      setIsUserEditSubmitting(true);
+      const res = await fetch(`/api/admin/users/${selectedUserForEdit.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': 'admin'
+        },
+        body: JSON.stringify({
+          name: editUserName,
+          email: editUserEmail,
+          whatsappNumber: editUserWhatsapp,
+          age: Number(editUserAge),
+          gender: editUserGender,
+          seeking: editUserSeeking,
+          childrenCount: Number(editUserChildrenCount),
+          city: editUserCity,
+          subLocation: editUserSubLocation,
+          intent: editUserIntent,
+          bio: editUserBio,
+          bouncerVerified: editUserBouncerVerified,
+          subscriptionPlan: editUserSubscriptionPlan,
+          walletBalance: Number(editUserWalletBalance),
+          walletAdjustmentReason: editUserWalletAdjustmentReason || 'Admin Profile Edit'
+        })
+      });
+
+      if (res.ok) {
+        onRefreshData();
+        setIsUserEditModalOpen(false);
+        setSelectedUserForEdit(null);
+      } else {
+        const d = await res.json();
+        alert(d.error || 'Failed to update user profile.');
+      }
+    } catch (err) {
+      alert('Error updating user profile.');
+    } finally {
+      setIsUserEditSubmitting(false);
+    }
+  };
 
   const handleOpenEditModal = (p: SingleProfile) => {
     setEditingProfile(p);
@@ -103,7 +189,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditIntent(p.intent || 'Marriage');
     setEditWhatsapp(p.whatsappNumber || '+263 77 123 4567');
     setEditBio(p.bio || '');
-    setEditPhoto(p.photos[0] || '');
+    setEditPhoto(p.photos?.[0] || '');
     setEditBouncerStatus(p.bouncerStatus);
     setEditBouncerNotes(p.bouncerNotes || '');
     setEditHeight(p.height || "5'7\"");
@@ -141,7 +227,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       whatsappNumber: editWhatsapp,
       gender: editGender,
       bio: editBio,
-      photos: editPhoto ? [editPhoto, ...editingProfile.photos.slice(1)] : editingProfile.photos,
+      photos: editPhoto ? [editPhoto, ...(editingProfile.photos || []).slice(1)] : (editingProfile.photos || []),
       bouncerStatus: editBouncerStatus,
       bouncerNotes: editBouncerNotes,
       height: editHeight,
@@ -211,27 +297,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const [fundInputState, setFundInputState] = useState<Record<string, string>>({});
+  const [selectedWalletModalUser, setSelectedWalletModalUser] = useState<any | null>(null);
+  const [modalFundAmount, setModalFundAmount] = useState<string>('5');
+  const [modalFundAction, setModalFundAction] = useState<'add' | 'remove' | 'set'>('add');
+  const [modalFundReason, setModalFundReason] = useState<string>('');
+  const [isFundSubmitting, setIsFundSubmitting] = useState<boolean>(false);
+  const [auditFilter, setAuditFilter] = useState<'all' | 'paynow' | 'wallet_adjustments'>('all');
 
-  const handleModifyFunds = async (userId: string, action: 'add' | 'remove' | 'set', amount: number) => {
+  const handleModifyFunds = async (userId: string, action: 'add' | 'remove' | 'set', amount: number, reason?: string) => {
     if (isNaN(amount) || amount < 0) {
       alert('Please enter a valid positive dollar amount.');
       return;
     }
     try {
+      setIsFundSubmitting(true);
       const res = await fetch(`/api/admin/users/${userId}/funds`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, amount })
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': 'admin'
+        },
+        body: JSON.stringify({ action, amount, reason: reason || 'Manual Admin Adjustment' })
       });
       if (res.ok) {
         onRefreshData();
         setFundInputState(prev => ({ ...prev, [userId]: '' }));
+        setSelectedWalletModalUser(null);
+        setModalFundReason('');
       } else {
         const d = await res.json();
         alert(d.error || 'Failed to update user funds.');
       }
     } catch (err) {
       alert('Error updating user wallet funds.');
+    } finally {
+      setIsFundSubmitting(false);
     }
   };
 
@@ -278,6 +378,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const avgViewsPerProfile = profiles.length > 0 ? Math.round(totalViewsCount / profiles.length) : 0;
   const sortedByViews = [...profiles].sort((a, b) => (b.viewsCount || 0) - (a.viewsCount || 0));
   const maxViewsInList = sortedByViews.length > 0 ? (sortedByViews[0].viewsCount || 1) : 1;
+
+  // Linked user for currently active profile editing modal
+  const editingProfileLinkedUser = editingProfile
+    ? userSubscriptions.find(
+        (u) =>
+          u.id === editingProfile.id ||
+          (u.whatsappNumber && u.whatsappNumber === editingProfile.whatsappNumber) ||
+          u.name.toLowerCase() === editingProfile.name.toLowerCase()
+      )
+    : null;
+
+  // Projected balance calculations for dedicated wallet funds modal
+  const modalCurBalance = selectedWalletModalUser ? Number(selectedWalletModalUser.walletBalance || 0) : 0;
+  const modalInputAmt = Number(modalFundAmount) || 0;
+  const modalProjectedBalance =
+    modalFundAction === 'add'
+      ? modalCurBalance + modalInputAmt
+      : modalFundAction === 'remove'
+      ? Math.max(0, modalCurBalance - modalInputAmt)
+      : Math.max(0, modalInputAmt);
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6">
@@ -513,7 +633,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <tr key={p.id} className="hover:bg-slate-800/40 transition-colors">
                     <td className="p-3">
                       <img
-                        src={p.photos[0]}
+                        src={p.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
                         alt={p.name}
                         referrerPolicy="no-referrer"
                         className="w-12 h-12 rounded-xl object-cover ring-1 ring-slate-700"
@@ -586,7 +706,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 >
                   <div className="flex items-center gap-4">
                     <img
-                      src={p.photos[0]}
+                      src={p.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
                       alt={p.name}
                       referrerPolicy="no-referrer"
                       className="w-16 h-16 rounded-2xl object-cover ring-2 ring-amber-500/40"
@@ -731,56 +851,75 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </td>
                         {/* Admin Add / Remove Funds Column */}
                         <td className="p-3">
-                          <div className="space-y-1.5 min-w-[220px]">
+                          <div className="space-y-1.5 min-w-[240px]">
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-[11px] text-slate-500 font-medium">Balance:</span>
-                              <span className="font-mono font-extrabold text-emerald-700 text-sm bg-emerald-100/80 px-2 py-0.5 rounded-lg border border-emerald-200">
-                                ${Number(userBalance).toFixed(2)}
+                              <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                                <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                                Balance:
                               </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono font-extrabold text-emerald-700 text-sm bg-emerald-100/80 px-2 py-0.5 rounded-lg border border-emerald-200 shadow-xs">
+                                  ${Number(userBalance).toFixed(2)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedWalletModalUser(u);
+                                    setModalFundAmount('5');
+                                    setModalFundAction('add');
+                                    setModalFundReason('');
+                                  }}
+                                  className="px-2 py-0.5 bg-slate-900 hover:bg-slate-800 text-white rounded text-[10px] font-extrabold uppercase flex items-center gap-1 transition-colors"
+                                  title="Open detailed wallet balance adjustment dialog"
+                                >
+                                  <Edit3 className="w-3 h-3 text-amber-400" />
+                                  <span>Adjust</span>
+                                </button>
+                              </div>
                             </div>
                             <div className="flex items-center gap-1">
                               <button
                                 type="button"
-                                onClick={() => handleModifyFunds(u.id, 'add', 5)}
-                                className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-md shadow-xs"
+                                onClick={() => handleModifyFunds(u.id, 'add', 5, 'Quick +$5 Admin Credit')}
+                                className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-md shadow-xs transition-all active:scale-95"
                                 title="Add $5 to user wallet"
                               >
                                 +$5
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleModifyFunds(u.id, 'add', 10)}
-                                className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-md shadow-xs"
+                                onClick={() => handleModifyFunds(u.id, 'add', 10, 'Quick +$10 Admin Credit')}
+                                className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-md shadow-xs transition-all active:scale-95"
                                 title="Add $10 to user wallet"
                               >
                                 +$10
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleModifyFunds(u.id, 'add', 20)}
-                                className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-md shadow-xs"
+                                onClick={() => handleModifyFunds(u.id, 'add', 20, 'Quick +$20 Admin Credit')}
+                                className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-md shadow-xs transition-all active:scale-95"
                                 title="Add $20 to user wallet"
                               >
                                 +$20
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleModifyFunds(u.id, 'remove', 5)}
-                                className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold rounded-md shadow-xs"
+                                onClick={() => handleModifyFunds(u.id, 'remove', 5, 'Quick -$5 Admin Debit')}
+                                className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold rounded-md shadow-xs transition-all active:scale-95"
                                 title="Deduct $5 from user wallet"
                               >
                                 -$5
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleModifyFunds(u.id, 'remove', 10)}
-                                className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold rounded-md shadow-xs"
+                                onClick={() => handleModifyFunds(u.id, 'remove', 10, 'Quick -$10 Admin Debit')}
+                                className="px-1.5 py-0.5 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold rounded-md shadow-xs transition-all active:scale-95"
                                 title="Deduct $10 from user wallet"
                               >
                                 -$10
                               </button>
                             </div>
-                            {/* Custom amount */}
+                            {/* Custom amount inline */}
                             <div className="flex items-center gap-1 pt-0.5">
                               <input
                                 type="number"
@@ -789,28 +928,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 placeholder="$ Amount"
                                 value={customAmountStr}
                                 onChange={(e) => setFundInputState({ ...fundInputState, [u.id]: e.target.value })}
-                                className="w-18 px-1.5 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-800 focus:outline-none focus:border-emerald-500"
+                                className="w-20 px-2 py-1 bg-white border border-slate-300 rounded text-[11px] text-slate-800 focus:outline-none focus:border-emerald-500 font-mono"
                               />
                               <button
                                 type="button"
                                 disabled={customAmountNum <= 0}
-                                onClick={() => handleModifyFunds(u.id, 'add', customAmountNum)}
-                                className="px-1.5 py-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white text-[9px] font-black uppercase rounded"
+                                onClick={() => handleModifyFunds(u.id, 'add', customAmountNum, 'Manual Custom Credit')}
+                                className="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white text-[9px] font-black uppercase rounded shadow-xs"
                               >
                                 + Add
                               </button>
                               <button
                                 type="button"
                                 disabled={customAmountNum <= 0}
-                                onClick={() => handleModifyFunds(u.id, 'remove', customAmountNum)}
-                                className="px-1.5 py-1 bg-rose-700 hover:bg-rose-600 disabled:opacity-40 text-white text-[9px] font-black uppercase rounded"
+                                onClick={() => handleModifyFunds(u.id, 'remove', customAmountNum, 'Manual Custom Debit')}
+                                className="px-2 py-1 bg-rose-700 hover:bg-rose-600 disabled:opacity-40 text-white text-[9px] font-black uppercase rounded shadow-xs"
                               >
                                 - Cut
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleModifyFunds(u.id, 'set', customAmountNum)}
-                                className="px-1.5 py-1 bg-slate-700 hover:bg-slate-600 text-white text-[9px] font-black uppercase rounded"
+                                onClick={() => handleModifyFunds(u.id, 'set', customAmountNum, 'Manual Exact Balance Set')}
+                                className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white text-[9px] font-black uppercase rounded shadow-xs"
                               >
                                 Set
                               </button>
@@ -825,6 +964,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               className="bg-slate-50 border border-emerald-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             >
                               <option value="free">Free Pass ($0)</option>
+                              <option value="starter_1_single">$3 Starter Pack (1 Single Profile)</option>
                               <option value="test_1_single">$3 Test Pass (1 Single)</option>
                               <option value="starter_3_or_4">$6 Starter (1 to 3 Singles)</option>
                               <option value="starter_10_singles">$10 Bundle (4 to 10 Singles)</option>
@@ -840,13 +980,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </div>
                         </td>
                         <td className="p-3 text-right">
-                          <button
-                            onClick={() => handleRemoveUser(u.id, u.name)}
-                            className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
-                            title="Remove User & Single Profile"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenUserEditModal(u)}
+                              className="p-2 text-emerald-700 hover:bg-emerald-100 rounded-xl transition-colors"
+                              title="Edit User Profile & Wallet Balance"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveUser(u.id, u.name)}
+                              className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                              title="Remove User & Single Profile"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -860,80 +1011,183 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* TAB 4: PAYMENT AUDIT LOG */}
       {activeTab === 'audit' && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
-          <h3 className="text-xl font-extrabold text-white font-serif mb-4 flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-emerald-400" />
-            Gateway Payment Audit Logs
-          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div>
+              <h3 className="text-xl font-extrabold text-white font-serif flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-emerald-400" />
+                Gateway Payment & Transaction Audit Logs
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Complete audit trail of all Paynow orders, VIP upgrades, and Manual Wallet Balance adjustments.
+              </p>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-2xl border border-slate-800 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setAuditFilter('all')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                  auditFilter === 'all'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                All ({transactions.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuditFilter('paynow')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                  auditFilter === 'paynow'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Paynow ({transactions.filter(t => t.planId !== 'wallet_adjustment' && !t.cardBrand?.includes('Wallet')).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuditFilter('wallet_adjustments')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                  auditFilter === 'wallet_adjustments'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm font-black'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Wallet className="w-3.5 h-3.5" />
+                Wallet Adjustments ({transactions.filter(t => t.planId === 'wallet_adjustment' || t.cardBrand?.includes('Wallet') || t.cardBrand?.includes('Adj')).length})
+              </button>
+            </div>
+          </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
                 <tr>
-                  <th className="p-3">TX ID</th>
+                  <th className="p-3">TX ID / Ref</th>
                   <th className="p-3">Customer</th>
-                  <th className="p-3">Plan</th>
+                  <th className="p-3">Activity / Description</th>
                   <th className="p-3">Amount</th>
-                  <th className="p-3">Method</th>
+                  <th className="p-3">Type / Channel</th>
                   <th className="p-3">Status</th>
                   <th className="p-3">Timestamp</th>
                   <th className="p-3 text-right">Admin Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80">
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-800/40">
-                    <td className="p-3 font-mono text-amber-400">{tx.id}</td>
-                    <td className="p-3 font-semibold text-white">
-                      <div>{tx.userName}</div>
-                      <div className="text-[10px] text-slate-400">{tx.userEmail}</div>
-                    </td>
-                    <td className="p-3 font-bold text-slate-200">{tx.planName}</td>
-                    <td className="p-3 font-bold text-emerald-400">${tx.amount.toFixed(2)}</td>
-                    <td className="p-3 text-[11px]">{tx.cardBrand} {tx.cardLast4 ? `•••• ${tx.cardLast4}` : ''}</td>
-                    <td className="p-3">
-                      {tx.status === 'pending_approval' ? (
-                        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full text-[10px] font-extrabold animate-pulse">
-                          ⏳ Pending Approval
-                        </span>
-                      ) : tx.status === 'succeeded' ? (
-                        <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
-                          ✅ Approved
-                        </span>
-                      ) : (
-                        <span className="bg-rose-500/20 text-rose-400 border border-rose-500/40 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
-                          ❌ Rejected
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 text-[11px] text-slate-400">{new Date(tx.date).toLocaleString()}</td>
-                    <td className="p-3 text-right">
-                      {tx.status === 'pending_approval' ? (
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => onApprovePayment && onApprovePayment(tx.id)}
-                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] uppercase rounded-xl flex items-center gap-1 shadow-md"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onRejectPayment && onRejectPayment(tx.id)}
-                            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[10px] uppercase rounded-xl flex items-center gap-1 shadow-md"
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                            Reject
-                          </button>
-                        </div>
-                      ) : tx.status === 'succeeded' ? (
-                        <span className="text-[10px] text-emerald-400 font-bold">Verified</span>
-                      ) : (
-                        <span className="text-[10px] text-rose-400 font-bold">Declined</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {transactions
+                  .filter((tx) => {
+                    const isWalletAdj = tx.planId === 'wallet_adjustment' || tx.cardBrand?.includes('Wallet') || tx.cardBrand?.includes('Adj');
+                    if (auditFilter === 'paynow') return !isWalletAdj;
+                    if (auditFilter === 'wallet_adjustments') return isWalletAdj;
+                    return true;
+                  })
+                  .map((tx) => {
+                    const isWalletAdj = tx.planId === 'wallet_adjustment' || tx.cardBrand?.includes('Wallet') || tx.cardBrand?.includes('Adj');
+                    const isCredit = isWalletAdj && (tx.cardBrand?.includes('Credit') || tx.planName?.includes('+') || tx.planName?.includes('Credit'));
+                    const isDebit = isWalletAdj && (tx.cardBrand?.includes('Debit') || tx.planName?.includes('-') || tx.planName?.includes('Debit'));
+
+                    return (
+                      <tr key={tx.id} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="p-3">
+                          <span className="font-mono text-amber-400 font-bold block">{tx.id}</span>
+                          {tx.reference && tx.reference !== tx.id && (
+                            <span className="font-mono text-[10px] text-slate-400">{tx.reference}</span>
+                          )}
+                        </td>
+                        <td className="p-3 font-semibold text-white">
+                          <div>{tx.userName}</div>
+                          <div className="text-[10px] text-slate-400">{tx.userEmail}</div>
+                        </td>
+                        <td className="p-3">
+                          {isWalletAdj ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase flex items-center gap-1 ${
+                                isCredit
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  : isDebit
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                              }`}>
+                                <Wallet className="w-3 h-3" />
+                                {isCredit ? 'Wallet Credit' : isDebit ? 'Wallet Debit' : 'Wallet Balance Set'}
+                              </span>
+                              <span className="text-slate-300 text-xs">{tx.planName}</span>
+                            </div>
+                          ) : (
+                            <span className="font-bold text-slate-200">{tx.planName}</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {isWalletAdj ? (
+                            <span className={`font-mono font-extrabold text-sm ${
+                              isCredit ? 'text-emerald-400' : isDebit ? 'text-rose-400' : 'text-amber-400'
+                            }`}>
+                              {isCredit ? `+$${tx.amount.toFixed(2)}` : isDebit ? `-$${tx.amount.toFixed(2)}` : `$${tx.amount.toFixed(2)}`}
+                            </span>
+                          ) : (
+                            <span className="font-mono font-bold text-emerald-400">${tx.amount.toFixed(2)}</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-[11px]">
+                          {isWalletAdj ? (
+                            <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 w-fit">
+                              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                              Admin Manual
+                            </span>
+                          ) : (
+                            <span>{tx.cardBrand} {tx.cardLast4 ? `•••• ${tx.cardLast4}` : ''}</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {tx.status === 'pending_approval' ? (
+                            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full text-[10px] font-extrabold animate-pulse">
+                              ⏳ Pending Approval
+                            </span>
+                          ) : tx.status === 'succeeded' ? (
+                            <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1 w-fit">
+                              <CheckCircle2 className="w-3 h-3" />
+                              {isWalletAdj ? 'Applied' : 'Approved'}
+                            </span>
+                          ) : (
+                            <span className="bg-rose-500/20 text-rose-400 border border-rose-500/40 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
+                              ❌ Rejected
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-[11px] text-slate-400">{new Date(tx.date).toLocaleString()}</td>
+                        <td className="p-3 text-right">
+                          {tx.status === 'pending_approval' ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => onApprovePayment && onApprovePayment(tx.id)}
+                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] uppercase rounded-xl flex items-center gap-1 shadow-md"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onRejectPayment && onRejectPayment(tx.id)}
+                                className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[10px] uppercase rounded-xl flex items-center gap-1 shadow-md"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                Reject
+                              </button>
+                            </div>
+                          ) : isWalletAdj ? (
+                            <span className="text-[10px] text-amber-400 font-bold">Admin Logged</span>
+                          ) : tx.status === 'succeeded' ? (
+                            <span className="text-[10px] text-emerald-400 font-bold">Verified</span>
+                          ) : (
+                            <span className="text-[10px] text-rose-400 font-bold">Declined</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
@@ -960,16 +1214,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  {ord.items.map((it: any, idx: number) => (
+                  {(ord.items || []).filter((it: any) => !!it && !!it.profile).map((it: any, idx: number) => (
                     <div key={idx} className="flex items-center gap-3 text-xs bg-slate-900 p-2.5 rounded-xl">
                       <img
-                        src={it.profile.photos[0]}
-                        alt={it.profile.name}
+                        src={it.profile?.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
+                        alt={it.profile?.name || 'Single'}
                         referrerPolicy="no-referrer"
                         className="w-10 h-10 rounded-lg object-cover"
                       />
                       <div>
-                        <div className="font-bold text-white">{it.profile.name}, {it.profile.age} ({it.profile.location})</div>
+                        <div className="font-bold text-white">{it.profile?.name}, {it.profile?.age} ({it.profile?.location})</div>
                         <div className="text-[11px] text-slate-400">Date Type: <strong className="text-amber-400">{it.dateType}</strong></div>
                         <div className="text-[11px] text-slate-300 italic">"{it.icebreakerMessage}"</div>
                       </div>
@@ -1073,7 +1327,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             #{rank + 1}
                           </span>
                           <img
-                            src={p.photos[0]}
+                            src={p.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
                             alt={p.name}
                             referrerPolicy="no-referrer"
                             className="w-9 h-9 rounded-xl object-cover ring-2 ring-slate-700"
@@ -1138,7 +1392,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <td className="p-3 font-semibold text-white">
                             <div className="flex items-center gap-2.5">
                               <img
-                                src={p.photos[0]}
+                                src={p.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
                                 alt={p.name}
                                 referrerPolicy="no-referrer"
                                 className="w-8 h-8 rounded-lg object-cover ring-1 ring-slate-700"
@@ -1668,11 +1922,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <label className="block text-slate-400 font-bold mb-1">Gender</label>
                   <select
                     value={newGender}
-                    onChange={e => setNewGender(e.target.value as 'female' | 'male')}
+                    onChange={e => setNewGender(e.target.value as 'female' | 'male' | 'non-binary')}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                   >
                     <option value="female">Female</option>
                     <option value="male">Male</option>
+                    <option value="non-binary">Non-binary</option>
                   </select>
                 </div>
 
@@ -1822,7 +2077,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-4">
               <div className="flex items-center gap-3">
                 <img
-                  src={editPhoto || editingProfile.photos[0]}
+                  src={editPhoto || editingProfile.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
                   alt="Profile"
                   referrerPolicy="no-referrer"
                   className="w-12 h-12 rounded-xl object-cover ring-2 ring-amber-500/50"
@@ -1849,7 +2104,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </label>
                 <div className="flex items-center gap-4">
                   <img
-                    src={editPhoto || editingProfile.photos[0]}
+                    src={editPhoto || editingProfile.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
                     alt="Preview"
                     referrerPolicy="no-referrer"
                     className="w-16 h-16 rounded-2xl object-cover shrink-0 ring-2 ring-amber-500/60 shadow-md"
@@ -1918,11 +2173,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <label className="block text-slate-400 font-bold mb-1">Gender</label>
                   <select
                     value={editGender}
-                    onChange={e => setEditGender(e.target.value as 'female' | 'male')}
+                    onChange={e => setEditGender(e.target.value as 'female' | 'male' | 'non-binary')}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                   >
                     <option value="female">Female</option>
                     <option value="male">Male</option>
+                    <option value="non-binary">Non-binary</option>
                   </select>
                 </div>
 
@@ -2042,6 +2298,65 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 />
               </div>
 
+              {/* Linked User Wallet Balance Quick Access */}
+              {editingProfileLinkedUser && (
+                <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-800/60 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="w-4 h-4 text-emerald-400" />
+                      <span className="font-bold text-emerald-300 text-xs">Linked User Account Wallet:</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-extrabold text-emerald-300 text-sm bg-emerald-900/80 px-2.5 py-0.5 rounded-lg border border-emerald-700">
+                        ${Number(editingProfileLinkedUser.walletBalance || 0).toFixed(2)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedWalletModalUser(editingProfileLinkedUser);
+                          setModalFundAmount('5');
+                          setModalFundAction('add');
+                          setModalFundReason('');
+                        }}
+                        className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-extrabold uppercase transition-colors"
+                      >
+                        Adjust Funds
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleModifyFunds(editingProfileLinkedUser.id, 'add', 5, 'Quick +$5 from Profile Editor')}
+                      className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold rounded"
+                    >
+                      +$5
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleModifyFunds(editingProfileLinkedUser.id, 'add', 10, 'Quick +$10 from Profile Editor')}
+                      className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold rounded"
+                    >
+                      +$10
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleModifyFunds(editingProfileLinkedUser.id, 'add', 20, 'Quick +$20 from Profile Editor')}
+                      className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold rounded"
+                    >
+                      +$20
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleModifyFunds(editingProfileLinkedUser.id, 'remove', 5, 'Quick -$5 from Profile Editor')}
+                      className="px-2 py-0.5 bg-rose-700 hover:bg-rose-600 text-white text-[10px] font-bold rounded"
+                    >
+                      -$5
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-slate-400 font-bold mb-1">Bouncer Notes</label>
                 <input
@@ -2066,6 +2381,535 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black uppercase"
                 >
                   Save Profile Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DEDICATED MODAL: MANUAL WALLET BALANCE ADJUSTMENT */}
+      {selectedWalletModalUser && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <Wallet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white font-serif">Adjust User Wallet</h3>
+                  <p className="text-xs text-slate-400">Add, deduct, or set balance with audit history</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedWalletModalUser(null)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* User Details & Current Balance */}
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 mb-5 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-bold text-white">{selectedWalletModalUser.name}</div>
+                  <div className="text-xs text-slate-400">{selectedWalletModalUser.email}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Current Balance</div>
+                  <div className="text-xl font-mono font-black text-emerald-400">
+                    ${Number(selectedWalletModalUser.walletBalance || 0).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Type Selector */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                Adjustment Type
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalFundAction('add')}
+                  className={`py-2 px-3 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-all ${
+                    modalFundAction === 'add'
+                      ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400/40'
+                      : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  Credit (+)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalFundAction('remove')}
+                  className={`py-2 px-3 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-all ${
+                    modalFundAction === 'remove'
+                      ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-400/40'
+                      : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <ArrowDownLeft className="w-3.5 h-3.5" />
+                  Debit (-)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalFundAction('set')}
+                  className={`py-2 px-3 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 transition-all ${
+                    modalFundAction === 'set'
+                      ? 'bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-300/40'
+                      : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <DollarSign className="w-3.5 h-3.5" />
+                  Set Exact
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                Quick Presets
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {['1', '3', '5', '10', '15', '20', '50'].map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setModalFundAmount(amt)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all ${
+                      modalFundAmount === amt
+                        ? 'bg-slate-700 text-white border border-emerald-500'
+                        : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    ${amt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Amount Field */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                Dollar Amount ($ USD)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono font-bold">$</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={modalFundAmount}
+                  onChange={(e) => setModalFundAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full pl-8 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono font-bold text-base focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            {/* Audit Reason / Memo */}
+            <div className="mb-5">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                Audit Reason / Memo (Logged to Transaction History)
+              </label>
+              <input
+                type="text"
+                value={modalFundReason}
+                onChange={(e) => setModalFundReason(e.target.value)}
+                placeholder="e.g., Cash deposit received, Promotional goodwill credit, Match refund"
+                className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            {/* Projected Balance Breakdown */}
+            <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3.5 mb-5 flex items-center justify-between text-xs">
+              <span className="text-slate-400 font-medium">New Projected Balance:</span>
+              <span className={`font-mono font-black text-base ${
+                modalProjectedBalance >= modalCurBalance ? 'text-emerald-400' : 'text-amber-400'
+              }`}>
+                ${modalProjectedBalance.toFixed(2)}
+              </span>
+            </div>
+
+            {/* Dialog Footer Actions */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                disabled={isFundSubmitting}
+                onClick={() => setSelectedWalletModalUser(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs uppercase"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isFundSubmitting || !Number(modalFundAmount)}
+                onClick={() => {
+                  const amt = Number(modalFundAmount);
+                  handleModifyFunds(selectedWalletModalUser.id, modalFundAction, amt, modalFundReason);
+                }}
+                className={`px-5 py-2 rounded-xl text-xs font-black uppercase shadow-lg transition-all disabled:opacity-50 flex items-center gap-1.5 ${
+                  modalFundAction === 'add'
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    : modalFundAction === 'remove'
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                    : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                }`}
+              >
+                {isFundSubmitting ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  {modalFundAction === 'add'
+                    ? `Credit +$${Number(modalFundAmount || 0).toFixed(2)}`
+                    : modalFundAction === 'remove'
+                    ? `Debit -$${Number(modalFundAmount || 0).toFixed(2)}`
+                    : `Set to $${Number(modalFundAmount || 0).toFixed(2)}`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DEDICATED MODAL: ADMIN USER PROFILE & WALLET EDIT MODAL */}
+      {isUserEditModalOpen && selectedUserForEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl my-8 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-800 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <UserCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-extrabold text-white font-serif">Edit User Profile & Wallet</h3>
+                  <p className="text-xs text-slate-400">Update account credentials, gender, location, subscription plan, and wallet funds.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUserEditModalOpen(false);
+                  setSelectedUserForEdit(null);
+                }}
+                className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white transition-colors"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveUserEdit} className="space-y-4 text-xs">
+              {/* Profile Account Fields */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={editUserName}
+                    onChange={e => setEditUserName(e.target.value)}
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-semibold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={editUserEmail}
+                    onChange={e => setEditUserEmail(e.target.value)}
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">WhatsApp Number</label>
+                  <input
+                    type="text"
+                    value={editUserWhatsapp}
+                    onChange={e => setEditUserWhatsapp(e.target.value)}
+                    placeholder="+263 77 123 4567"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Age</label>
+                  <input
+                    type="number"
+                    value={editUserAge}
+                    onChange={e => setEditUserAge(Number(e.target.value))}
+                    min={18}
+                    max={99}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Gender</label>
+                  <select
+                    value={editUserGender}
+                    onChange={e => setEditUserGender(e.target.value as 'female' | 'male' | 'non-binary')}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                    <option value="non-binary">Non-binary</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">Interested In (Seeking)</label>
+                  <select
+                    value={editUserSeeking}
+                    onChange={e => setEditUserSeeking(e.target.value as 'female' | 'male' | 'everyone')}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="male">Men</option>
+                    <option value="female">Women</option>
+                    <option value="everyone">Everyone</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">📍 Zimbabwe City</label>
+                  <select
+                    value={editUserCity}
+                    onChange={e => {
+                      const nextCity = e.target.value;
+                      setEditUserCity(nextCity);
+                      const nextData = ZIMBABWE_LOCATIONS.find((l) => l.city === nextCity);
+                      if (nextData && nextData.subLocations.length > 0) {
+                        setEditUserSubLocation(nextData.subLocations[0]);
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    {ZIMBABWE_LOCATIONS.map((loc) => (
+                      <option key={loc.city} value={loc.city}>
+                        {loc.city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">🏘️ Sub-location</label>
+                  <select
+                    value={editUserSubLocation}
+                    onChange={e => setEditUserSubLocation(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    {(ZIMBABWE_LOCATIONS.find(l => l.city.toLowerCase() === editUserCity.toLowerCase())?.subLocations || ['CBD']).map((sub) => (
+                      <option key={sub} value={sub}>
+                        {sub}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">💍 Dating Intent</label>
+                  <select
+                    value={editUserIntent}
+                    onChange={e => setEditUserIntent(e.target.value as DatingIntent)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-bold focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="Marriage">💍 Seeking Marriage</option>
+                    <option value="Funny">😂 Funny & Good Vibe</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">👶 Children Count</label>
+                  <select
+                    value={editUserChildrenCount}
+                    onChange={e => setEditUserChildrenCount(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value={0}>0 (No children)</option>
+                    <option value={1}>1 Child</option>
+                    <option value={2}>2 Children</option>
+                    <option value={3}>3+ Children</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">⭐ Subscription Plan</label>
+                  <select
+                    value={editUserSubscriptionPlan}
+                    onChange={e => setEditUserSubscriptionPlan(e.target.value as SubscriptionPlanId)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="free">Free Pass ($0)</option>
+                    <option value="starter_1_single">$3 Starter Pack (1 Single)</option>
+                    <option value="test_1_single">$3 Test Pass (1 Single)</option>
+                    <option value="starter_3_or_4">$6 Starter (1 to 3 Singles)</option>
+                    <option value="starter_10_singles">$10 Bundle (4 to 10 Singles)</option>
+                    <option value="vip_30_singles">$15 VIP Access (30+ Singles)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-bold mb-1">🛡️ Bouncer Verification</label>
+                  <div className="flex items-center gap-3 pt-2">
+                    <label className="inline-flex items-center gap-2 cursor-pointer text-slate-200 font-semibold">
+                      <input
+                        type="checkbox"
+                        checked={editUserBouncerVerified}
+                        onChange={e => setEditUserBouncerVerified(e.target.checked)}
+                        className="w-4 h-4 rounded text-emerald-600 bg-slate-950 border-slate-800 focus:ring-emerald-500"
+                      />
+                      <span>Verified Profile</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bio */}
+              <div>
+                <label className="block text-slate-400 font-bold mb-1">Bio / Profile Description</label>
+                <textarea
+                  rows={2}
+                  value={editUserBio}
+                  onChange={e => setEditUserBio(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {/* WALLET BALANCE & FUNDS MANAGEMENT SECTION */}
+              <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-800/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-emerald-400" />
+                    <div>
+                      <span className="font-bold text-emerald-300 text-sm block">User Wallet Funds</span>
+                      <span className="text-[11px] text-emerald-400/80">Manage user wallet balance & audit trail</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-bold text-emerald-400/70 block">Current Balance</span>
+                    <span className="font-mono font-black text-emerald-300 text-base">
+                      ${Number(selectedUserForEdit.walletBalance || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Edit Wallet Amount */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-emerald-300 font-bold text-xs mb-1">
+                      New Wallet Balance ($ USD)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-mono font-bold">$</span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        value={editUserWalletBalance}
+                        onChange={e => setEditUserWalletBalance(Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-full pl-7 pr-3 py-2 bg-slate-950 border border-emerald-700/80 rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:border-emerald-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-emerald-300 font-bold text-xs mb-1">
+                      Quick Balance Modifiers
+                    </label>
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setEditUserWalletBalance(prev => prev + 5)}
+                        className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs"
+                      >
+                        +$5
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditUserWalletBalance(prev => prev + 10)}
+                        className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs"
+                      >
+                        +$10
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditUserWalletBalance(prev => prev + 20)}
+                        className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs"
+                      >
+                        +$20
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditUserWalletBalance(prev => Math.max(0, prev - 5))}
+                        className="px-2 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs"
+                      >
+                        -$5
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Audit Reason */}
+                <div>
+                  <label className="block text-emerald-300 font-bold text-xs mb-1">
+                    Audit Note / Reason for Balance Adjustment
+                  </label>
+                  <input
+                    type="text"
+                    value={editUserWalletAdjustmentReason}
+                    onChange={e => setEditUserWalletAdjustmentReason(e.target.value)}
+                    placeholder="e.g., Cash top-up at office, Promotional VIP bonus, Profile edit adjustment"
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-emerald-800/80 rounded-xl text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  disabled={isUserEditSubmitting}
+                  onClick={() => {
+                    setIsUserEditModalOpen(false);
+                    setSelectedUserForEdit(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold uppercase text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUserEditSubmitting}
+                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black uppercase text-xs shadow-lg transition-all flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isUserEditSubmitting ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>Save User & Wallet</span>
                 </button>
               </div>
             </form>

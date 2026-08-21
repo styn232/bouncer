@@ -24,6 +24,7 @@ import { VerificationModal } from './components/VerificationModal';
 import { SafetyCenterModal } from './components/SafetyCenterModal';
 import { ReportModal } from './components/ReportModal';
 import { MatchQuizModal } from './components/MatchQuizModal';
+import { FeaturedSingles } from './components/FeaturedSingles';
 import { auth, onAuthStateChanged, signOut, db, doc, getDoc } from './lib/firebase';
 import { INITIAL_PROFILES } from './data/mockData';
 
@@ -822,6 +823,15 @@ export default function App() {
         {/* DISCOVER & HOME TAB: DIRECT SINGLES DIRECTORY */}
         {(activeTab === 'discover' || activeTab === 'home') && (
           <div className="space-y-6">
+            {/* FEATURED SINGLES SPOTLIGHT: Horizontal Scroll Section at the Top */}
+            <FeaturedSingles
+              profiles={profiles}
+              onViewDetails={(prof) => setSelectedProfileModal(prof)}
+              onAddToCart={handleAddToCart}
+              cartProfileIds={cartItems.map((item) => item.profileId)}
+              currentUser={currentUser}
+            />
+
             {/* Main Singles Directory Section Header */}
             <div className="border-b border-slate-800 pb-4">
               <h2 className="text-2xl sm:text-3xl font-black text-white font-serif flex items-center gap-2">

@@ -45,6 +45,7 @@ export interface SingleProfile {
 export type SubscriptionPlanId =
   | 'free'
   | 'test_1_single'
+  | 'starter_1_single'
   | 'starter_3_or_4'
   | 'starter_10_singles'
   | 'bundle_5_to_10'
@@ -53,6 +54,7 @@ export type SubscriptionPlanId =
   | 'vip_monthly'
   | 'ultimate_access'
   | 'bouncer_pass'
+  | 'wallet_adjustment'
   | string;
 
 export interface SiteSettings {
@@ -83,6 +85,7 @@ export interface User {
   intent?: DatingIntent;
   interests?: string[];
   purchasedProfileIds?: string[]; // IDs of profile WhatsApp numbers unlocked after payment
+  unlockedSinglesCount?: number; // Total number of singles unlocked
   bouncerVerified: boolean;
   walletBalance?: number; // Account funds balance in USD
   isOnline?: boolean;

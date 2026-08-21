@@ -87,8 +87,8 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
               >
                 <div className="relative shrink-0">
                   <img
-                    src={conv.participant.photos[0]}
-                    alt={conv.participant.name}
+                    src={conv.participant?.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
+                    alt={conv.participant?.name || 'Participant'}
                     className="w-12 h-12 rounded-2xl object-cover ring-2 ring-rose-500/40"
                   />
                   {conv.isOnline && (
@@ -99,8 +99,8 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-extrabold text-white truncate flex items-center gap-1">
-                      <span>{conv.participant.name}</span>
-                      {conv.participant.bouncerStatus === 'verified' && (
+                      <span>{conv.participant?.name || 'Participant'}</span>
+                      {conv.participant?.bouncerStatus === 'verified' && (
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       )}
                     </h3>
@@ -121,16 +121,16 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({
           <div className="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <img
-                src={selectedConv.participant.photos[0]}
-                alt={selectedConv.participant.name}
+                src={selectedConv.participant?.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
+                alt={selectedConv.participant?.name || 'Participant'}
                 className="w-10 h-10 rounded-2xl object-cover ring-2 ring-rose-500"
               />
               <div>
                 <h3 className="text-sm font-extrabold text-white flex items-center gap-1">
-                  <span>{selectedConv.participant.name}, {selectedConv.participant.age}</span>
+                  <span>{selectedConv.participant?.name || 'Participant'}{selectedConv.participant?.age ? `, ${selectedConv.participant.age}` : ''}</span>
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 </h3>
-                <p className="text-[10px] text-slate-400">📍 {selectedConv.participant.location}</p>
+                <p className="text-[10px] text-slate-400">📍 {selectedConv.participant?.location || 'Zimbabwe'}</p>
               </div>
             </div>
 

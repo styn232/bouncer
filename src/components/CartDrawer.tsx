@@ -51,7 +51,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   if (!isOpen) return null;
 
   // Dynamic Tiered Pricing Calculation
-  // 1 single = $3 Test Package | 2 to 3 singles = $6 | 4 to 10 singles = $10 | More than 10 or 30+ Singles VIP = $15
+  // 1 single = $3 Starter Pack (1 single profile) | 2 to 3 singles = $6 | 4 to 10 singles = $10 | More than 10 or 30+ Singles VIP = $15
   const calculateSinglesFee = (count: number) => {
     if (count === 0) return 0;
     if (count === 1) return 3;
@@ -64,14 +64,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   // Map cart count to subscription plan for Paynow backend
   const getPlanId = (count: number): string => {
-    if (count === 1) return 'test_1_single';
+    if (count === 1) return 'starter_1_single';
     if (count <= 3) return 'starter_3_or_4';
     if (count <= 10) return 'starter_10_singles';
     return 'vip_30_singles';
   };
 
   // Format exact user WhatsApp checkout message:
-  const chosenSinglesNames = cartItems.map(i => `${i.profile.name} (${i.profile.age}, ${i.profile.city || i.profile.location})`).join(', ');
+  const validCartItems = cartItems.filter(i => !!i && !!i.profile);
+  const chosenSinglesNames = validCartItems.map(i => `${i.profile.name || 'Single'} (${i.profile.age || ''}, ${i.profile.city || i.profile.location || ''})`).join(', ');
   const whatsappTextMessage = `Hi Auntie I need these Singles: ${chosenSinglesNames || 'Selected Singles'}. My name is ${currentUser?.name || guestPhone || 'a Member'}.`;
   const whatsappDirectUrl = `https://wa.me/263715786859?text=${encodeURIComponent(whatsappTextMessage)}`;
 
@@ -318,18 +319,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
-                  {(unlockedContacts.length > 0 ? unlockedContacts : cartItems.map(i => ({
+                  {(unlockedContacts.length > 0 ? unlockedContacts : validCartItems.map(i => ({
                     profileId: i.profileId,
-                    name: i.profile.name,
-                    age: i.profile.age,
-                    location: i.profile.location,
-                    city: i.profile.city,
-                    photos: i.profile.photos,
-                    whatsappNumber: i.profile.whatsappNumber || '+263 71 578 6859'
+                    name: i.profile?.name || 'Single',
+                    age: i.profile?.age,
+                    location: i.profile?.location,
+                    city: i.profile?.city,
+                    photos: i.profile?.photos || [],
+                    whatsappNumber: i.profile?.whatsappNumber || '+263 71 578 6859'
                   }))).map((contact) => {
                     const phoneNum = contact.whatsappNumber;
                     const cleanPhone = phoneNum.replace(/[^0-9]/g, '');
-                    const waUrl = `https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent(contact.name.split(' ')[0])},%20I%20found%20your%20profile%20on%20Dating%20With%20Bouncer!`;
+                    const waUrl = `https://wa.me/${cleanPhone}?text=Hi%20${encodeURIComponent((contact.name || 'there').split(' ')[0])},%20I%20found%20your%20profile%20on%20Dating%20With%20Bouncer!`;
 
                     return (
                       <div
@@ -423,7 +424,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           ) : (
             /* Chosen Items List */
             <div className="space-y-4">
-              {cartItems.map((item) => (
+              {validCartItems.map((item) => (
                 <div
                   key={item.profileId}
                   className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row gap-4 items-start"
@@ -431,21 +432,21 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   {/* Single Summary Info: Name, Age, Location */}
                   <div className="flex items-center gap-3 shrink-0 w-full md:w-56">
                     <img
-                      src={item.profile.photos[0]}
-                      alt={item.profile.name}
+                      src={item.profile?.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
+                      alt={item.profile?.name || 'Single'}
                       referrerPolicy="no-referrer"
                       className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-2 ring-emerald-400/50 shadow-sm"
                     />
                     <div>
                       <div className="flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 mb-1 w-fit">
                         <Star className="w-3 h-3 text-amber-500 fill-amber-400" />
-                        <span>{item.profile.averageRating ? item.profile.averageRating.toFixed(1) : '5.0'} Rating</span>
+                        <span>{item.profile?.averageRating ? item.profile.averageRating.toFixed(1) : '5.0'} Rating</span>
                       </div>
                       <h4 className="text-base sm:text-lg font-extrabold text-slate-900 font-serif">
-                        {item.profile.name}, <span className="text-emerald-700 font-sans">{item.profile.age}</span>
+                        {item.profile?.name || 'Single'}, <span className="text-emerald-700 font-sans">{item.profile?.age}</span>
                       </h4>
                       <p className="text-xs text-slate-600 flex items-center gap-1 mt-0.5">
-                        📍 {item.profile.location}
+                        📍 {item.profile?.location}
                       </p>
                     </div>
                   </div>
@@ -500,7 +501,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                             item.preferredTime
                           )
                         }
-                        placeholder={`Write a quick message about meeting ${item.profile.name.split(' ')[0]}...`}
+                        placeholder={`Write a quick message about meeting ${(item.profile?.name || 'Single').split(' ')[0]}...`}
                         className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
                       />
                     </div>

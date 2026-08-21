@@ -276,15 +276,27 @@ async function startServer() {
   paynow.resultUrl = process.env.PAYNOW_RESULT_URL || 'https://datingwithbouncer.com/api/paynow/result';
   paynow.returnUrl = process.env.PAYNOW_RETURN_URL || 'https://datingwithbouncer.com/payment-success';
 
-  function getPaynowAuthEmail(customerEmail: string): string {
-    // In Paynow Test Mode, Paynow strictly enforces that authemail MUST match the merchant's registered email
-    if (IS_PAYNOW_TEST_MODE) {
+  function getPaynowAuthEmail(customerEmail?: string): string {
+    const isTestMode = process.env.PAYNOW_TEST_MODE === 'true' || IS_PAYNOW_TEST_MODE;
+
+    // In Paynow Test Mode, Paynow strictly requires that authemail MUST NOT be the customer's email.
+    // It must either be omitted or explicitly set to the registered merchant email address.
+    if (isTestMode) {
       return PAYNOW_MERCHANT_EMAIL;
     }
+
     // In Live/Production Mode, use customer email if valid, otherwise fallback to merchant email
-    if (customerEmail && customerEmail.includes('@') && !customerEmail.includes('example.com') && !customerEmail.includes('datingwithbouncer.com')) {
-      return customerEmail;
+    if (
+      customerEmail &&
+      typeof customerEmail === 'string' &&
+      customerEmail.includes('@') &&
+      !customerEmail.includes('example.com') &&
+      !customerEmail.includes('datingwithbouncer.com') &&
+      !customerEmail.includes('test')
+    ) {
+      return customerEmail.trim();
     }
+
     return PAYNOW_MERCHANT_EMAIL;
   }
 
@@ -403,6 +415,32 @@ async function startServer() {
       targetUser.subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       targetUser.bouncerVerified = true;
 
+      // Update purchased profile IDs
+      if (!targetUser.purchasedProfileIds) {
+        targetUser.purchasedProfileIds = [];
+      }
+      if (Array.isArray(tx.profileIds) && tx.profileIds.length > 0) {
+        for (const pid of tx.profileIds) {
+          if (!targetUser.purchasedProfileIds.includes(pid)) {
+            targetUser.purchasedProfileIds.push(pid);
+          }
+        }
+      }
+
+      // Update unlocked singles count
+      const unlockedCount = targetUser.purchasedProfileIds.length;
+      if (tx.planId === 'test_1_single' || tx.planId === 'starter_1_single' || tx.amount === 3) {
+        targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, Math.max(1, unlockedCount));
+      } else if (tx.planId === 'starter_3_or_4' || tx.amount === 6) {
+        targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, Math.max(3, unlockedCount));
+      } else if (tx.planId === 'starter_10_singles' || tx.amount === 10) {
+        targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, Math.max(10, unlockedCount));
+      } else if (tx.planId === 'vip_30_singles' || tx.amount >= 15) {
+        targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, Math.max(30, unlockedCount));
+      } else {
+        targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, unlockedCount);
+      }
+
       if (currentUser && currentUser.id === targetUser.id) {
         currentUser = { ...targetUser };
       }
@@ -414,7 +452,7 @@ async function startServer() {
         id: `notif_${Date.now()}`,
         userId: tx.userId,
         title: '🎉 Payment Approved!',
-        message: `Your payment of $${tx.amount} for ${tx.planName} has been verified & approved! VIP features activated.`,
+        message: `Your payment of $${tx.amount} for ${tx.planName} has been verified & approved! VIP features and unlocked singles activated.`,
         type: 'system',
         read: false,
         createdAt: new Date().toISOString()
@@ -1072,10 +1110,10 @@ async function startServer() {
     if (!isAuthorizedAdmin(req)) {
       return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
     }
-    const { amount, action } = req.body; // action: 'add' | 'remove' | 'set', amount: number
+    const { amount, action, reason, note } = req.body; // action: 'add' | 'remove' | 'set', amount: number
     const userId = req.params.id;
     
-    const uIdx = users.findIndex(u => u.id === userId || u.email.toLowerCase() === userId.toLowerCase());
+    const uIdx = users.findIndex(u => u.id === userId || (u.email && u.email.toLowerCase() === userId.toLowerCase()));
     if (uIdx === -1) {
       return res.status(404).json({ error: 'User account not found' });
     }
@@ -1083,12 +1121,16 @@ async function startServer() {
     const numAmount = Number(amount) || 0;
     const currentBal = Number(users[uIdx].walletBalance) || 0;
     let newBal = currentBal;
+    let deltaAmount = 0;
 
     if (action === 'add') {
-      newBal = currentBal + Math.abs(numAmount);
+      deltaAmount = Math.abs(numAmount);
+      newBal = currentBal + deltaAmount;
     } else if (action === 'remove') {
+      deltaAmount = -Math.min(currentBal, Math.abs(numAmount));
       newBal = Math.max(0, currentBal - Math.abs(numAmount));
     } else if (action === 'set') {
+      deltaAmount = Math.max(0, numAmount) - currentBal;
       newBal = Math.max(0, numAmount);
     }
 
@@ -1099,12 +1141,235 @@ async function startServer() {
       currentUser.walletBalance = users[uIdx].walletBalance;
     }
 
+    const customNote = reason || note ? ` (${reason || note})` : '';
+
+    // Record adjustment in transaction history audit log
+    const adjustmentTx: PaymentTransaction = {
+      id: `tx_adj_${Date.now()}_${Math.floor(100 + Math.random() * 900)}`,
+      userId: users[uIdx].id,
+      userName: users[uIdx].name,
+      userEmail: users[uIdx].email,
+      amount: Number(Math.abs(numAmount).toFixed(2)),
+      planId: 'wallet_adjustment',
+      planName: action === 'add'
+        ? `👛 Admin Wallet Credit (+$${Math.abs(numAmount).toFixed(2)})${customNote}`
+        : action === 'remove'
+        ? `👛 Admin Wallet Debit (-$${Math.abs(numAmount).toFixed(2)})${customNote}`
+        : `👛 Admin Wallet Balance Set ($${Math.abs(numAmount).toFixed(2)})${customNote}`,
+      cardLast4: 'ADMIN',
+      cardBrand: action === 'add' ? 'Wallet Credit' : action === 'remove' ? 'Wallet Debit' : 'Wallet Set',
+      status: 'succeeded',
+      date: new Date().toISOString(),
+      reference: `WAL-ADJ-${Date.now()}`
+    };
+
+    transactions.unshift(adjustmentTx);
+
+    // Send notification to user
+    notifications.unshift({
+      id: `notif_${Date.now()}`,
+      userId: users[uIdx].id,
+      title: action === 'add' ? '💰 Wallet Credited' : '👛 Wallet Balance Adjusted',
+      message: `Admin ${action === 'add' ? 'added $' + Math.abs(numAmount).toFixed(2) : 'adjusted your wallet by $' + Math.abs(numAmount).toFixed(2)}${customNote}. New balance: $${users[uIdx].walletBalance.toFixed(2)}.`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
     saveAppData();
     res.json({
       success: true,
       user: users[uIdx],
       newBalance: users[uIdx].walletBalance,
-      message: `Successfully ${action === 'add' ? 'added $' + numAmount.toFixed(2) : 'deducted $' + numAmount.toFixed(2)} ${action === 'add' ? 'to' : 'from'} ${users[uIdx].name}'s funds. New balance: $${users[uIdx].walletBalance.toFixed(2)}`
+      transaction: adjustmentTx,
+      message: `Successfully ${action === 'add' ? 'added $' + numAmount.toFixed(2) : 'deducted $' + numAmount.toFixed(2)} ${action === 'add' ? 'to' : 'from'} ${users[uIdx].name}'s funds. Recorded in transaction history. New balance: $${users[uIdx].walletBalance.toFixed(2)}`
+    });
+  });
+
+  // Admin: Update User Profile & Account Data (including Wallet Balance)
+  app.put('/api/admin/users/:id', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const userId = req.params.id;
+    const {
+      name,
+      email,
+      whatsappNumber,
+      age,
+      city,
+      subLocation,
+      location,
+      childrenCount,
+      intent,
+      bio,
+      gender,
+      seeking,
+      bouncerVerified,
+      subscriptionPlan,
+      walletBalance,
+      walletAdjustmentReason
+    } = req.body;
+
+    const uIdx = users.findIndex(u => u.id === userId || (u.email && u.email.toLowerCase() === userId.toLowerCase()));
+    if (uIdx === -1) {
+      return res.status(404).json({ error: 'User account not found' });
+    }
+
+    const prevUser = users[uIdx];
+    const prevBalance = Number(prevUser.walletBalance) || 0;
+    const formattedName = name ? capitalizeName(name) : prevUser.name;
+    const fullLocation = location || (city && subLocation ? `${city} (${subLocation}), Zimbabwe` : prevUser.location);
+
+    let newBalance = prevBalance;
+    if (walletBalance !== undefined && !isNaN(Number(walletBalance))) {
+      newBalance = Math.max(0, Number(Number(walletBalance).toFixed(2)));
+    }
+
+    // If wallet balance changed by admin, record in transaction log
+    if (newBalance !== prevBalance) {
+      const diff = newBalance - prevBalance;
+      const isCredit = diff > 0;
+      const customReason = walletAdjustmentReason ? ` (${walletAdjustmentReason})` : '';
+
+      const adjTx: PaymentTransaction = {
+        id: `tx_adj_${Date.now()}_${Math.floor(100 + Math.random() * 900)}`,
+        userId: prevUser.id,
+        userName: formattedName,
+        userEmail: email || prevUser.email,
+        amount: Number(Math.abs(diff).toFixed(2)),
+        planId: 'wallet_adjustment',
+        planName: isCredit
+          ? `👛 Admin Profile Edit Wallet Credit (+$${Math.abs(diff).toFixed(2)})${customReason}`
+          : `👛 Admin Profile Edit Wallet Debit (-$${Math.abs(diff).toFixed(2)})${customReason}`,
+        cardLast4: 'ADMIN',
+        cardBrand: isCredit ? 'Admin Credit' : 'Admin Debit',
+        status: 'succeeded',
+        date: new Date().toISOString(),
+        reference: `ADM-PROF-${Date.now()}`
+      };
+      transactions.unshift(adjTx);
+
+      notifications.unshift({
+        id: `notif_${Date.now()}`,
+        userId: prevUser.id,
+        title: isCredit ? '💰 Wallet Credited by Admin' : '👛 Wallet Balance Updated',
+        message: `Admin updated your profile & adjusted wallet balance to $${newBalance.toFixed(2)}${customReason}.`,
+        type: 'system',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    users[uIdx] = {
+      ...prevUser,
+      name: formattedName,
+      ...(email && { email }),
+      ...(whatsappNumber && { whatsappNumber }),
+      ...(age !== undefined && { age: Number(age) }),
+      ...(city && { city }),
+      ...(subLocation && { subLocation }),
+      location: fullLocation,
+      ...(childrenCount !== undefined && { childrenCount: Number(childrenCount) }),
+      ...(intent && { intent }),
+      ...(bio !== undefined && { bio }),
+      ...(gender && { gender }),
+      ...(seeking && { seeking }),
+      ...(bouncerVerified !== undefined && { bouncerVerified: Boolean(bouncerVerified) }),
+      ...(subscriptionPlan && { subscriptionPlan }),
+      walletBalance: newBalance
+    };
+
+    if (currentUser && currentUser.id === users[uIdx].id) {
+      currentUser = users[uIdx];
+    }
+
+    // Synchronize linked SingleProfile if found
+    const pIdx = profiles.findIndex(p => p.id === prevUser.id || p.name.toLowerCase() === prevUser.name.toLowerCase());
+    if (pIdx !== -1) {
+      profiles[pIdx] = {
+        ...profiles[pIdx],
+        name: formattedName,
+        age: users[uIdx].age,
+        city: users[uIdx].city || profiles[pIdx].city,
+        subLocation: users[uIdx].subLocation || profiles[pIdx].subLocation,
+        location: users[uIdx].location,
+        childrenCount: users[uIdx].childrenCount ?? profiles[pIdx].childrenCount,
+        intent: users[uIdx].intent || profiles[pIdx].intent,
+        whatsappNumber: users[uIdx].whatsappNumber || profiles[pIdx].whatsappNumber,
+        bio: users[uIdx].bio || profiles[pIdx].bio,
+        gender: users[uIdx].gender || profiles[pIdx].gender,
+        seeking: users[uIdx].seeking || profiles[pIdx].seeking,
+        bouncerStatus: users[uIdx].bouncerVerified ? 'verified' : profiles[pIdx].bouncerStatus
+      };
+    }
+
+    saveAppData();
+    res.json({
+      success: true,
+      user: users[uIdx],
+      message: `User profile for ${users[uIdx].name} updated successfully by Admin.`
+    });
+  });
+
+  // User Add Funds / Wallet Top-Up Endpoint
+  app.post('/api/wallet/topup', (req, res) => {
+    const { amount, paymentMethod, mobileNumber, reference } = req.body;
+    if (!currentUser) {
+      return res.status(401).json({ error: 'Please log in to add wallet funds.' });
+    }
+
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: 'Please specify a valid deposit amount greater than $0.' });
+    }
+
+    const uIdx = users.findIndex(u => u.id === currentUser.id);
+    if (uIdx === -1) {
+      return res.status(404).json({ error: 'User account not found' });
+    }
+
+    const currentBal = Number(users[uIdx].walletBalance) || 0;
+    const newBal = Number((currentBal + numAmount).toFixed(2));
+    users[uIdx].walletBalance = newBal;
+    currentUser.walletBalance = newBal;
+
+    const brandName = paymentMethod === 'ecocash' ? 'EcoCash Top-up' : paymentMethod === 'onemoney' ? 'OneMoney Top-up' : 'Paynow Card Deposit';
+    const txRef = reference || `TOPUP-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const topupTx: PaymentTransaction = {
+      id: `tx_topup_${Date.now()}`,
+      reference: txRef,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userEmail: currentUser.email,
+      amount: numAmount,
+      planId: 'wallet_topup',
+      planName: `💵 Wallet Deposit (+$${numAmount.toFixed(2)})`,
+      cardLast4: mobileNumber ? mobileNumber.slice(-4) : 'TOPUP',
+      cardBrand: brandName,
+      status: 'succeeded',
+      date: new Date().toISOString()
+    };
+
+    transactions.unshift(topupTx);
+
+    notifications.unshift({
+      id: `notif_${Date.now()}`,
+      userId: currentUser.id,
+      title: '💵 Funds Added Successfully!',
+      message: `+$${numAmount.toFixed(2)} added to your Dating With Bouncer wallet. Current balance: $${newBal.toFixed(2)}.`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    saveAppData();
+    res.json({
+      success: true,
+      newBalance: newBal,
+      transaction: topupTx,
+      message: `Successfully deposited $${numAmount.toFixed(2)} into your wallet.`
     });
   });
 
@@ -1246,7 +1511,10 @@ async function startServer() {
       const userId = currentUser ? currentUser.id : 'usr_guest';
 
       const reference = `BOUNCER-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const isTestMode = IS_PAYNOW_TEST_MODE || process.env.PAYNOW_TEST_MODE === 'true';
       const authEmail = getPaynowAuthEmail(userEmail);
+      // In Test Mode, ensure authemail is explicitly set to PAYNOW_MERCHANT_EMAIL and NEVER customer's email
+      const paymentAuthEmail = isTestMode ? PAYNOW_MERCHANT_EMAIL : authEmail;
 
       const isMobileMethod = paymentMethod === 'ecocash' || paymentMethod === 'onemoney';
       const phoneToUse = (mobileNumber || guestPhone || '0771490167').replace(/\s+/g, '');
@@ -1274,7 +1542,7 @@ async function startServer() {
       transactions.unshift(transaction);
       saveAppData();
 
-      const payment = paynow.createPayment(reference, authEmail);
+      const payment = paynow.createPayment(reference, paymentAuthEmail);
       payment.add(plan.name, plan.price);
 
       let response: any = null;
@@ -1559,33 +1827,9 @@ async function startServer() {
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
-    tx.status = 'succeeded';
+    activateUserSubscription(tx);
 
-    // Activate subscription for the user
-    const targetUser = users.find(u => u.id === tx.userId || (u.email && tx.userEmail && u.email.toLowerCase() === tx.userEmail.toLowerCase()));
-    if (targetUser) {
-      targetUser.subscriptionPlan = tx.planId as SubscriptionPlanId;
-      targetUser.subscriptionStatus = 'active';
-      targetUser.subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-      targetUser.bouncerVerified = true;
-
-      if (currentUser && currentUser.id === targetUser.id) {
-        currentUser = { ...targetUser };
-      }
-    }
-
-    // Send user notification
-    notifications.unshift({
-      id: `notif_${Date.now()}`,
-      userId: tx.userId,
-      title: '🎉 Payment Approved!',
-      message: `Your payment of $${tx.amount} for ${tx.planName} has been verified & approved by Admin! VIP features activated.`,
-      type: 'system',
-      read: false,
-      createdAt: new Date().toISOString()
-    });
-
-    res.json({ success: true, message: 'Payment approved successfully!', transaction: tx });
+    res.json({ success: true, message: 'Payment approved successfully! VIP & unlocked profiles activated.', transaction: tx });
   });
 
   app.put('/api/admin/payments/:id/reject', (req, res) => {
@@ -1631,12 +1875,15 @@ async function startServer() {
     }
     const userSubs = users.map(u => ({
       userId: u.id,
+      id: u.id,
       name: u.name,
       email: u.email,
+      whatsappNumber: u.whatsappNumber,
       plan: u.subscriptionPlan,
       status: u.subscriptionStatus,
       expiresAt: u.subscriptionExpiresAt || 'N/A',
-      bouncerVerified: u.bouncerVerified
+      bouncerVerified: u.bouncerVerified,
+      walletBalance: u.walletBalance !== undefined ? u.walletBalance : 0
     }));
     res.json({ userSubscriptions: userSubs, transactions });
   });

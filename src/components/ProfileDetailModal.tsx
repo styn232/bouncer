@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck, Eye } from 'lucide-react';
+import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck, Eye, Crown, Zap } from 'lucide-react';
 import { SingleProfile, User } from '../types';
+import { capitalizeName, formatDisplayName, maskPhoneNumber } from '../utils/format';
 
 interface ProfileDetailModalProps {
   profile: SingleProfile | null;
@@ -26,7 +27,7 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
 
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
 
-  // Unlocked check
+  // Unlocked check: Admin, purchased profile, or active subscription plan
   const isUnlocked =
     currentUser?.role === 'admin' ||
     currentUser?.purchasedProfileIds?.includes(profile.id) ||
@@ -35,7 +36,8 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
     currentUser?.subscriptionPlan === 'starter_10_singles' ||
     currentUser?.subscriptionPlan === 'vip_15_singles' ||
     currentUser?.subscriptionPlan === 'starter_3_or_4' ||
-    currentUser?.subscriptionPlan === 'test_1_single';
+    currentUser?.subscriptionPlan === 'test_1_single' ||
+    currentUser?.subscriptionPlan === 'starter_1_single';
 
   // Reviews state
   const [localReviews, setLocalReviews] = useState<any[]>(profile?.reviews || []);
@@ -48,6 +50,9 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
   const [currentViewsCount, setCurrentViewsCount] = useState<number>(profile?.viewsCount || 0);
 
   const isOwner = currentUser && (currentUser.id === profile.id || currentUser.email === profile.email);
+
+  const formattedName = capitalizeName(profile.name);
+  const firstName = formattedName.split(' ')[0] || 'Single';
 
   React.useEffect(() => {
     if (profile) {
@@ -124,11 +129,11 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
             <X className="w-5 h-5" />
           </button>
 
-          {/* Left Side: Photo Gallery */}
+            {/* Left Side: Photo Gallery */}
           <div className="w-full md:w-1/2 bg-slate-950 flex flex-col justify-between p-4 border-r border-slate-800">
             <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-slate-900 mb-3 shadow-inner">
               <img
-                src={profile.photos[selectedPhotoIdx] || profile.photos[0]}
+                src={profile.photos?.[selectedPhotoIdx] || profile.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'}
                 alt={profile.name}
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
@@ -154,9 +159,9 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
             </div>
 
             {/* Thumbnail Row */}
-            {profile.photos.length > 1 && (
+            {(profile.photos?.length || 0) > 1 && (
               <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {profile.photos.map((photo, idx) => (
+                {(profile.photos || []).map((photo, idx) => (
                   <button
                     key={idx}
                     onClick={() => setSelectedPhotoIdx(idx)}
@@ -190,8 +195,8 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                   </span>
                 </div>
 
-                <h2 className="text-3xl font-extrabold text-white font-serif tracking-tight flex items-center gap-2 flex-wrap">
-                  <span>{profile.name}, <span className="text-amber-400 font-sans">{profile.age}</span></span>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-serif tracking-tight flex items-center gap-2 flex-wrap">
+                  <span>{formattedName}, <span className="text-amber-400 font-sans">{profile.age}</span></span>
                   {profile.bouncerStatus === 'vip_approved' && (
                     <span className="inline-flex items-center gap-1 bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-full shadow-md">
                       <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
@@ -243,51 +248,110 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* Direct WhatsApp Contact Box */}
-              {currentUser ? (
-                <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl mb-6 flex flex-col gap-2 shadow-sm">
+              {/* Direct WhatsApp Contact Box with Security Blur & Lock for Non-Subscribers */}
+              {isUnlocked ? (
+                /* UNLOCKED: Full Clear WhatsApp Number & Active Chat Button */
+                <div className="p-4 bg-emerald-950/40 border border-emerald-500/50 rounded-2xl mb-6 flex flex-col gap-2 shadow-lg">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Direct WhatsApp Access
+                    <span className="text-xs font-extrabold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Direct WhatsApp Access Unlocked
                     </span>
-                    <span className="text-[10px] font-extrabold bg-emerald-600 text-white px-2 py-0.5 rounded-full">VETTED SINGLE</span>
+                    <span className="text-[10px] font-extrabold bg-emerald-500 text-slate-950 px-2 py-0.5 rounded-full font-sans">
+                      ACTIVE ACCESS
+                    </span>
                   </div>
-                  <p className="text-xs text-slate-700">
-                    Direct Contact Number:{' '}
-                    <strong className="text-emerald-900 font-mono text-sm tracking-wider">
+                  <p className="text-xs text-slate-300">
+                    Direct WhatsApp Number:{' '}
+                    <strong className="text-emerald-300 font-mono text-sm tracking-wider">
                       {profile.whatsappNumber || '+263 77 123 4567'}
                     </strong>
                   </p>
                   <a
-                    href={`https://wa.me/${(profile.whatsappNumber || '263771234567').replace(/[^0-9]/g, '')}?text=Hi%20${encodeURIComponent(profile.name.split(' ')[0])},%20I%20found%20your%20profile%20on%20Dating%20With%20Bouncer!`}
+                    href={`https://wa.me/${(profile.whatsappNumber || '263771234567').replace(/[^0-9]/g, '')}?text=Hi%20${encodeURIComponent(firstName)},%20I%20found%20your%20profile%20on%20Dating%20With%20Bouncer!`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-md transition-transform active:scale-95"
+                    className="mt-1 w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-md transition-transform active:scale-95"
                   >
                     <MessageCircle className="w-4 h-4" />
-                    Click to Chat on WhatsApp with {profile.name.split(' ')[0]}
+                    Click to Chat on WhatsApp with {firstName}
                   </a>
                 </div>
               ) : (
-                <div className="p-5 bg-slate-950 border border-amber-500/40 rounded-2xl mb-6 flex flex-col gap-3 shadow-lg">
-                  <div className="flex items-center gap-2 text-amber-400 font-extrabold text-xs uppercase tracking-wider">
-                    <Lock className="w-4 h-4" />
-                    <span>Sign Up Required to Select Singles</span>
+                /* LOCKED / BLURRED: Private WhatsApp Button Blurred with Lock Icon & VIP Upgrade Prompt */
+                <div className="relative overflow-hidden p-4 bg-slate-950/90 border border-amber-500/40 rounded-2xl mb-6 shadow-xl">
+                  {/* Decorative blurred background layer */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-rose-500/5 to-amber-500/5 backdrop-blur-sm pointer-events-none" />
+
+                  <div className="relative z-10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Lock className="w-4 h-4 text-amber-400" /> Private WhatsApp Details Locked
+                      </span>
+                      <span className="text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full">
+                        VIP / STARTER PLAN
+                      </span>
+                    </div>
+
+                    {/* Masked / Blurred phone preview */}
+                    <div className="flex items-center justify-between bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                      <div className="text-xs text-slate-400">
+                        Phone:{' '}
+                        <span className="font-mono text-slate-300 filter blur-[3px] select-none tracking-widest">
+                          {maskPhoneNumber(profile.whatsappNumber)}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1">
+                        <Lock className="w-3 h-3" /> Protected
+                      </span>
+                    </div>
+
+                    {/* Upgrade prompt explanation */}
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Upgrade to a <strong>VIP Plan</strong> or unlock this single with the <strong>$3 Starter Pack</strong> to access private WhatsApp numbers & initiate direct chat.
+                    </p>
+
+                    {/* Blurred / Disabled WhatsApp Action Button */}
+                    <div className="relative group">
+                      <div className="w-full py-2.5 bg-emerald-950/40 border border-emerald-900/60 text-emerald-500/40 font-extrabold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 filter blur-[1.5px] cursor-not-allowed select-none">
+                        <MessageCircle className="w-4 h-4 opacity-50" />
+                        <span>Chat on WhatsApp with {firstName}</span>
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="bg-slate-950/90 text-amber-300 border border-amber-500/50 text-[11px] font-extrabold px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-amber-400" />
+                          Locked Contact
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick Upgrade / Choose Single Action */}
+                    <div className="pt-1">
+                      {currentUser ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onAddToCart) onAddToCart(profile);
+                          }}
+                          className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
+                        >
+                          <Crown className="w-4 h-4 text-slate-950" />
+                          Unlock WhatsApp for $3 or Upgrade to VIP
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            if (onOpenAuth) onOpenAuth();
+                          }}
+                          className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
+                        >
+                          <UserCheck className="w-4 h-4 text-slate-950" />
+                          Sign Up / Log In to Unlock WhatsApp
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    You need to sign up or log in to view WhatsApp contact numbers and select singles.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      if (onOpenAuth) onOpenAuth();
-                    }}
-                    className="w-full py-3 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-md transition-transform active:scale-95"
-                  >
-                    <UserCheck className="w-4 h-4 text-slate-950" />
-                    Sign Up to Select Singles & Chat
-                  </button>
                 </div>
               )}
 
@@ -444,12 +508,12 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                 </button>
               )}
 
-              {profile.whatsappNumber ? (
+              {isUnlocked && profile.whatsappNumber ? (
                 <a
-                  href={`https://wa.me/${profile.whatsappNumber.replace(/[^0-9]/g, '')}?text=Hi%20${encodeURIComponent(profile.name.split(' ')[0])},%20I%20found%20your%20profile%20on%20Dating%20With%20Bouncer!`}
+                  href={`https://wa.me/${profile.whatsappNumber.replace(/[^0-9]/g, '')}?text=Hi%20${encodeURIComponent(firstName)},%20I%20found%20your%20profile%20on%20Dating%20With%20Bouncer!`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider bg-emerald-700 hover:bg-emerald-600 text-white transition-all flex items-center justify-center gap-2 shadow-md"
+                  className="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider bg-emerald-600 hover:bg-emerald-500 text-white transition-all flex items-center justify-center gap-2 shadow-md active:scale-95"
                 >
                   <MessageCircle className="w-4 h-4 text-white" />
                   <span>Chat on WhatsApp</span>
@@ -460,10 +524,10 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                   onClick={() => {
                     if (onAddToCart) onAddToCart(profile);
                   }}
-                  className="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center justify-center gap-2 shadow-md"
+                  className="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 transition-all flex items-center justify-center gap-2 shadow-md active:scale-95"
                 >
                   <Lock className="w-4 h-4 text-slate-950" />
-                  <span>Unlock Number via Paynow</span>
+                  <span>Unlock WhatsApp ($3 Starter or VIP)</span>
                 </button>
               ) : (
                 <button
@@ -472,10 +536,10 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                     onClose();
                     if (onOpenAuth) onOpenAuth();
                   }}
-                  className="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 transition-all flex items-center justify-center gap-2 shadow-md"
+                  className="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-xs uppercase tracking-wider bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 transition-all flex items-center justify-center gap-2 shadow-md active:scale-95"
                 >
                   <Lock className="w-4 h-4 text-slate-950" />
-                  <span>Sign Up to Select</span>
+                  <span>Sign Up to Unlock WhatsApp</span>
                 </button>
               )}
             </div>

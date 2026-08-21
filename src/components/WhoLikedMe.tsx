@@ -60,7 +60,7 @@ export const WhoLikedMe: React.FC<WhoLikedMeProps> = ({
             className="relative h-64 rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 cursor-pointer group shadow-xl"
           >
             <img
-              src={liker.photos[0]}
+              src={liker.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
               alt={liker.name}
               referrerPolicy="no-referrer"
               className={`w-full h-full object-cover transition-transform group-hover:scale-105 ${

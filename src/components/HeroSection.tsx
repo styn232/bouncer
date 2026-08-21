@@ -132,7 +132,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               >
                 <div className="relative w-16 h-16 sm:w-20 sm:h-20">
                   <img
-                    src={single.photos[0]}
+                    src={single.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
                     alt={single.name}
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover rounded-2xl ring-2 ring-rose-500/50 group-hover:scale-105 transition-transform"
@@ -172,7 +172,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 className="relative h-64 rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 group cursor-pointer shadow-xl"
               >
                 <img
-                  src={single.photos[0]}
+                  src={single.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
                   alt={single.name}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

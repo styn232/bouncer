@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User as UserIcon, ShieldCheck, Camera, Sparkles, X, Check, Heart, MapPin, Briefcase, Baby, Upload, Mail, Phone } from 'lucide-react';
+import { User as UserIcon, ShieldCheck, Camera, Sparkles, X, Check, Heart, MapPin, Briefcase, Baby, Upload, Mail, Phone, Wallet, PlusCircle, ArrowUpRight, DollarSign, CreditCard, Smartphone } from 'lucide-react';
 import { User, DatingIntent } from '../types';
 import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -32,15 +32,44 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   const [intent, setIntent] = useState<DatingIntent>(currentUser?.intent || 'Marriage');
   const [bio, setBio] = useState(currentUser?.bio || '');
   const [whatsappNumber, setWhatsappNumber] = useState(currentUser?.whatsappNumber || '+263 77 123 4567');
-  const [gender, setGender] = useState(currentUser?.gender || 'female');
-  const [seeking, setSeeking] = useState(currentUser?.seeking || 'male');
+  const [gender, setGender] = useState<'female' | 'male' | 'non-binary'>(currentUser?.gender || 'female');
+  const [seeking, setSeeking] = useState<'female' | 'male' | 'everyone'>(currentUser?.seeking || 'male');
   const [photo1, setPhoto1] = useState(currentUser?.avatar || '');
   const [photo2, setPhoto2] = useState('');
   const [photo3, setPhoto3] = useState('');
   const [interestsText, setInterestsText] = useState((currentUser?.interests || []).join(', '));
   const [bouncerVerified, setBouncerVerified] = useState(currentUser?.bouncerVerified || false);
 
+  // Wallet & Add Funds state
+  const [userWalletBalance, setUserWalletBalance] = useState<number>(currentUser?.walletBalance ?? 0);
+  const [isAddingFunds, setIsAddingFunds] = useState<boolean>(false);
+  const [topupAmount, setTopupAmount] = useState<string>('10');
+  const [topupMethod, setTopupMethod] = useState<'ecocash' | 'onemoney' | 'paynow'>('ecocash');
+  const [topupMobile, setTopupMobile] = useState<string>(currentUser?.whatsappNumber || '+263 77 123 4567');
+  const [isTopupLoading, setIsTopupLoading] = useState<boolean>(false);
+  const [topupSuccessMsg, setTopupSuccessMsg] = useState<string | null>(null);
+
   const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      setName(currentUser.name || '');
+      setEmail(currentUser.email || '');
+      setAge(currentUser.age || 25);
+      setCity(currentUser.city || 'Harare');
+      setSubLocation(currentUser.subLocation || 'Borrowdale');
+      setChildrenCount(currentUser.childrenCount ?? 0);
+      setIntent(currentUser.intent || 'Marriage');
+      setBio(currentUser.bio || '');
+      setWhatsappNumber(currentUser.whatsappNumber || '+263 77 123 4567');
+      setGender(currentUser.gender || 'female');
+      setSeeking(currentUser.seeking || 'male');
+      setPhoto1(currentUser.avatar || '');
+      setInterestsText((currentUser.interests || []).join(', '));
+      setBouncerVerified(currentUser.bouncerVerified || false);
+      setUserWalletBalance(currentUser.walletBalance ?? 0);
+    }
+  }, [currentUser]);
 
   // Available sub-locations for chosen city
   const activeCityData = ZIMBABWE_LOCATIONS.find(l => l.city.toLowerCase() === city.toLowerCase());
@@ -56,6 +85,46 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
       }
     } catch (err) {
       console.warn('Photo processing note:', err);
+    }
+  };
+
+  const handleTopupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountNum = parseFloat(topupAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      alert('Please enter a valid deposit amount greater than $0.');
+      return;
+    }
+
+    try {
+      setIsTopupLoading(true);
+      setTopupSuccessMsg(null);
+
+      const res = await fetch('/api/wallet/topup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amountNum,
+          paymentMethod: topupMethod,
+          mobileNumber: topupMobile
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setUserWalletBalance(data.newBalance);
+        setTopupSuccessMsg(`🎉 Successfully added $${amountNum.toFixed(2)} to your wallet! New balance: $${data.newBalance.toFixed(2)}`);
+        setTimeout(() => {
+          setIsAddingFunds(false);
+          setTopupSuccessMsg(null);
+        }, 2500);
+      } else {
+        alert(data.error || 'Failed to deposit funds. Please try again.');
+      }
+    } catch (err) {
+      alert('Error connecting to deposit gateway.');
+    } finally {
+      setIsTopupLoading(false);
     }
   };
 
@@ -76,12 +145,13 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
       intent,
       bio,
       whatsappNumber,
-      gender: gender as any,
-      seeking: seeking as any,
+      gender,
+      seeking,
       avatar: photo1 || currentUser?.avatar,
       photos: photos.length > 0 ? photos : [photo1 || currentUser?.avatar || ''],
       interests,
-      bouncerVerified
+      bouncerVerified,
+      walletBalance: userWalletBalance
     });
     setIsSaved(true);
     setTimeout(() => {
@@ -128,9 +198,141 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 Edit My Profile
               </h2>
               <p className="text-xs text-slate-400">
-                Update your Name, Email, Phone Number, Profile Picture, and Dating Details.
+                Manage your Profile Details, Dating Intent, Gender, and Account Wallet Funds.
               </p>
             </div>
+          </div>
+
+          {/* USER WALLET FUNDS & ADD FUNDS CARD */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 to-slate-950 border border-emerald-500/40 shadow-lg mb-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                  <Wallet className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider font-extrabold text-emerald-400">
+                    Account Funds Balance
+                  </div>
+                  <div className="text-2xl font-black font-mono text-white flex items-center gap-1">
+                    <span>${Number(userWalletBalance).toFixed(2)}</span>
+                    <span className="text-xs font-bold text-emerald-300">USD</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddingFunds(!isAddingFunds)}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-md flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>{isAddingFunds ? 'Close Add Funds' : 'Add Funds'}</span>
+              </button>
+            </div>
+
+            {/* EXPANDABLE ADD FUNDS / TOP-UP WIDGET */}
+            {isAddingFunds && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="pt-3 border-t border-emerald-500/30 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-emerald-300 flex items-center gap-1">
+                    <DollarSign className="w-3.5 h-3.5" />
+                    Top Up Wallet with EcoCash, OneMoney, or Card
+                  </span>
+                  <span className="text-[10px] text-slate-400">Instant Deposit Credit</span>
+                </div>
+
+                {topupSuccessMsg && (
+                  <div className="p-3 bg-emerald-500/20 border border-emerald-400 text-emerald-300 font-bold rounded-xl text-xs flex items-center gap-2">
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span>{topupSuccessMsg}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleTopupSubmit} className="space-y-3">
+                  {/* Preset Amount Badges */}
+                  <div>
+                    <label className="block text-[11px] text-slate-300 font-bold mb-1.5">
+                      Select Deposit Amount:
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {['5', '10', '20', '50'].map((amt) => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setTopupAmount(amt)}
+                          className={`py-2 rounded-xl text-xs font-black font-mono transition-all border ${
+                            topupAmount === amt
+                              ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md'
+                              : 'bg-slate-900 hover:bg-slate-800 text-white border-slate-700'
+                          }`}
+                        >
+                          +${amt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom Amount + Mobile */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">
+                        Custom Amount ($ USD)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={topupAmount}
+                        onChange={(e) => setTopupAmount(e.target.value)}
+                        placeholder="e.g. 15"
+                        className="w-full bg-slate-950 border border-emerald-500/40 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-emerald-400 text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">
+                        Payment Method
+                      </label>
+                      <select
+                        value={topupMethod}
+                        onChange={(e) => setTopupMethod(e.target.value as any)}
+                        className="w-full bg-slate-950 border border-emerald-500/40 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-emerald-400 text-xs"
+                      >
+                        <option value="ecocash">📱 EcoCash Zimbabwe</option>
+                        <option value="onemoney">📶 OneMoney Zimbabwe</option>
+                        <option value="paynow">💳 Paynow Card / Visa / Mastercard</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <p className="text-[10px] text-slate-400">
+                      Funds can be used anytime to unlock singles' contact numbers.
+                    </p>
+                    <button
+                      type="submit"
+                      disabled={isTopupLoading || !topupAmount || parseFloat(topupAmount) <= 0}
+                      className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg flex items-center gap-1.5"
+                    >
+                      {isTopupLoading ? (
+                        <span>Processing Deposit...</span>
+                      ) : (
+                        <>
+                          <DollarSign className="w-3.5 h-3.5" />
+                          <span>Deposit +${parseFloat(topupAmount || '0').toFixed(2)}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            )}
           </div>
 
           {/* Bouncer Verification Status Banner */}

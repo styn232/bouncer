@@ -12,29 +12,29 @@ export const INITIAL_PROFILES: SingleProfile[] = [];
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'test_1_single',
-    name: '1 Single Test Pass',
+    name: '$3 Starter Pack',
     price: 3,
     billingPeriod: 'monthly',
-    tagline: 'Test package: Unlock 1 Single WhatsApp contact number to see it working!',
-    badge: '$3 TEST PASS',
+    tagline: 'Starter Pack: Unlock & view exactly 1 Single Profile & private WhatsApp contact number',
+    badge: '$3 STARTER PACK',
     popular: false,
     features: [
-      'Select 1 Single for only $3',
+      'Unlock & view exactly 1 Single Profile',
       'Unlock Direct WhatsApp Phone Number',
       'Instant Live Test & Direct Connection',
-      'Fast Identity & Bouncer Clearance'
+      'Bouncer Security Vetting & ID Verification'
     ]
   },
   {
     id: 'starter_3_or_4',
-    name: '1 to 3 Singles Pass',
+    name: '2 to 3 Singles Pass',
     price: 6,
     billingPeriod: 'monthly',
-    tagline: 'Unlock direct WhatsApp contact numbers & dates for 1 to 3 Singles',
-    badge: '$6 STARTER',
+    tagline: 'Unlock direct WhatsApp contact numbers & dates for 2 to 3 Singles',
+    badge: '$6 PASS',
     popular: false,
     features: [
-      'Select 1 to 3 Singles for $6',
+      'Select 2 to 3 Singles for $6',
       'Unlock Direct WhatsApp Phone Numbers',
       'Fast Identity Verification',
       'Send Direct Date Requests'

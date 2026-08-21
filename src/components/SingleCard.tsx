@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { MapPin, ShieldCheck, Eye, Heart, Sparkles, ChevronLeft, ChevronRight, Check, Star, UserCheck } from 'lucide-react';
+import { MapPin, ShieldCheck, Eye, Heart, Sparkles, ChevronLeft, ChevronRight, Check, Star, UserCheck, Crown, Lock } from 'lucide-react';
 import { SingleProfile, User } from '../types';
+import { formatDisplayName, capitalizeName } from '../utils/format';
 
 interface SingleCardProps {
   profile: SingleProfile;
@@ -22,15 +23,29 @@ export const SingleCard: React.FC<SingleCardProps> = ({
   const [isLiked, setIsLiked] = useState(false);
 
   const isOwner = currentUser && (currentUser.id === profile.id || currentUser.email === profile.email);
+  const formattedDisplayName = formatDisplayName(profile.name, 17);
+
+  const isUnlocked =
+    currentUser?.role === 'admin' ||
+    currentUser?.purchasedProfileIds?.includes(profile.id) ||
+    (currentUser?.subscriptionStatus === 'active' && currentUser?.subscriptionPlan && currentUser?.subscriptionPlan !== 'free') ||
+    currentUser?.subscriptionPlan === 'vip_30_singles' ||
+    currentUser?.subscriptionPlan === 'starter_10_singles' ||
+    currentUser?.subscriptionPlan === 'vip_15_singles' ||
+    currentUser?.subscriptionPlan === 'starter_3_or_4' ||
+    currentUser?.subscriptionPlan === 'test_1_single' ||
+    currentUser?.subscriptionPlan === 'starter_1_single';
 
   const nextPhoto = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setCurrentPhotoIdx((prev) => (prev + 1) % profile.photos.length);
+    const len = profile.photos?.length || 1;
+    setCurrentPhotoIdx((prev) => (prev + 1) % len);
   };
 
   const prevPhoto = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setCurrentPhotoIdx((prev) => (prev - 1 + profile.photos.length) % profile.photos.length);
+    const len = profile.photos?.length || 1;
+    setCurrentPhotoIdx((prev) => (prev - 1 + len) % len);
   };
 
   const starRating = profile.averageRating || 5.0;
@@ -46,14 +61,22 @@ export const SingleCard: React.FC<SingleCardProps> = ({
       {/* Top Image Container with Photo Navigation */}
       <div className="relative aspect-[4/5] sm:aspect-[1/1] overflow-hidden bg-slate-100">
         <img
-          src={profile.photos[currentPhotoIdx] || profile.photos[0]}
-          alt={profile.name}
+          src={profile.photos?.[currentPhotoIdx] || profile.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'}
+          alt={capitalizeName(profile.name)}
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
         />
 
         {/* Subtle Gradient Overlay for badge visibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/30" />
+
+        {/* Top Left Featured / Spotlight Badge */}
+        {profile.isFeatured && (
+          <div className="absolute top-2 sm:top-3 left-2 sm:left-3 bg-amber-500 text-slate-950 font-black text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 border border-amber-300 z-10">
+            <Crown className="w-3 h-3 fill-slate-950 text-slate-950" />
+            <span>FEATURED</span>
+          </div>
+        )}
 
         {/* Top Right Quick Like Button */}
         <button
@@ -71,7 +94,7 @@ export const SingleCard: React.FC<SingleCardProps> = ({
         </button>
 
         {/* Photo Navigation Arrows */}
-        {profile.photos.length > 1 && (
+        {(profile.photos?.length || 0) > 1 && (
           <div className="absolute inset-x-1.5 sm:inset-x-2 top-1/2 -translate-y-1/2 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
             <button
               onClick={prevPhoto}
@@ -96,6 +119,14 @@ export const SingleCard: React.FC<SingleCardProps> = ({
           </div>
         )}
 
+        {/* WhatsApp Lock Indicator Pill */}
+        {!isUnlocked && (
+          <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3 bg-slate-950/90 backdrop-blur-md border border-amber-500/50 text-amber-300 text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 sm:py-1 rounded-lg sm:rounded-xl shadow-md flex items-center gap-1">
+            <Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400" />
+            <span>Private WhatsApp</span>
+          </div>
+        )}
+
         {/* Star Rating Overlay Pill */}
         <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3 bg-white/95 backdrop-blur-md border border-amber-200 text-slate-900 text-[9px] sm:text-[11px] font-black px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-lg sm:rounded-xl shadow-md flex items-center gap-0.5 sm:gap-1">
           <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500 fill-amber-400" />
@@ -109,7 +140,7 @@ export const SingleCard: React.FC<SingleCardProps> = ({
           {/* Prominent Name, Age & Verified Badges Header */}
           <div className="flex items-center justify-between mb-1 gap-1">
             <h3 className="text-sm sm:text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-1 sm:gap-1.5 font-serif truncate min-w-0">
-              <span className="truncate">{profile.name}</span>
+              <span className="truncate">{formattedDisplayName}</span>
               <span className="text-emerald-700 font-sans text-xs sm:text-lg font-extrabold shrink-0">
                 , {profile.age}
               </span>
@@ -202,4 +233,5 @@ export const SingleCard: React.FC<SingleCardProps> = ({
     </motion.div>
   );
 };
+
 
