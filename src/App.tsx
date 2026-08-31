@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye, RefreshCw } from 'lucide-react';
-import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage } from './types';
+import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, NotificationItem } from './types';
 import { Navbar, MainTabType } from './components/Navbar';
 import { SinglesFilterBar } from './components/SinglesFilterBar';
 import { SingleCard } from './components/SingleCard';
@@ -140,6 +140,7 @@ export default function App() {
 
   // Toast Notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   const addToast = (title: string, message: string, type: 'success' | 'info' | 'cart' | 'bouncer' = 'success') => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
@@ -236,6 +237,12 @@ export default function App() {
       if (likersRes && likersRes.ok) {
         const d = await likersRes.json().catch(() => null);
         if (Array.isArray(d)) setLikers(d);
+      }
+
+      const notifsRes = await fetch('/api/notifications').catch(() => null);
+      if (notifsRes && notifsRes.ok) {
+        const d = await notifsRes.json().catch(() => null);
+        if (Array.isArray(d)) setNotifications(d);
       }
     } catch {}
   };
@@ -1107,46 +1114,47 @@ export default function App() {
                   <p className="text-slate-200">{currentUser.bio || 'No bio entered yet.'}</p>
                 </div>
 
-                {/* Owner-Only Profile Views & Notification Log */}
+                {/* Owner-Only Profile Views & Real Notification Log */}
                 <div className="p-4 bg-slate-950/90 border border-amber-500/30 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-amber-300 font-extrabold text-xs sm:text-sm">
                       <Eye className="w-4 h-4 text-amber-400" />
-                      <span>My Profile Views ({profiles.find(p => p.id === currentUser.id || p.name.toLowerCase() === currentUser.name.toLowerCase())?.viewsCount || 24} Views)</span>
+                      <span>
+                        My Profile Views ({profiles.find(p => p.id === currentUser.id || (p.name && currentUser.name && p.name.toLowerCase() === currentUser.name.toLowerCase()))?.viewsCount || 0} Views)
+                      </span>
                     </div>
                     <span className="text-[10px] text-amber-300 font-bold bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/40">
-                      Seen by Owner Only
+                      Real Views Only
                     </span>
                   </div>
 
                   <div className="space-y-2 pt-2 border-t border-slate-800">
                     <p className="text-[11px] text-slate-400 font-medium">Recent Profile View Notifications:</p>
-                    <div className="space-y-1.5">
-                      <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 text-xs flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-amber-400">👁️</span>
-                          <span className="text-white font-bold">Chiedza Moyo</span>
-                          <span className="text-slate-300">has viewed your profile!</span>
-                        </div>
-                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Just now</span>
+                    {notifications.filter(n => 
+                      (n.userId === currentUser.id || n.userId === 'all' || (profiles.some(p => (p.id === currentUser.id || (p.name && currentUser.name && p.name.toLowerCase() === currentUser.name.toLowerCase())) && p.id === n.userId))) && 
+                      (n.title.toLowerCase().includes('view') || n.message.toLowerCase().includes('viewed') || n.type === 'like' || n.type === 'match')
+                    ).length === 0 ? (
+                      <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800 text-xs text-slate-400 text-center">
+                        No profile views recorded yet. Real notifications will appear here as members view your profile.
                       </div>
-                      <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 text-xs flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-amber-400">👁️</span>
-                          <span className="text-white font-bold">Rudo Mpofu</span>
-                          <span className="text-slate-300">has viewed your profile!</span>
-                        </div>
-                        <span className="text-[10px] text-slate-400">15 mins ago</span>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {notifications.filter(n => 
+                          (n.userId === currentUser.id || n.userId === 'all' || (profiles.some(p => (p.id === currentUser.id || (p.name && currentUser.name && p.name.toLowerCase() === currentUser.name.toLowerCase())) && p.id === n.userId))) && 
+                          (n.title.toLowerCase().includes('view') || n.message.toLowerCase().includes('viewed') || n.type === 'like' || n.type === 'match')
+                        ).slice(0, 5).map((notif) => (
+                          <div key={notif.id} className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 text-xs flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-amber-400">👁️</span>
+                              <span className="text-slate-200">{notif.message}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                      <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 text-xs flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-amber-400">👁️</span>
-                          <span className="text-white font-bold">Tarisai Ndlovu</span>
-                          <span className="text-slate-300">has viewed your profile!</span>
-                        </div>
-                        <span className="text-[10px] text-slate-400">2 hours ago</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 

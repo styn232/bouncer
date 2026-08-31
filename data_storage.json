@@ -46,7 +46,7 @@
           "createdAt": "2026-08-15T16:24:01.420Z"
         }
       ],
-      "viewsCount": 142,
+      "viewsCount": 0,
       "createdAt": "2026-08-15T16:24:01.421Z"
     },
     {
@@ -81,7 +81,7 @@
       "isFeatured": true,
       "averageRating": 5,
       "reviews": [],
-      "viewsCount": 189,
+      "viewsCount": 0,
       "createdAt": "2026-08-15T16:24:01.421Z"
     },
     {
@@ -116,7 +116,7 @@
       "isFeatured": false,
       "averageRating": 4.9,
       "reviews": [],
-      "viewsCount": 98,
+      "viewsCount": 0,
       "createdAt": "2026-08-15T16:24:01.421Z"
     },
     {
@@ -150,7 +150,7 @@
       "isFeatured": false,
       "averageRating": 5,
       "reviews": [],
-      "viewsCount": 76,
+      "viewsCount": 0,
       "createdAt": "2026-08-15T16:24:01.421Z"
     },
     {
@@ -184,7 +184,7 @@
       "isFeatured": false,
       "averageRating": 4.8,
       "reviews": [],
-      "viewsCount": 115,
+      "viewsCount": 0,
       "createdAt": "2026-08-15T16:24:01.421Z"
     },
     {
@@ -218,7 +218,7 @@
       "isFeatured": true,
       "averageRating": 5,
       "reviews": [],
-      "viewsCount": 130,
+      "viewsCount": 0,
       "createdAt": "2026-08-15T16:24:01.421Z"
     }
   ],
@@ -236,7 +236,8 @@
       "avatar": "https://lh3.googleusercontent.com/a/ACg8ocLTLqINykDjWUZwlxDWx4zfS63kYB9t8B1VJVn3NF856LmMlVU=s96-c",
       "bio": "Super Administrator & Head Bouncer (jobsatespace@gmail.com).",
       "bouncerVerified": true,
-      "createdAt": "2026-01-01T00:00:00Z"
+      "createdAt": "2026-01-01T00:00:00Z",
+      "walletBalance": 10
     },
     {
       "id": "usr_demo",
@@ -267,6 +268,20 @@
     }
   ],
   "transactions": [
+    {
+      "id": "tx_topup_1788178838659",
+      "reference": "TOPUP-1788178838659-5760",
+      "userId": "usr_admin",
+      "userName": "Bouncer Chief Admin",
+      "userEmail": "jobsatespace@gmail.com",
+      "amount": 10,
+      "planId": "wallet_topup",
+      "planName": "💵 Wallet Deposit (+$10.00)",
+      "cardLast4": "4567",
+      "cardBrand": "EcoCash Top-up",
+      "status": "succeeded",
+      "date": "2026-08-31T12:20:38.659Z"
+    },
     {
       "id": "tx_1787166888776",
       "reference": "BOUNCER-1787166888776-1550",
@@ -497,6 +512,15 @@
   "messages": [],
   "notifications": [
     {
+      "id": "notif_1788178838659",
+      "userId": "usr_admin",
+      "title": "💵 Funds Added Successfully!",
+      "message": "+$10.00 added to your Dating With Bouncer wallet. Current balance: $10.00.",
+      "type": "system",
+      "read": false,
+      "createdAt": "2026-08-31T12:20:38.659Z"
+    },
+    {
       "id": "notif_1787166892118",
       "userId": "usr_guest",
       "title": "🎉 Payment Approved!",
@@ -645,5 +669,5 @@
       "p_tendai"
     ]
   },
-  "lastUpdated": "2026-08-19T19:14:52.119Z"
+  "lastUpdated": "2026-08-31T12:22:14.495Z"
 }

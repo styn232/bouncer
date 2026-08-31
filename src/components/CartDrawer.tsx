@@ -142,7 +142,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         }
         if (data.redirectUrl && paymentMethod === 'web') {
           setPaynowUrl(data.redirectUrl);
-          window.open(data.redirectUrl, '_blank');
+          // Open Paynow on SAME TAB
+          window.location.href = data.redirectUrl;
+          return;
         }
         if (data.reference) {
           setPaynowRef(data.reference);
@@ -670,20 +672,24 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   )}
                 </div>
 
-                {/* Paynow Payment Gateway Indicator */}
-                <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-emerald-50 to-emerald-100/80 border border-emerald-300">
-                  <div className="flex items-center justify-between mb-1.5">
+                {/* Paynow Payment Gateway Indicator with Immediate WhatsApp Reveal Instruction */}
+                <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-emerald-100/70 to-emerald-50 border-2 border-emerald-500 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-emerald-900">
                       <CreditCard className="w-4 h-4 text-emerald-700" />
-                      <span>Paynow [Test Mode Active]: EcoCash • OneMoney • Visa • Mastercard</span>
+                      <span>Paynow Instant Checkout: EcoCash • OneMoney • Visa • Mastercard</span>
                     </div>
-                    <span className="bg-amber-600 text-white font-black text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">
-                      TEST MODE
+                    <span className="bg-emerald-700 text-white font-black text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      Instant Reveal
                     </span>
                   </div>
-                  <p className="text-xs text-slate-700 leading-relaxed">
-                    Test Mode is active. You can initiate real Paynow requests or test payments safely. After initiating, click <strong>"Verify Paynow Confirmation & Reveal Numbers"</strong> to unlock WhatsApp contacts immediately.
-                  </p>
+                  <div className="flex items-start gap-2.5 text-xs text-emerald-950 font-medium">
+                    <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-emerald-900 font-extrabold block mb-0.5">⚠️ Crucial Instruction:</strong>
+                      Once you pay via <strong>Paynow</strong>, the Single's private <strong>WhatsApp contact number</strong> will be <strong>revealed and unlocked immediately!</strong>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Paynow Verification Status Notice */}

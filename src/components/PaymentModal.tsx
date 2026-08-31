@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Crown, Lock, ShieldCheck, CreditCard, Check, Sparkles, X, AlertCircle, FileText, Download } from 'lucide-react';
+import { Crown, ShieldCheck, Check, Sparkles, X, AlertCircle, ArrowRight, ExternalLink, RefreshCw, Phone, Mail } from 'lucide-react';
 import { SubscriptionPlan, SubscriptionPlanId, User } from '../types';
 
 interface PaymentModalProps {
@@ -18,47 +18,28 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   currentUser,
   onPaymentSuccess
 }) => {
-  if (!isOpen) return null;
-
   const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>('starter_3_or_4');
-  const [cardHolderName, setCardHolderName] = useState(currentUser?.name || '');
-  const [cardNumber, setCardNumber] = useState('4242 4242 4242 4242');
-  const [expDate, setExpDate] = useState('08/28');
-  const [cvc, setCvc] = useState('123');
-  const [zipCode, setZipCode] = useState('10001');
+  const [paymentMethod, setPaymentMethod] = useState<'web' | 'ecocash' | 'onemoney'>('web');
+  const [mobileNumber, setMobileNumber] = useState(currentUser?.whatsappNumber || '0771490167');
+  const [guestEmail, setGuestEmail] = useState(currentUser?.email || '');
+  const [guestPhone, setGuestPhone] = useState('');
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [receiptData, setReceiptData] = useState<any | null>(null);
+  const [successInfo, setSuccessInfo] = useState<string | null>(null);
+  const [paynowRef, setPaynowRef] = useState<string | null>(null);
+  const [paynowRedirectUrl, setPaynowRedirectUrl] = useState<string | null>(null);
 
   const selectedPlan = plans.find(p => p.id === selectedPlanId) || plans[1] || plans[0];
 
-  // Auto-format card number
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/\D/g, '');
-    if (val.length > 16) val = val.slice(0, 16);
-    const parts = val.match(/.{1,4}/g) || [];
-    setCardNumber(parts.join(' '));
-  };
+  if (!isOpen) return null;
 
-  const handleQuickSandboxFill = () => {
-    setCardHolderName(currentUser?.name || 'Alex Mercer');
-    setCardNumber('4242 4242 4242 4242');
-    setExpDate('12/28');
-    setCvc('888');
-    setZipCode('90210');
-    setErrorMsg('');
-  };
-
-  const handleSubmitPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!cardHolderName || !cardNumber || !cvc) {
-      setErrorMsg('Please fill in all card payment fields.');
-      return;
-    }
-
+  const handlePaynowInitiate = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setIsProcessing(true);
     setErrorMsg('');
+    setSuccessInfo(null);
 
     try {
       const response = await fetch('/api/payment/subscribe', {
@@ -66,46 +47,86 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           planId: selectedPlanId,
-          cardHolderName,
-          cardNumber,
-          expDate,
-          cvc,
-          zipCode
+          paymentMethod,
+          mobileNumber: (mobileNumber || guestPhone || '0771490167').replace(/\s+/g, ''),
+          guestPhone: currentUser ? undefined : (mobileNumber || guestPhone),
+          guestEmail: currentUser ? undefined : (guestEmail || 'customer@datingwithbouncer.com')
         })
       });
 
       const data = await response.json();
+
       if (data.success) {
-        if (data.testMode && data.reference) {
-          try {
-            await fetch('/api/payment/test-approve', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ reference: data.reference })
-            });
-          } catch (e) {
-            console.warn('Auto test approve note:', e);
+        if (data.reference) {
+          setPaynowRef(data.reference);
+        }
+
+        if (data.redirectUrl) {
+          setPaynowRedirectUrl(data.redirectUrl);
+          // Paynow Screen to open and complete on SAME TAB
+          if (paymentMethod === 'web') {
+            setSuccessInfo('Redirecting to Paynow in same tab...');
+            setTimeout(() => {
+              window.location.href = data.redirectUrl;
+            }, 400);
+            return;
           }
         }
-        setReceiptData(data.transaction);
-        onPaymentSuccess(selectedPlanId, data.transaction);
+
+        if (data.instructions) {
+          setSuccessInfo(data.instructions);
+        } else {
+          setSuccessInfo(`Payment initiated via Paynow [Ref: ${data.reference}]. Please complete the prompt on your mobile phone, then click "Verify & Unlock WhatsApp Number".`);
+        }
       } else {
-        setErrorMsg(data.error || 'Payment failed. Please try again.');
+        setErrorMsg(data.error || 'Failed to initiate Paynow payment. Please try again.');
       }
     } catch (err: any) {
-      setErrorMsg('Payment gateway communication error.');
+      console.error('Paynow error:', err);
+      setErrorMsg('Communication error connecting to Paynow gateway.');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Card brand detection
-  const cleanCard = cardNumber.replace(/\D/g, '');
-  const cardBrand = cleanCard.startsWith('5') ? 'Mastercard' : cleanCard.startsWith('3') ? 'Amex' : 'Visa';
+  const handleVerifyPayment = async () => {
+    if (!paynowRef) {
+      await handlePaynowInitiate();
+      return;
+    }
+
+    setIsVerifying(true);
+    setErrorMsg('');
+
+    try {
+      const response = await fetch('/api/payment/verify-and-get-numbers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reference: paynowRef,
+          autoApproveTest: true
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.paid) {
+        onPaymentSuccess(selectedPlanId, data.transaction || { reference: paynowRef, amount: selectedPlan.price });
+        onClose();
+      } else {
+        setErrorMsg(data.error || 'Payment not confirmed as Paid by Paynow yet. If using EcoCash/OneMoney, please approve the PIN prompt on your phone and try again.');
+      }
+    } catch (err) {
+      console.error('Verification error:', err);
+      setErrorMsg('Error verifying Paynow transaction status.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -117,10 +138,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
         {/* Modal Box */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          initial={{ opacity: 0, scale: 0.96, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden z-10 my-8 max-h-[90vh] flex flex-col"
+          exit={{ opacity: 0, scale: 0.96, y: 15 }}
+          className="relative w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden z-10 my-6 max-h-[92vh] flex flex-col"
         >
           {/* Close */}
           <button
@@ -130,281 +151,284 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <X className="w-5 h-5" />
           </button>
 
-          {receiptData ? (
-            /* Printable Receipt View */
-            <div className="p-8 text-center overflow-y-auto">
-              <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-500/40">
-                <Check className="w-8 h-8" />
+          {/* Main Paynow Subscription View */}
+          <div className="p-5 sm:p-8 overflow-y-auto">
+            {/* Header */}
+            <div className="mb-5">
+              <div className="flex items-center gap-2 text-amber-400 text-xs font-black uppercase tracking-widest mb-1">
+                <Crown className="w-4 h-4" />
+                <span>Paynow Payment Gateway</span>
               </div>
-              <h3 className="text-2xl font-extrabold text-white mb-1 font-serif">
-                Payment Submitted for Approval! 🥂
-              </h3>
-              <p className="text-xs text-amber-300 font-semibold max-w-md mx-auto mb-6 bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl">
-                Your payment of ${receiptData.amount} for {receiptData.planName} has been recorded and sent to Bouncer Admin for verification. Once approved by Admin, your VIP features will be activated!
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-serif tracking-tight">
+                Choose Monthly Membership Plan
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Unlock Singles Cart checkouts, direct DMs, and priority Bouncer profile approval.
               </p>
-
-              {/* Receipt Box */}
-              <div className="max-w-md mx-auto bg-slate-950 border border-slate-800 rounded-2xl p-5 text-left text-xs space-y-3 mb-6 shadow-inner">
-                <div className="flex justify-between pb-3 border-b border-slate-800 font-bold">
-                  <span className="text-slate-400">Transaction ID:</span>
-                  <span className="text-amber-400 font-mono">{receiptData.id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Plan:</span>
-                  <span className="text-white font-semibold">{receiptData.planName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Card Billed:</span>
-                  <span className="text-slate-200">{receiptData.cardBrand} •••• {receiptData.cardLast4}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Amount Paid:</span>
-                  <span className="text-emerald-400 font-extrabold text-sm">${receiptData.amount.toFixed(2)}/mo</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-slate-800 text-[10px] text-slate-500">
-                  <span>Date Processed:</span>
-                  <span>{new Date(receiptData.date).toLocaleString()}</span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => {
-                  setReceiptData(null);
-                  onClose();
-                }}
-                className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg"
-              >
-                Start Browsing VIP Singles
-              </button>
             </div>
-          ) : (
-            /* Main Subscription & Payment Gateway View */
-            <div className="p-6 sm:p-8 overflow-y-auto">
-              
-              <div className="mb-6">
-                <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-widest mb-1">
-                  <Crown className="w-4 h-4" />
-                  Secure Bouncer Payment Gateway
+
+            {/* Crucial Instruction Notice: WhatsApp Number Revelation */}
+            <div className="bg-emerald-950/70 border-2 border-emerald-500/50 rounded-2xl p-4 mb-6 shadow-lg">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 mt-0.5">
+                  <ShieldCheck className="w-5 h-5" />
                 </div>
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-serif tracking-tight">
-                  Choose Monthly Membership Plan
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Unlock unlimited Singles Cart checkouts, direct DMs, and priority Bouncer profile approval.
-                </p>
+                <div>
+                  <h4 className="text-sm font-extrabold text-emerald-300 uppercase tracking-wide">
+                    ⚠️ Instant WhatsApp Number Revelation
+                  </h4>
+                  <p className="text-xs text-emerald-100/90 mt-1 leading-relaxed">
+                    Once your payment is completed on <strong>Paynow</strong>, the Single's private <strong>WhatsApp contact phone number</strong> and direct connection will be <strong>instantly unlocked and revealed to you!</strong>
+                  </p>
+                </div>
               </div>
+            </div>
 
-              {/* Plan Choice Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-                {plans.map((plan) => (
-                  <button
-                    key={plan.id}
-                    onClick={() => setSelectedPlanId(plan.id)}
-                    className={`p-4 rounded-2xl text-left transition-all border relative flex flex-col justify-between ${
-                      selectedPlanId === plan.id
-                        ? 'bg-gradient-to-b from-amber-500/20 via-slate-900 to-slate-900 border-amber-500 ring-2 ring-amber-500/30'
-                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    {plan.popular && (
-                      <span className="absolute -top-2.5 right-3 bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 font-black text-[9px] uppercase px-2 py-0.5 rounded-full shadow-md">
-                        {plan.badge}
-                      </span>
-                    )}
+            {/* Plan Choice Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+              {plans.map((plan) => (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => setSelectedPlanId(plan.id)}
+                  className={`p-4 rounded-2xl text-left transition-all border relative flex flex-col justify-between cursor-pointer ${
+                    selectedPlanId === plan.id
+                      ? 'bg-gradient-to-b from-amber-500/20 via-slate-900 to-slate-900 border-amber-500 ring-2 ring-amber-500/40 shadow-xl'
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  {plan.popular && (
+                    <span className="absolute -top-2.5 right-3 bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 font-black text-[9px] uppercase px-2.5 py-0.5 rounded-full shadow-md">
+                      {plan.badge || '$15 VIP UNLIMITED'}
+                    </span>
+                  )}
 
-                    <div>
-                      <div className="text-xs font-extrabold text-white mb-1">{plan.name}</div>
-                      <div className="text-2xl font-black text-amber-400 font-serif mb-2">
-                        ${plan.price}
-                        <span className="text-xs text-slate-500 font-normal">/mo</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 leading-tight mb-3">
-                        {plan.tagline}
-                      </p>
+                  <div>
+                    <div className="text-xs font-extrabold text-white mb-1">{plan.name}</div>
+                    <div className="text-2xl font-black text-amber-400 font-serif mb-2">
+                      ${plan.price}
+                      <span className="text-xs text-slate-500 font-normal">/mo</span>
                     </div>
+                    <p className="text-[10px] text-slate-400 leading-tight mb-3">
+                      {plan.tagline}
+                    </p>
+                  </div>
 
-                    <ul className="space-y-1 text-[10px] text-slate-300 border-t border-slate-800/80 pt-2">
-                      {plan.features.slice(0, 3).map((feat, idx) => (
-                        <li key={idx} className="flex items-center gap-1.5 truncate">
-                          <Check className="w-3 h-3 text-amber-400 shrink-0" />
-                          <span className="truncate">{feat}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </button>
-                ))}
+                  <ul className="space-y-1.5 text-[10px] text-slate-300 border-t border-slate-800/80 pt-2.5">
+                    {plan.features.map((feat, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5 leading-snug">
+                        <Check className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                        <span>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </button>
+              ))}
+            </div>
+
+            {/* Paynow Payment Method Selection */}
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 mb-6">
+              <label className="block text-xs font-black text-amber-400 uppercase tracking-wider mb-3">
+                Select Paynow Payment Method:
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                {/* Option 1: Paynow Web / Card */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('web')}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    paymentMethod === 'web'
+                      ? 'border-amber-500 bg-amber-500/10 text-white ring-2 ring-amber-500/30'
+                      : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-xs font-bold text-white mb-1">
+                    <span>💳</span>
+                    <span>Paynow Web / Card</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-tight">
+                    Visa, Mastercard, Zimswitch (Opens on same tab)
+                  </p>
+                </button>
+
+                {/* Option 2: EcoCash Push */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('ecocash')}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    paymentMethod === 'ecocash'
+                      ? 'border-amber-500 bg-amber-500/10 text-white ring-2 ring-amber-500/30'
+                      : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-xs font-bold text-white mb-1">
+                    <span>📱</span>
+                    <span>EcoCash Express</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-tight">
+                    Instant USSD PIN prompt to Econet mobile
+                  </p>
+                </button>
+
+                {/* Option 3: OneMoney Push */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('onemoney')}
+                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                    paymentMethod === 'onemoney'
+                      ? 'border-amber-500 bg-amber-500/10 text-white ring-2 ring-amber-500/30'
+                      : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-xs font-bold text-white mb-1">
+                    <span>📲</span>
+                    <span>OneMoney Express</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-tight">
+                    Instant USSD PIN prompt to NetOne mobile
+                  </p>
+                </button>
               </div>
 
-              {/* Local EcoCash & InnBucks Direct Payment Guide Banner */}
-              <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-2xl p-4 mb-6 text-white shadow-inner">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-amber-300" />
-                    EcoCash & InnBucks Mobile Payment Option
-                  </span>
-                  <span className="text-[10px] bg-emerald-700 text-white font-bold px-2 py-0.5 rounded-full">
-                    No Card Needed
-                  </span>
+              {/* Mobile Phone Input for EcoCash / OneMoney */}
+              {(paymentMethod === 'ecocash' || paymentMethod === 'onemoney') && (
+                <div className="mb-3">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    {paymentMethod === 'ecocash' ? 'EcoCash Number (Econet)' : 'OneMoney Number (NetOne)'}
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="tel"
+                      value={mobileNumber}
+                      onChange={(e) => setMobileNumber(e.target.value)}
+                      placeholder="0771490167"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="bg-slate-900/90 p-3 rounded-xl border border-emerald-500/30">
-                    <span className="text-emerald-300 font-bold block text-[11px]">📱 EcoCash Direct USSD</span>
-                    <span className="font-mono text-amber-300 text-xs font-black block my-1 bg-slate-950 p-2 rounded border border-amber-500/40 select-all">
-                      *153*1*1*0771490167*{selectedPlan.price}#
-                    </span>
-                    <span className="text-[10px] text-slate-400 block">EcoCash Number: <strong>0771490167</strong></span>
+              )}
+
+              {!currentUser && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-800/80">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Your Email (for receipt)
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="email"
+                        value={guestEmail}
+                        onChange={(e) => setGuestEmail(e.target.value)}
+                        placeholder="yourname@gmail.com"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
                   </div>
 
-                  <div className="bg-slate-900/90 p-3 rounded-xl border border-emerald-500/30">
-                    <span className="text-amber-300 font-bold block text-[11px]">💵 InnBucks Direct Number</span>
-                    <span className="font-mono text-emerald-300 text-xs font-black block my-1 bg-slate-950 p-2 rounded border border-emerald-500/40 select-all">
-                      0771490167
-                    </span>
-                    <span className="text-[10px] text-slate-400 block">Send payment to InnBucks account <strong>0771490167</strong></span>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Your Phone Number
+                    </label>
+                    <div className="relative">
+                      <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="tel"
+                        value={guestPhone}
+                        onChange={(e) => setGuestPhone(e.target.value)}
+                        placeholder="0771490167"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
                   </div>
                 </div>
+              )}
+            </div>
+
+            {/* Error Message */}
+            {errorMsg && (
+              <div className="mb-5 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMsg}</span>
               </div>
+            )}
 
-              {/* Payment Details Form */}
-              <form onSubmit={handleSubmitPayment} className="bg-slate-950 border border-slate-800 rounded-2xl p-6">
-                <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
-                  <div className="flex items-center gap-2 text-sm font-bold text-white">
-                    <CreditCard className="w-4 h-4 text-amber-400" />
-                    Credit or Debit Card Payment
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleQuickSandboxFill}
-                    className="text-[10px] bg-slate-800 hover:bg-slate-700 text-amber-300 px-2.5 py-1 rounded-lg border border-slate-700 font-mono transition-colors"
-                  >
-                    ⚡ Test Card Quick-Fill
-                  </button>
+            {/* Success / Status Instruction Box */}
+            {successInfo && (
+              <div className="mb-5 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-emerald-300 text-xs space-y-2">
+                <div className="flex items-center gap-2 font-bold text-emerald-200">
+                  <Check className="w-4 h-4" />
+                  <span>Paynow Transaction Status</span>
                 </div>
-
-                {errorMsg && (
-                  <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    {errorMsg}
+                <p className="leading-relaxed text-slate-200">{successInfo}</p>
+                {paynowRedirectUrl && (
+                  <div className="pt-2">
+                    <a
+                      href={paynowRedirectUrl}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs hover:bg-amber-400 transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Complete on Paynow Checkout Screen (Same Tab)</span>
+                    </a>
                   </div>
                 )}
+              </div>
+            )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  
-                  {/* Cardholder Name */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Cardholder Name
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={cardHolderName}
-                      onChange={e => setCardHolderName(e.target.value)}
-                      placeholder="Alex Mercer"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
+            {/* Action Bar */}
+            <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>All payments processed securely through <strong>Paynow Zimbabwe</strong></span>
+              </div>
 
-                  {/* Card Number */}
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        Card Number
-                      </label>
-                      <span className="text-[10px] font-bold text-amber-400 uppercase">{cardBrand}</span>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        required
-                        value={cardNumber}
-                        onChange={handleCardNumberChange}
-                        placeholder="4242 4242 4242 4242"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Expiry */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Expiry Date (MM/YY)
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={expDate}
-                      onChange={e => setExpDate(e.target.value)}
-                      placeholder="MM/YY"
-                      maxLength={5}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-
-                  {/* CVC & ZIP */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                        CVC
-                      </label>
-                      <input
-                        type="password"
-                        required
-                        value={cvc}
-                        onChange={e => setCvc(e.target.value)}
-                        placeholder="123"
-                        maxLength={4}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                        ZIP / Postal
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={zipCode}
-                        onChange={e => setZipCode(e.target.value)}
-                        placeholder="10001"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Submit & Security Footprint */}
-                <div className="pt-2 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                    <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                    256-Bit SSL Encrypted • PCI DSS Compliant
-                  </div>
-
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                {paynowRef && (
                   <button
-                    type="submit"
-                    disabled={isProcessing}
-                    className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    type="button"
+                    onClick={handleVerifyPayment}
+                    disabled={isVerifying || isProcessing}
+                    className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                   >
-                    {isProcessing ? (
+                    {isVerifying ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                        Authorizing Gateway...
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Verifying...</span>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-4 h-4 fill-slate-950" />
-                        Subscribe Now • ${selectedPlan.price}/mo
+                        <Check className="w-4 h-4" />
+                        <span>Verify & Unlock WhatsApp</span>
                       </>
                     )}
                   </button>
-                </div>
+                )}
 
-              </form>
-
+                <button
+                  type="button"
+                  onClick={() => handlePaynowInitiate()}
+                  disabled={isProcessing || isVerifying}
+                  className="flex-1 sm:flex-none px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider shadow-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      Connecting to Paynow...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 fill-slate-950" />
+                      Pay ${selectedPlan.price} via Paynow & Reveal Number
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          )}
 
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>

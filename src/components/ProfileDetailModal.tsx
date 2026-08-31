@@ -23,21 +23,7 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
   currentUser,
   onOpenAuth
 }) => {
-  if (!isOpen || !profile) return null;
-
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
-
-  // Unlocked check: Admin, purchased profile, or active subscription plan
-  const isUnlocked =
-    currentUser?.role === 'admin' ||
-    currentUser?.purchasedProfileIds?.includes(profile.id) ||
-    (currentUser?.subscriptionStatus === 'active' && currentUser?.subscriptionPlan && currentUser?.subscriptionPlan !== 'free') ||
-    currentUser?.subscriptionPlan === 'vip_30_singles' ||
-    currentUser?.subscriptionPlan === 'starter_10_singles' ||
-    currentUser?.subscriptionPlan === 'vip_15_singles' ||
-    currentUser?.subscriptionPlan === 'starter_3_or_4' ||
-    currentUser?.subscriptionPlan === 'test_1_single' ||
-    currentUser?.subscriptionPlan === 'starter_1_single';
 
   // Reviews state
   const [localReviews, setLocalReviews] = useState<any[]>(profile?.reviews || []);
@@ -49,13 +35,25 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
 
   const [currentViewsCount, setCurrentViewsCount] = useState<number>(profile?.viewsCount || 0);
 
-  const isOwner = currentUser && (currentUser.id === profile.id || currentUser.email === profile.email);
+  // Unlocked check: Admin, purchased profile, or active subscription plan
+  const isUnlocked =
+    currentUser?.role === 'admin' ||
+    (profile && currentUser?.purchasedProfileIds?.includes(profile.id)) ||
+    (currentUser?.subscriptionStatus === 'active' && currentUser?.subscriptionPlan && currentUser?.subscriptionPlan !== 'free') ||
+    currentUser?.subscriptionPlan === 'vip_30_singles' ||
+    currentUser?.subscriptionPlan === 'starter_10_singles' ||
+    currentUser?.subscriptionPlan === 'vip_15_singles' ||
+    currentUser?.subscriptionPlan === 'starter_3_or_4' ||
+    currentUser?.subscriptionPlan === 'test_1_single' ||
+    currentUser?.subscriptionPlan === 'starter_1_single';
 
-  const formattedName = capitalizeName(profile.name);
+  const isOwner = currentUser && profile && (currentUser.id === profile.id || currentUser.email === profile.email);
+
+  const formattedName = profile ? capitalizeName(profile.name) : '';
   const firstName = formattedName.split(' ')[0] || 'Single';
 
   React.useEffect(() => {
-    if (profile) {
+    if (profile && isOpen) {
       setLocalReviews(profile.reviews || []);
       setCurrentViewsCount(profile.viewsCount || 0);
 
@@ -73,7 +71,9 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
         })
         .catch(() => {});
     }
-  }, [profile?.id]);
+  }, [profile?.id, isOpen]);
+
+  if (!isOpen || !profile) return null;
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();

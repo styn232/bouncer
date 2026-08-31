@@ -71,7 +71,7 @@ const DEFAULT_STARTER_PROFILES: SingleProfile[] = [
         createdAt: new Date().toISOString()
       }
     ],
-    viewsCount: 142,
+    viewsCount: 0,
     createdAt: new Date().toISOString()
   },
   {
@@ -101,7 +101,7 @@ const DEFAULT_STARTER_PROFILES: SingleProfile[] = [
     isFeatured: true,
     averageRating: 5.0,
     reviews: [],
-    viewsCount: 189,
+    viewsCount: 0,
     createdAt: new Date().toISOString()
   },
   {
@@ -131,7 +131,7 @@ const DEFAULT_STARTER_PROFILES: SingleProfile[] = [
     isFeatured: false,
     averageRating: 4.9,
     reviews: [],
-    viewsCount: 98,
+    viewsCount: 0,
     createdAt: new Date().toISOString()
   },
   {
@@ -160,7 +160,7 @@ const DEFAULT_STARTER_PROFILES: SingleProfile[] = [
     isFeatured: false,
     averageRating: 5.0,
     reviews: [],
-    viewsCount: 76,
+    viewsCount: 0,
     createdAt: new Date().toISOString()
   },
   {
@@ -189,7 +189,7 @@ const DEFAULT_STARTER_PROFILES: SingleProfile[] = [
     isFeatured: false,
     averageRating: 4.8,
     reviews: [],
-    viewsCount: 115,
+    viewsCount: 0,
     createdAt: new Date().toISOString()
   },
   {
@@ -218,7 +218,7 @@ const DEFAULT_STARTER_PROFILES: SingleProfile[] = [
     isFeatured: true,
     averageRating: 5.0,
     reviews: [],
-    viewsCount: 130,
+    viewsCount: 0,
     createdAt: new Date().toISOString()
   }
 ];

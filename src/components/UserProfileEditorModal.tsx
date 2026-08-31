@@ -21,8 +21,6 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   onSaveProfile,
   onApplyBouncerBadge
 }) => {
-  if (!isOpen || !currentUser) return null;
-
   const [name, setName] = useState(currentUser?.name || '');
   const [email, setEmail] = useState(currentUser?.email || '');
   const [age, setAge] = useState(currentUser?.age || 25);
@@ -74,6 +72,8 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   // Available sub-locations for chosen city
   const activeCityData = ZIMBABWE_LOCATIONS.find(l => l.city.toLowerCase() === city.toLowerCase());
   const availableSubLocations = activeCityData ? activeCityData.subLocations : ['CBD'];
+
+  if (!isOpen || !currentUser) return null;
 
   const handlePhotoUpload = async (index: 1 | 2 | 3, file: File) => {
     try {

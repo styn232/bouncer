@@ -30,8 +30,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onLoginSuccess,
   initialMode = 'user'
 }) => {
-  if (!isOpen) return null;
-
   const [mode, setMode] = useState<'user_login' | 'user_register' | 'admin_login' | 'admin_register'>(
     initialMode === 'admin' ? 'admin_login' : 'user_login'
   );
@@ -58,6 +56,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Sub-locations for selected city
   const activeCityData = ZIMBABWE_LOCATIONS.find((l) => l.city.toLowerCase() === city.toLowerCase());
   const availableSubLocations = activeCityData ? activeCityData.subLocations : ['CBD'];
+
+  if (!isOpen) return null;
 
   // Handle Google Sign-In with Firebase
   const handleGoogleSignIn = async () => {
