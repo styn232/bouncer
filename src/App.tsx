@@ -1,17 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye, RefreshCw } from 'lucide-react';
-import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, NotificationItem } from './types';
+import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye, RefreshCw, Bell } from 'lucide-react';
+import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, NotificationItem, CentralizedLoadingState } from './types';
 import { Navbar, MainTabType } from './components/Navbar';
 import { SinglesFilterBar } from './components/SinglesFilterBar';
 import { SingleCard } from './components/SingleCard';
 import { CartDrawer } from './components/CartDrawer';
 import { ProfileDetailModal } from './components/ProfileDetailModal';
+import { PhotoGalleryModal } from './components/PhotoGalleryModal';
 import { PaymentModal } from './components/PaymentModal';
 import { UserProfileEditorModal } from './components/UserProfileEditorModal';
 import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
 import { ToastNotification, Toast } from './components/ToastNotification';
+import { NotificationCenterModal } from './components/NotificationCenterModal';
+import { PushNotificationBanner } from './components/PushNotificationBanner';
+import { playRomanticChime, triggerBrowserPushNotification, formatGenderTargetedNotification } from './utils/pushNotification';
+import { dataCache, INITIAL_LOADING_STATE } from './utils/dataCache';
 
 // Dating with Bouncer Components
 import { HeroSection } from './components/HeroSection';
@@ -85,10 +90,16 @@ export default function App() {
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [likers, setLikers] = useState<SingleProfile[]>([]);
 
-  const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
+  // Centralized Loading State Management
+  const [loadingState, setLoadingState] = useState<CentralizedLoadingState>(INITIAL_LOADING_STATE);
+
+  const updateLoading = (patch: Partial<CentralizedLoadingState>) => {
+    setLoadingState((prev) => ({ ...prev, ...patch }));
+  };
 
   // Filter States
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProvince, setSelectedProvince] = useState('all');
   const [selectedCity, setSelectedCity] = useState('all');
   const [selectedSubLocation, setSelectedSubLocation] = useState('all');
   const [minAge, setMinAge] = useState(18);
@@ -96,6 +107,7 @@ export default function App() {
   const [selectedGender, setSelectedGender] = useState('all');
   const [selectedChildren, setSelectedChildren] = useState('all');
   const [selectedIntent, setSelectedIntent] = useState('all');
+  const [selectedHivStatus, setSelectedHivStatus] = useState('all');
   const [selectedBouncerStatus, setSelectedBouncerStatus] = useState('all');
   const [sortByStars, setSortByStars] = useState(true);
 
@@ -114,6 +126,8 @@ export default function App() {
 
   // Modals state
   const [selectedProfileModal, setSelectedProfileModal] = useState<SingleProfile | null>(null);
+  const [photoGalleryProfile, setPhotoGalleryProfile] = useState<SingleProfile | null>(null);
+  const [photoGalleryInitialIdx, setPhotoGalleryInitialIdx] = useState<number>(0);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -138,113 +152,302 @@ export default function App() {
     totalCartOrders: 0
   });
 
-  // Toast Notifications
+  // Toast Notifications & Push Alerts
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const seenNotifIdsRef = useRef<Set<string>>(new Set());
 
-  const addToast = (title: string, message: string, type: 'success' | 'info' | 'cart' | 'bouncer' = 'success') => {
+  const addToast = (
+    title: string,
+    message: string,
+    type: 'success' | 'info' | 'cart' | 'bouncer' | 'new_single' | 'love' = 'success',
+    extra?: { photo?: string; profileId?: string; actionLabel?: string; onAction?: () => void }
+  ) => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-    setToasts((prev) => [...prev, { id, title, message, type }]);
+    setToasts((prev) => [...prev, { id, title, message, type, ...extra }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
+    }, 6000);
   };
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Fetch Profiles from Backend with graceful fallback
-  const fetchProfiles = async () => {
-    try {
-      setIsLoadingProfiles(true);
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-      if (selectedCity !== 'all') params.append('city', selectedCity);
-      if (selectedSubLocation !== 'all') params.append('subLocation', selectedSubLocation);
-      if (minAge > 18) params.append('minAge', minAge.toString());
-      if (maxAge < 70) params.append('maxAge', maxAge.toString());
-      if (selectedGender !== 'all') params.append('gender', selectedGender);
-      if (selectedChildren !== 'all') params.append('childrenCount', selectedChildren);
-      if (selectedIntent !== 'all') params.append('intent', selectedIntent);
-      if (selectedBouncerStatus !== 'all') params.append('bouncerStatus', selectedBouncerStatus);
+  // Push Notification & New Single Alert trigger
+  const notifyNewSingleSignedUp = (single: {
+    age?: number;
+    city?: string;
+    location?: string;
+    name?: string;
+    photos?: string[];
+    id?: string;
+    gender?: 'male' | 'female' | string;
+  }) => {
+    const age = single.age || 24;
+    const location = single.city || single.location || 'Harare';
+    const singleGender = (single.gender || 'female').toLowerCase();
 
-      const res = await fetch(`/api/profiles?${params.toString()}`).catch(() => null);
-      if (res && res.ok) {
-        const data = await res.json().catch(() => null);
-        if (Array.isArray(data)) {
-          setProfiles(data);
-          return;
+    // Smart Gender Routing:
+    // If male registered -> sent to females
+    // If female registered -> sent to males
+    const notifInfo = formatGenderTargetedNotification({
+      age,
+      city: location,
+      location,
+      gender: singleGender
+    });
+
+    const userGender = currentUser?.gender?.toLowerCase();
+    const isAdmin = currentUser?.role === 'admin';
+    // Deliver if admin, visitor, or gender matches target
+    const shouldAlertUser = isAdmin || !userGender || notifInfo.targetGender === 'all' || notifInfo.targetGender === userGender;
+
+    if (shouldAlertUser) {
+      // 1. Play sweet romantic chime via Web Audio API
+      playRomanticChime();
+
+      // 2. Trigger native browser push notification
+      triggerBrowserPushNotification(notifInfo.title, notifInfo.message, {
+        icon: single.photos?.[0],
+        onClick: () => {
+          if (single.id) {
+            const found = profiles.find((p) => p.id === single.id);
+            if (found) setSelectedProfileModal(found);
+          } else {
+            setActiveTab('home');
+          }
         }
-      }
+      });
 
-      // Local fallback filtering if offline or network hiccup
-      let filtered = [...INITIAL_PROFILES];
-      if (searchTerm) {
-        filtered = filtered.filter(p => 
-          p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-          p.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.bio.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+      // 3. Show rich in-app Toast with romantic dating colors and click action
+      addToast(notifInfo.title, notifInfo.message, 'new_single', {
+        photo: single.photos?.[0],
+        profileId: single.id,
+        actionLabel: 'View Profile',
+        onAction: () => {
+          if (single.id) {
+            const found = profiles.find((p) => p.id === single.id);
+            if (found) setSelectedProfileModal(found);
+          } else {
+            setActiveTab('home');
+          }
+        }
+      });
+    }
+
+    // 4. Also store in notifications list
+    const newNotif: NotificationItem = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      userId: 'all',
+      title: notifInfo.title,
+      message: notifInfo.message,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString(),
+      targetGender: notifInfo.targetGender,
+      gender: singleGender as any,
+      profileId: single.id,
+      photo: single.photos?.[0]
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+  };
+
+  // Optimized Fetch Profiles with In-Memory Caching, Deduplication & Non-Blocking Background Sync
+  const fetchProfiles = async (options?: { force?: boolean; silent?: boolean }) => {
+    const queryKey = 'profiles_' + JSON.stringify({
+      search: searchTerm.trim().toLowerCase(),
+      province: selectedProvince,
+      city: selectedCity,
+      sub: selectedSubLocation,
+      minAge,
+      maxAge,
+      gender: selectedGender,
+      children: selectedChildren,
+      intent: selectedIntent,
+      hivStatus: selectedHivStatus,
+      bouncer: selectedBouncerStatus
+    });
+
+    // Return cached results instantly if fresh and not forced
+    if (!options?.force) {
+      const cached = dataCache.get<SingleProfile[]>(queryKey);
+      if (cached) {
+        setProfiles(cached);
+        updateLoading({ isProfilesLoading: false, isFilterUpdating: false });
+        return;
       }
-      if (selectedCity !== 'all') filtered = filtered.filter(p => p.city.toLowerCase() === selectedCity.toLowerCase());
-      if (selectedGender !== 'all') filtered = filtered.filter(p => p.gender === selectedGender);
-      if (selectedIntent !== 'all') filtered = filtered.filter(p => p.intent === selectedIntent);
-      if (selectedBouncerStatus !== 'all') filtered = filtered.filter(p => p.bouncerStatus === selectedBouncerStatus);
-      filtered = filtered.filter(p => p.age >= minAge && p.age <= maxAge);
-      setProfiles(filtered);
-    } catch (err) {
-      // Graceful fallback
-      setProfiles(INITIAL_PROFILES);
+    }
+
+    // Set non-blocking indicator if profiles already rendered, otherwise show initial load
+    if (profiles.length === 0) {
+      updateLoading({ isProfilesLoading: true, isFilterUpdating: false });
+    } else {
+      updateLoading({ isFilterUpdating: true });
+    }
+
+    try {
+      const signal = dataCache.getProfileAbortSignal();
+      const result = await dataCache.dedupe(queryKey, async () => {
+        const params = new URLSearchParams();
+        if (searchTerm.trim()) params.append('search', searchTerm.trim());
+        if (selectedProvince !== 'all') params.append('province', selectedProvince);
+        if (selectedCity !== 'all') params.append('city', selectedCity);
+        if (selectedSubLocation !== 'all') params.append('subLocation', selectedSubLocation);
+        if (minAge > 18) params.append('minAge', minAge.toString());
+        if (maxAge < 70) params.append('maxAge', maxAge.toString());
+        if (selectedGender !== 'all') params.append('gender', selectedGender);
+        if (selectedChildren !== 'all') params.append('childrenCount', selectedChildren);
+        if (selectedIntent !== 'all') params.append('intent', selectedIntent);
+        if (selectedHivStatus !== 'all') params.append('hivStatus', selectedHivStatus);
+        if (selectedBouncerStatus !== 'all') params.append('bouncerStatus', selectedBouncerStatus);
+
+        const res = await fetch(`/api/profiles?${params.toString()}`, { signal }).catch((e) => {
+          if (e.name === 'AbortError') return null;
+          return null;
+        });
+
+        if (res && res.ok) {
+          const data = await res.json().catch(() => null);
+          if (Array.isArray(data)) return data;
+        }
+
+        // Local fallback filtering if offline or temporary network issue
+        let filtered = [...INITIAL_PROFILES];
+        if (searchTerm) {
+          filtered = filtered.filter(p => 
+            p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            (p.province && p.province.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (p.city && p.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (p.bio && p.bio.toLowerCase().includes(searchTerm.toLowerCase()))
+          );
+        }
+        if (selectedProvince !== 'all') {
+          filtered = filtered.filter(p => (p.province || '').toLowerCase() === selectedProvince.toLowerCase());
+        }
+        if (selectedCity !== 'all') filtered = filtered.filter(p => (p.city || '').toLowerCase() === selectedCity.toLowerCase());
+        if (selectedGender !== 'all') filtered = filtered.filter(p => p.gender === selectedGender);
+        if (selectedIntent !== 'all') filtered = filtered.filter(p => p.intent === selectedIntent);
+        if (selectedHivStatus !== 'all') {
+          const target = selectedHivStatus.toLowerCase();
+          filtered = filtered.filter(p => {
+            const val = (p.hivStatus || 'HIV-').toLowerCase();
+            if (target.includes('+') || target.includes('pos')) {
+              return val.includes('+') || val.includes('pos');
+            }
+            return val.includes('-') || val.includes('neg') || !val.includes('+');
+          });
+        }
+        if (selectedBouncerStatus !== 'all') filtered = filtered.filter(p => p.bouncerStatus === selectedBouncerStatus);
+        filtered = filtered.filter(p => p.age >= minAge && p.age <= maxAge);
+        return filtered;
+      });
+
+      if (result && Array.isArray(result)) {
+        setProfiles(result);
+        dataCache.set(queryKey, result);
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.warn('Profile fetch note:', err);
+      }
     } finally {
-      setIsLoadingProfiles(false);
+      updateLoading({
+        isProfilesLoading: false,
+        isFilterUpdating: false,
+        lastSyncedAt: new Date()
+      });
     }
   };
 
-  // Fetch Social & Chat Features Data
-  const fetchSocialData = async () => {
+  // Optimized Fetch Social & Chat Features with Promise.allSettled concurrency & caching
+  const fetchSocialData = async (options?: { force?: boolean; silent?: boolean }) => {
+    if (!options?.silent) {
+      updateLoading({ isSocialLoading: true });
+    }
+
     try {
-      const reelsRes = await fetch('/api/reels').catch(() => null);
-      if (reelsRes && reelsRes.ok) {
-        const d = await reelsRes.json().catch(() => null);
-        if (Array.isArray(d)) setReels(d);
-      }
+      await dataCache.dedupe('social_batch_fetch', async () => {
+        const notifUrl = `/api/notifications?gender=${encodeURIComponent(currentUser?.gender || '')}&userId=${encodeURIComponent(currentUser?.id || '')}&role=${encodeURIComponent(currentUser?.role || '')}`;
+        const results = await Promise.allSettled([
+          fetch('/api/reels').then(r => r.ok ? r.json() : null),
+          fetch('/api/stories').then(r => r.ok ? r.json() : null),
+          fetch('/api/posts').then(r => r.ok ? r.json() : null),
+          fetch('/api/conversations').then(r => r.ok ? r.json() : null),
+          fetch('/api/who-liked-me').then(r => r.ok ? r.json() : null),
+          fetch(notifUrl).then(r => r.ok ? r.json() : null)
+        ]);
 
-      const storiesRes = await fetch('/api/stories').catch(() => null);
-      if (storiesRes && storiesRes.ok) {
-        const d = await storiesRes.json().catch(() => null);
-        if (Array.isArray(d)) setStories(d);
-      }
+        const [reelsRes, storiesRes, postsRes, convsRes, likersRes, notifsRes] = results;
 
-      const postsRes = await fetch('/api/posts').catch(() => null);
-      if (postsRes && postsRes.ok) {
-        const d = await postsRes.json().catch(() => null);
-        if (Array.isArray(d)) setPosts(d);
-      }
-
-      const convsRes = await fetch('/api/conversations').catch(() => null);
-      if (convsRes && convsRes.ok) {
-        const convs = await convsRes.json().catch(() => null);
-        if (Array.isArray(convs)) {
-          setConversations(convs);
-          if (convs.length > 0 && !activeConvId) {
-            setActiveConvId(convs[0].id);
+        if (reelsRes.status === 'fulfilled' && Array.isArray(reelsRes.value)) setReels(reelsRes.value);
+        if (storiesRes.status === 'fulfilled' && Array.isArray(storiesRes.value)) setStories(storiesRes.value);
+        if (postsRes.status === 'fulfilled' && Array.isArray(postsRes.value)) setPosts(postsRes.value);
+        if (convsRes.status === 'fulfilled' && Array.isArray(convsRes.value)) {
+          setConversations(convsRes.value);
+          if (convsRes.value.length > 0 && !activeConvId) {
+            setActiveConvId(convsRes.value[0].id);
           }
         }
-      }
+        if (likersRes.status === 'fulfilled' && Array.isArray(likersRes.value)) setLikers(likersRes.value);
+        if (notifsRes.status === 'fulfilled' && Array.isArray(notifsRes.value)) {
+          const freshNotifs = notifsRes.value;
+          setNotifications(freshNotifs);
 
-      const likersRes = await fetch('/api/who-liked-me').catch(() => null);
-      if (likersRes && likersRes.ok) {
-        const d = await likersRes.json().catch(() => null);
-        if (Array.isArray(d)) setLikers(d);
-      }
+          // Alert for unread New Single sign-ups (with gender routing)
+          freshNotifs.forEach((n: NotificationItem) => {
+            if (!n.read && !seenNotifIdsRef.current.has(n.id)) {
+              seenNotifIdsRef.current.add(n.id);
 
-      const notifsRes = await fetch('/api/notifications').catch(() => null);
-      if (notifsRes && notifsRes.ok) {
-        const d = await notifsRes.json().catch(() => null);
-        if (Array.isArray(d)) setNotifications(d);
-      }
-    } catch {}
+              const userGender = currentUser?.gender?.toLowerCase();
+              const isAdmin = currentUser?.role === 'admin';
+              const isTargetedToMe = isAdmin || !userGender || !n.targetGender || n.targetGender === 'all' || n.targetGender === userGender;
+
+              const isSingleAlert = n.title.toLowerCase().includes('single') ||
+                                    n.title.toLowerCase().includes('gentleman') ||
+                                    n.title.toLowerCase().includes('lady') ||
+                                    n.message.toLowerCase().includes('registered') ||
+                                    n.message.toLowerCase().includes('signed up');
+
+              if (isSingleAlert && isTargetedToMe) {
+                playRomanticChime();
+                triggerBrowserPushNotification(n.title, n.message, {
+                  icon: n.photo,
+                  onClick: () => {
+                    if (n.profileId) {
+                      const found = profiles.find((p) => p.id === n.profileId);
+                      if (found) setSelectedProfileModal(found);
+                    } else {
+                      setActiveTab('home');
+                    }
+                  }
+                });
+                addToast(n.title, n.message, 'new_single', {
+                  photo: n.photo,
+                  profileId: n.profileId,
+                  actionLabel: 'View Profile',
+                  onAction: () => {
+                    if (n.profileId) {
+                      const found = profiles.find((p) => p.id === n.profileId);
+                      if (found) setSelectedProfileModal(found);
+                    } else {
+                      setActiveTab('home');
+                    }
+                  }
+                });
+              }
+            } else if (n.id) {
+              seenNotifIdsRef.current.add(n.id);
+            }
+          });
+        }
+      });
+    } catch (err) {
+      console.warn('Social fetch note:', err);
+    } finally {
+      updateLoading({ isSocialLoading: false });
+    }
   };
 
   // Fetch Messages for Active Conversation
@@ -333,135 +536,212 @@ export default function App() {
     };
   }, []);
 
-  // Fetch Auth & Admin Data with per-call error guards
-  const fetchInitialData = async () => {
+  // Optimized Fetch Auth, Settings & Admin Data with Parallelism, In-Memory Caching & Deduplication
+  const fetchInitialData = async (options?: { force?: boolean; silent?: boolean }) => {
+    if (options?.silent) {
+      updateLoading({ isBackgroundSyncing: true });
+    } else {
+      updateLoading({ isInitialLoading: true, isBackgroundSyncing: true });
+    }
+
     try {
-      // 1. Session Persistence Check
-      const savedUserStr = localStorage.getItem('bouncer_logged_user');
-      let currentSessionUser: User | null = null;
+      await dataCache.dedupe('initial_data_fetch', async () => {
+        // 1. Session Persistence Check
+        const savedUserStr = localStorage.getItem('bouncer_logged_user');
+        let currentSessionUser: User | null = currentUser;
 
-      if (savedUserStr) {
-        try {
-          const savedUser = JSON.parse(savedUserStr);
-          if (savedUser && (savedUser.id || savedUser.email)) {
-            currentSessionUser = savedUser;
-            setCurrentUser(savedUser);
-            // Sync with server
-            fetch('/api/auth/sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user: savedUser })
-            }).catch(() => {});
+        if (savedUserStr) {
+          try {
+            const savedUser = JSON.parse(savedUserStr);
+            if (savedUser && (savedUser.id || savedUser.email)) {
+              currentSessionUser = savedUser;
+              setCurrentUser(savedUser);
+              // Non-blocking sync with server
+              fetch('/api/auth/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user: savedUser })
+              }).catch(() => {});
+            }
+          } catch (e) {
+            localStorage.removeItem('bouncer_logged_user');
           }
-        } catch (e) {
-          localStorage.removeItem('bouncer_logged_user');
-        }
-      } else {
-        const meRes = await fetch('/api/auth/me').catch(() => null);
-        if (meRes && meRes.ok) {
-          const data = await meRes.json().catch(() => null);
-          if (data && data.user && (data.user.id || data.user.email)) {
-            currentSessionUser = data.user;
-            setCurrentUser(data.user);
-            localStorage.setItem('bouncer_logged_user', JSON.stringify(data.user));
-          }
-        }
-      }
-
-      // 2. Fetch Site Settings
-      const settingsRes = await fetch('/api/settings').catch(() => null);
-      if (settingsRes && settingsRes.ok) {
-        const st = await settingsRes.json().catch(() => null);
-        if (st && st.siteName) {
-          setSiteSettings(st);
-          if (st.siteName) document.title = st.siteName;
-        }
-      }
-
-      const plansRes = await fetch('/api/subscriptions/plans').catch(() => null);
-      if (plansRes && plansRes.ok) {
-        const plans = await plansRes.json().catch(() => null);
-        if (Array.isArray(plans)) setSubscriptionPlans(plans);
-      }
-
-      // Fetch admin data if current user is admin
-      const isUserAdmin = currentSessionUser?.role === 'admin' || (currentUser?.role === 'admin');
-      if (isUserAdmin) {
-        const statsRes = await fetch('/api/admin/stats', {
-          headers: {
-            'x-user-role': 'admin',
-            'x-user-email': currentSessionUser?.email || currentUser?.email || 'jobsatespace@gmail.com'
-          }
-        }).catch(() => null);
-        if (statsRes && statsRes.ok) {
-          const stats = await statsRes.json().catch(() => null);
-          if (stats) setAdminStats(stats);
-        }
-
-        const subRes = await fetch('/api/admin/subscriptions', {
-          headers: {
-            'x-user-role': 'admin',
-            'x-user-email': currentSessionUser?.email || currentUser?.email || 'jobsatespace@gmail.com'
-          }
-        }).catch(() => null);
-        if (subRes && subRes.ok) {
-          const subs = await subRes.json().catch(() => null);
-          if (subs && Array.isArray(subs.userSubscriptions)) {
-            setUserSubscriptions(subs.userSubscriptions);
+        } else {
+          const meRes = await fetch('/api/auth/me').catch(() => null);
+          if (meRes && meRes.ok) {
+            const data = await meRes.json().catch(() => null);
+            if (data && data.user && (data.user.id || data.user.email)) {
+              currentSessionUser = data.user;
+              setCurrentUser(data.user);
+              localStorage.setItem('bouncer_logged_user', JSON.stringify(data.user));
+            }
           }
         }
-      }
 
-      const txRes = await fetch('/api/payment/transactions').catch(() => null);
-      if (txRes && txRes.ok) {
-        const txs = await txRes.json().catch(() => null);
-        if (Array.isArray(txs)) setTransactions(txs);
-      }
+        // 2. Prepare parallel background requests
+        const isUserAdmin = currentSessionUser?.role === 'admin' || (currentUser?.role === 'admin');
+        const adminEmail = currentSessionUser?.email || currentUser?.email || 'jobsatespace@gmail.com';
 
-      const matchRes = await fetch('/api/matches').catch(() => null);
-      if (matchRes && matchRes.ok) {
-        const matches = await matchRes.json().catch(() => null);
-        if (Array.isArray(matches)) setMatchOrders(matches);
-      }
+        const fetchers: Promise<any>[] = [];
 
-      fetchSocialData();
-    } catch {}
+        // Site Settings (Cache TTL: 5 min)
+        const cachedSettings = !options?.force ? dataCache.get<any>('settings') : null;
+        if (cachedSettings) {
+          setSiteSettings(cachedSettings);
+          if (cachedSettings.siteName) document.title = cachedSettings.siteName;
+        } else {
+          fetchers.push(
+            fetch('/api/settings')
+              .then(r => r.ok ? r.json() : null)
+              .then(st => {
+                if (st && st.siteName) {
+                  setSiteSettings(st);
+                  dataCache.set('settings', st);
+                  document.title = st.siteName;
+                }
+              })
+              .catch(() => null)
+          );
+        }
+
+        // Subscription Plans (Cache TTL: 5 min)
+        const cachedPlans = !options?.force ? dataCache.get<any>('plans') : null;
+        if (cachedPlans) {
+          setSubscriptionPlans(cachedPlans);
+        } else {
+          fetchers.push(
+            fetch('/api/subscriptions/plans')
+              .then(r => r.ok ? r.json() : null)
+              .then(plans => {
+                if (Array.isArray(plans)) {
+                  setSubscriptionPlans(plans);
+                  dataCache.set('plans', plans);
+                }
+              })
+              .catch(() => null)
+          );
+        }
+
+        // Admin Stats & Subscriptions (Only fetched if admin)
+        if (isUserAdmin) {
+          fetchers.push(
+            fetch('/api/admin/stats', {
+              headers: {
+                'x-user-role': 'admin',
+                'x-user-email': adminEmail
+              }
+            })
+              .then(r => r.ok ? r.json() : null)
+              .then(stats => {
+                if (stats) setAdminStats(stats);
+              })
+              .catch(() => null)
+          );
+
+          fetchers.push(
+            fetch('/api/admin/subscriptions', {
+              headers: {
+                'x-user-role': 'admin',
+                'x-user-email': adminEmail
+              }
+            })
+              .then(r => r.ok ? r.json() : null)
+              .then(subs => {
+                if (subs && Array.isArray(subs.userSubscriptions)) {
+                  setUserSubscriptions(subs.userSubscriptions);
+                }
+              })
+              .catch(() => null)
+          );
+        }
+
+        // Transactions
+        fetchers.push(
+          fetch('/api/payment/transactions')
+            .then(r => r.ok ? r.json() : null)
+            .then(txs => {
+              if (Array.isArray(txs)) setTransactions(txs);
+            })
+            .catch(() => null)
+        );
+
+        // Matches
+        fetchers.push(
+          fetch('/api/matches')
+            .then(r => r.ok ? r.json() : null)
+            .then(matches => {
+              if (Array.isArray(matches)) setMatchOrders(matches);
+            })
+            .catch(() => null)
+        );
+
+        // Run all concurrent background initial requests in parallel
+        await Promise.allSettled(fetchers);
+
+        // Non-blocking social sync
+        fetchSocialData({ silent: true });
+      });
+    } catch (err) {
+      console.warn('Initial data sync note:', err);
+    } finally {
+      updateLoading({
+        isInitialLoading: false,
+        isBackgroundSyncing: false,
+        lastSyncedAt: new Date()
+      });
+    }
   };
 
   const handleApprovePayment = async (txId: string) => {
     try {
+      updateLoading({ isActionLoading: true });
       const res = await fetch(`/api/admin/payments/${txId}/approve`, { method: 'PUT' });
       if (res.ok) {
         addToast('Payment Approved! 💳', 'User subscription plan activated successfully.', 'success');
-        fetchInitialData();
-        fetchProfiles();
+        dataCache.invalidateAll();
+        fetchInitialData({ force: true, silent: true });
+        fetchProfiles({ force: true, silent: true });
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      updateLoading({ isActionLoading: false });
     }
   };
 
   const handleRejectPayment = async (txId: string) => {
     try {
+      updateLoading({ isActionLoading: true });
       const res = await fetch(`/api/admin/payments/${txId}/reject`, { method: 'PUT' });
       if (res.ok) {
         addToast('Payment Rejected ❌', 'Transaction rejected by admin.', 'info');
-        fetchInitialData();
+        dataCache.invalidateAll();
+        fetchInitialData({ force: true, silent: true });
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      updateLoading({ isActionLoading: false });
     }
   };
 
-  // Initial fetch on mount without auto-refreshing polling
+  // Initial fetch on mount
   useEffect(() => {
     fetchInitialData();
   }, []);
 
+  // Debounced profile fetching to prevent unnecessary requests on rapid typing/filter changes
   useEffect(() => {
-    fetchProfiles();
+    const timer = setTimeout(() => {
+      fetchProfiles();
+    }, 200);
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, [
     searchTerm,
+    selectedProvince,
     selectedCity,
     selectedSubLocation,
     minAge,
@@ -469,8 +749,16 @@ export default function App() {
     selectedGender,
     selectedChildren,
     selectedIntent,
+    selectedHivStatus,
     selectedBouncerStatus
   ]);
+
+  // Lazy background sync when switching to social / chat tabs
+  useEffect(() => {
+    if (activeTab === 'feed' || activeTab === 'reels' || activeTab === 'wholikedme') {
+      fetchSocialData({ silent: true });
+    }
+  }, [activeTab]);
 
   // Handle Tab Selection with Admin Auth Gate
   const handleSelectTab = (tab: MainTabType) => {
@@ -644,6 +932,7 @@ export default function App() {
   // User Profile Saved
   const handleSaveUserProfile = async (updatedData: Partial<User>) => {
     try {
+      updateLoading({ isActionLoading: true });
       const res = await fetch('/api/auth/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -653,10 +942,13 @@ export default function App() {
         const data = await res.json();
         setCurrentUser(data.user);
         addToast('Profile Updated!', 'Your features and details have been saved for singles to view.', 'success');
-        fetchProfiles();
+        dataCache.invalidateProfiles();
+        fetchProfiles({ force: true, silent: true });
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      updateLoading({ isActionLoading: false });
     }
   };
 
@@ -668,6 +960,7 @@ export default function App() {
   // Admin Actions
   const handleAdminEditProfile = async (id: string, updatedData: Partial<SingleProfile>) => {
     try {
+      updateLoading({ isActionLoading: true });
       const res = await fetch(`/api/profiles/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -675,11 +968,14 @@ export default function App() {
       });
       if (res.ok) {
         addToast('Profile Updated ✍️', 'Single profile details and photo successfully saved!', 'success');
-        fetchProfiles();
-        fetchInitialData();
+        dataCache.invalidateProfiles();
+        fetchProfiles({ force: true, silent: true });
+        fetchInitialData({ force: true, silent: true });
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      updateLoading({ isActionLoading: false });
     }
   };
 
@@ -694,6 +990,7 @@ export default function App() {
     } catch (err) {
       console.error('Logout error:', err);
     }
+    dataCache.invalidateAll();
     localStorage.removeItem('bouncer_logged_user');
     setCurrentUser(null);
     setActiveTab('home');
@@ -702,6 +999,7 @@ export default function App() {
 
   const handleAdminAddProfile = async (newProfData: Partial<SingleProfile>) => {
     try {
+      updateLoading({ isActionLoading: true });
       const res = await fetch('/api/profiles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -709,37 +1007,46 @@ export default function App() {
       });
       if (res.ok) {
         const addedData = await res.json();
-        const profName = addedData.profile?.name || newProfData.name || 'A new single';
-        const profCity = addedData.profile?.city || newProfData.city || 'Zimbabwe';
-        addToast(
-          '🎉 New Single Added Notification!',
-          `📢 ${profName} from ${profCity} (${newProfData.age || 25} yrs) just joined Dating With Bouncer!`,
-          'bouncer'
-        );
+        const profile = addedData.profile || newProfData;
+        notifyNewSingleSignedUp({
+          age: profile.age || newProfData.age || 24,
+          city: profile.city || profile.location || newProfData.city || newProfData.location || 'Harare',
+          location: profile.location || profile.city || 'Harare',
+          photos: profile.photos || newProfData.photos,
+          id: profile.id
+        });
         handleResetFilters();
-        fetchProfiles();
-        fetchInitialData();
+        dataCache.invalidateProfiles();
+        fetchProfiles({ force: true, silent: true });
+        fetchInitialData({ force: true, silent: true });
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      updateLoading({ isActionLoading: false });
     }
   };
 
   const handleAdminDeleteProfile = async (id: string) => {
     try {
+      updateLoading({ isActionLoading: true });
       const res = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
       if (res.ok) {
         addToast('Profile Deleted', 'Single profile removed from directory.', 'info');
-        fetchProfiles();
-        fetchInitialData();
+        dataCache.invalidateProfiles();
+        fetchProfiles({ force: true, silent: true });
+        fetchInitialData({ force: true, silent: true });
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      updateLoading({ isActionLoading: false });
     }
   };
 
   const handleAdminUpdateBouncerStatus = async (id: string, status: any, notes?: string) => {
     try {
+      updateLoading({ isActionLoading: true });
       const res = await fetch(`/api/admin/profiles/${id}/bouncer-status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -747,16 +1054,20 @@ export default function App() {
       });
       if (res.ok) {
         addToast('Bouncer Status Updated 🛡️', `Profile badge status set to ${status}.`, 'bouncer');
-        fetchProfiles();
-        fetchInitialData();
+        dataCache.invalidateProfiles();
+        fetchProfiles({ force: true, silent: true });
+        fetchInitialData({ force: true, silent: true });
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      updateLoading({ isActionLoading: false });
     }
   };
 
   const handleResetFilters = () => {
     setSearchTerm('');
+    setSelectedProvince('all');
     setSelectedCity('all');
     setSelectedSubLocation('all');
     setMinAge(18);
@@ -764,6 +1075,7 @@ export default function App() {
     setSelectedGender('all');
     setSelectedChildren('all');
     setSelectedIntent('all');
+    setSelectedHivStatus('all');
     setSelectedBouncerStatus('all');
   };
 
@@ -785,47 +1097,61 @@ export default function App() {
     });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-rose-500 selection:text-white">
-      
-      {/* Toast Notification Container */}
-      <ToastNotification toasts={toasts} onDismiss={removeToast} />
+    <div className="min-h-screen bg-[#0e040c] text-rose-50 flex flex-col font-sans selection:bg-rose-500 selection:text-white relative">
+      {/* Romantic Ambient Atmosphere Glows */}
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(225,29,72,0.14),rgba(14,4,12,0))] z-0" />
+      <div className="fixed bottom-0 right-0 pointer-events-none w-96 h-96 bg-rose-600/5 rounded-full blur-3xl z-0" />
 
-      {/* Header Navbar */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={handleSelectTab}
-        cartCount={cartItems.length}
-        currentUser={currentUser}
-        siteSettings={siteSettings}
-        isLoggedIn={!!currentUser}
-        onLogout={handleLogout}
-        onOpenCart={() => setIsCartOpen(true)}
-        onOpenSafety={() => setIsSafetyModalOpen(true)}
-        onOpenVerification={() => setIsVerificationModalOpen(true)}
-        onOpenEditProfile={() => setIsUserModalOpen(true)}
-        onOpenAuth={() => {
-          if (!currentUser) {
-            setAuthModalInitialMode('user');
-            setIsAuthModalOpen(true);
-          }
-        }}
-        onOpenLogin={() => {
-          if (!currentUser) {
-            setAuthModalInitialMode('user');
-            setIsAuthModalOpen(true);
-          }
-        }}
-        onOpenRegister={() => {
-          if (!currentUser) {
-            setAuthModalInitialMode('user');
-            setIsAuthModalOpen(true);
-          }
-        }}
-        onOpenPayment={() => setIsPaymentModalOpen(true)}
-      />
+      <div className="relative z-10 flex flex-col flex-1">
+        {/* Push Notification Opt-in Banner */}
+        <PushNotificationBanner
+          onEnabled={() => {
+            addToast('Push Notifications Active ❤️', 'You will receive instant alerts whenever new singles sign up in Zimbabwe!', 'new_single');
+          }}
+        />
+
+        {/* Toast Notification Container */}
+        <ToastNotification toasts={toasts} onDismiss={removeToast} />
+
+        {/* Header Navbar */}
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={handleSelectTab}
+          cartCount={cartItems.length}
+          currentUser={currentUser}
+          siteSettings={siteSettings}
+          isLoggedIn={!!currentUser}
+          loadingState={loadingState}
+          unreadNotifCount={notifications.filter((n) => !n.read).length}
+          onOpenNotifications={() => setIsNotificationCenterOpen(true)}
+          onLogout={handleLogout}
+          onOpenCart={() => setIsCartOpen(true)}
+          onOpenSafety={() => setIsSafetyModalOpen(true)}
+          onOpenVerification={() => setIsVerificationModalOpen(true)}
+          onOpenEditProfile={() => setIsUserModalOpen(true)}
+          onOpenAuth={() => {
+            if (!currentUser) {
+              setAuthModalInitialMode('user');
+              setIsAuthModalOpen(true);
+            }
+          }}
+          onOpenLogin={() => {
+            if (!currentUser) {
+              setAuthModalInitialMode('user');
+              setIsAuthModalOpen(true);
+            }
+          }}
+          onOpenRegister={() => {
+            if (!currentUser) {
+              setAuthModalInitialMode('user');
+              setIsAuthModalOpen(true);
+            }
+          }}
+          onOpenPayment={() => setIsPaymentModalOpen(true)}
+        />
 
       {/* Main Body View Switching */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 md:pb-8 space-y-4 sm:space-y-6">
         
         {/* DISCOVER & HOME TAB: DIRECT SINGLES DIRECTORY */}
         {(activeTab === 'discover' || activeTab === 'home') && (
@@ -834,26 +1160,44 @@ export default function App() {
             <FeaturedSingles
               profiles={profiles}
               onViewDetails={(prof) => setSelectedProfileModal(prof)}
+              onViewPhotos={(prof, initialIdx) => {
+                setPhotoGalleryProfile(prof);
+                setPhotoGalleryInitialIdx(initialIdx || 0);
+              }}
               onAddToCart={handleAddToCart}
               cartProfileIds={cartItems.map((item) => item.profileId)}
               currentUser={currentUser}
             />
 
             {/* Main Singles Directory Section Header */}
-            <div className="border-b border-slate-800 pb-4">
-              <h2 className="text-2xl sm:text-3xl font-black text-white font-serif flex items-center gap-2">
-                <Flame className="w-6 h-6 sm:w-7 sm:h-7 text-amber-400 shrink-0" />
-                <span>Discover Vetted Singles</span>
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                Browse verified singles in your area vetted by Bouncer Security.
-              </p>
+            <div className="border-b border-rose-900/30 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-black text-rose-50 font-serif flex items-center gap-2.5">
+                  <Heart className="w-6 h-6 sm:w-7 sm:h-7 text-rose-500 fill-rose-500/20 shrink-0" />
+                  <span>Discover Vetted Singles</span>
+                </h2>
+                <p className="text-xs sm:text-sm text-rose-300/70 mt-1">
+                  Browse verified singles in Zimbabwe vetted by Bouncer Security. Get instant alerts when new singles sign up!
+                </p>
+              </div>
+              <button
+                onClick={() => setIsNotificationCenterOpen(true)}
+                className="self-start sm:self-auto px-3.5 py-1.5 rounded-full bg-gradient-to-r from-rose-950/80 to-pink-950/80 border border-rose-700/40 text-rose-200 text-xs font-semibold hover:border-rose-500 flex items-center gap-2 transition-all shadow-sm active:scale-95"
+              >
+                <Bell className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
+                <span>New Singles Alerts</span>
+                {notifications.filter((n) => !n.read).length > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                )}
+              </button>
             </div>
 
             <div className="flex flex-col lg:flex-row items-start gap-8">
               <SinglesFilterBar
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
+                selectedProvince={selectedProvince}
+                setSelectedProvince={setSelectedProvince}
                 selectedCity={selectedCity}
                 setSelectedCity={setSelectedCity}
                 selectedSubLocation={selectedSubLocation}
@@ -868,6 +1212,8 @@ export default function App() {
                 setSelectedChildren={setSelectedChildren}
                 selectedIntent={selectedIntent}
                 setSelectedIntent={setSelectedIntent}
+                selectedHivStatus={selectedHivStatus}
+                setSelectedHivStatus={setSelectedHivStatus}
                 selectedBouncerStatus={selectedBouncerStatus}
                 setSelectedBouncerStatus={setSelectedBouncerStatus}
                 sortByStars={sortByStars}
@@ -876,8 +1222,19 @@ export default function App() {
                 totalResults={displayedProfiles.length}
               />
 
-              <div className="flex-1 w-full space-y-6">
-                {isLoadingProfiles ? (
+              <div className="flex-1 w-full space-y-4">
+                {/* Non-blocking filter update indicator */}
+                {loadingState.isFilterUpdating && (
+                  <div className="w-full bg-slate-900/90 backdrop-blur rounded-2xl p-2.5 px-4 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300 animate-pulse shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                      <span>Updating singles filter in real-time...</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono">Live Search</span>
+                  </div>
+                )}
+
+                {loadingState.isProfilesLoading && profiles.length === 0 ? (
                   <div className="text-center py-20 bg-slate-900/40 rounded-3xl border border-slate-800">
                     <div className="w-10 h-10 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-xs text-slate-400">Loading Bouncer-vetted singles...</p>
@@ -900,7 +1257,7 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4 md:gap-6">
                     {displayedProfiles.map((profile) => (
                       <SingleCard
                         key={profile.id}
@@ -910,6 +1267,10 @@ export default function App() {
                         onAddToCart={handleAddToCart}
                         onViewDetails={(p) => {
                           setSelectedProfileModal(p);
+                        }}
+                        onViewPhotos={(p, initialIdx) => {
+                          setPhotoGalleryProfile(p);
+                          setPhotoGalleryInitialIdx(initialIdx || 0);
                         }}
                       />
                     ))}
@@ -1293,6 +1654,17 @@ export default function App() {
         }}
       />
 
+      {/* Photo Gallery Viewer Lightbox - Inspect full photos before choosing */}
+      <PhotoGalleryModal
+        profile={photoGalleryProfile}
+        isOpen={!!photoGalleryProfile}
+        initialPhotoIdx={photoGalleryInitialIdx}
+        isInCart={photoGalleryProfile ? cartItems.some((item) => item.profileId === photoGalleryProfile.id) : false}
+        onAddToCart={handleAddToCart}
+        onClose={() => setPhotoGalleryProfile(null)}
+        onViewFullProfile={(p) => setSelectedProfileModal(p)}
+      />
+
       {/* Payment Gateway Modal */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
@@ -1366,13 +1738,53 @@ export default function App() {
         }}
       />
 
+      {/* Notification Center Modal */}
+      <NotificationCenterModal
+        isOpen={isNotificationCenterOpen}
+        onClose={() => setIsNotificationCenterOpen(false)}
+        notifications={notifications}
+        currentUser={currentUser}
+        profiles={profiles}
+        onMarkAsRead={async (id) => {
+          setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+          await fetch(`/api/notifications/${id}/read`, { method: 'POST' }).catch(() => {});
+        }}
+        onClearAll={async () => {
+          setNotifications([]);
+          await fetch('/api/notifications/clear', { method: 'POST' }).catch(() => {});
+        }}
+        onViewProfile={(profileId) => {
+          const found = profiles.find((p) => p.id === profileId);
+          if (found) {
+            setSelectedProfileModal(found);
+            setIsNotificationCenterOpen(false);
+          }
+        }}
+        onSimulateTestPush={(gender?: 'male' | 'female') => {
+          const chosenGender = gender || (currentUser?.gender === 'female' ? 'male' : 'female');
+          const sample = profiles.find(p => p.gender === chosenGender) || profiles[Math.floor(Math.random() * profiles.length)] || {
+            age: 26,
+            city: 'Harare',
+            location: 'Harare'
+          };
+          notifyNewSingleSignedUp({
+            age: sample.age || 26,
+            city: sample.city || sample.location || 'Harare',
+            location: sample.location || sample.city || 'Harare',
+            photos: sample.photos,
+            id: sample.id,
+            gender: chosenGender
+          });
+        }}
+      />
+
       {/* Global Footer */}
-      <footer className="bg-slate-950 border-t border-slate-900 py-8 text-xs text-slate-500 mt-12">
+      <footer className="bg-[#0a0309] border-t border-rose-900/30 py-8 text-xs text-rose-300/60 mt-12">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-amber-500" />
-            <span className="font-bold text-slate-300 font-serif">DATING WITH BOUNCER</span>
-            <span>• Vetted Zimbabwe Singles Platform</span>
+            <Heart className="w-4 h-4 text-rose-500 fill-rose-500/30" />
+            <span className="font-bold text-rose-100 font-serif">DATING WITH BOUNCER</span>
+            <span className="text-rose-400/60">• Vetted Zimbabwe Singles Platform</span>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-4 text-[11px]">
@@ -1389,6 +1801,14 @@ export default function App() {
             </button>
             <span>•</span>
             <button
+              onClick={() => setIsNotificationCenterOpen(true)}
+              className="text-rose-400 hover:text-rose-300 flex items-center gap-1 font-semibold transition-colors"
+            >
+              <Bell className="w-3.5 h-3.5 text-rose-400" />
+              Singles Alerts
+            </button>
+            <span>•</span>
+            <button
               onClick={() => {
                 if (currentUser?.role === 'admin') {
                   setActiveTab('admin');
@@ -1397,7 +1817,7 @@ export default function App() {
                   setIsAuthModalOpen(true);
                 }
               }}
-              className="text-rose-400 font-bold hover:underline"
+              className="text-pink-400 font-bold hover:underline"
             >
               {currentUser?.role === 'admin' ? 'Open Admin Panel' : 'Staff Admin Portal'}
             </button>
@@ -1405,6 +1825,7 @@ export default function App() {
         </div>
       </footer>
 
+      </div>
     </div>
   );
 }

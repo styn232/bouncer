@@ -103,8 +103,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reference: paynowRef,
-          autoApproveTest: true
+          reference: paynowRef
         })
       });
 

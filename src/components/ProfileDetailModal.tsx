@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck, Eye, Crown, Zap } from 'lucide-react';
+import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck, Eye, Crown, Zap, HeartPulse, ChevronLeft, ChevronRight, Camera } from 'lucide-react';
 import { SingleProfile, User } from '../types';
-import { capitalizeName, formatDisplayName, maskPhoneNumber } from '../utils/format';
+import { capitalizeName, formatDisplayName, maskPhoneNumber, formatHivStatus } from '../utils/format';
 
 interface ProfileDetailModalProps {
   profile: SingleProfile | null;
@@ -119,26 +119,48 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden z-10 my-8 max-h-[90vh] flex flex-col md:flex-row"
+          className="relative w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl overflow-y-auto md:overflow-hidden z-10 my-4 sm:my-8 max-h-[94vh] md:max-h-[90vh] flex flex-col md:flex-row"
         >
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-20 p-2.5 rounded-full bg-slate-950/80 text-slate-300 hover:text-white border border-slate-700 backdrop-blur-md transition-colors"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 z-30 p-2 sm:p-2.5 rounded-full bg-slate-950/80 text-slate-300 hover:text-white border border-slate-700 backdrop-blur-md transition-colors"
+            aria-label="Close profile modal"
           >
             <X className="w-5 h-5" />
           </button>
 
-            {/* Left Side: Photo Gallery */}
-          <div className="w-full md:w-1/2 bg-slate-950 flex flex-col justify-between p-4 border-r border-slate-800">
-            <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-slate-900 mb-3 shadow-inner">
+          {/* Left Side: Photo Gallery */}
+          <div className="w-full md:w-1/2 bg-slate-950 flex flex-col justify-between p-3 sm:p-4 border-r border-slate-800 shrink-0">
+            <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-slate-900 mb-3 shadow-inner group select-none">
               <img
                 src={profile.photos?.[selectedPhotoIdx] || profile.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'}
                 alt={profile.name}
                 referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transition-transform duration-300"
               />
-              <div className="absolute top-3 left-3 flex flex-col gap-1 items-start">
+
+              {/* Photo Cycling Arrows */}
+              {(profile.photos?.length || 0) > 1 && (
+                <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex justify-between items-center pointer-events-auto z-20">
+                  <button
+                    onClick={() => setSelectedPhotoIdx((prev) => (prev - 1 + (profile.photos?.length || 1)) % (profile.photos?.length || 1))}
+                    className="p-1.5 sm:p-2 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md transition-all active:scale-95 shadow-md"
+                    aria-label="Previous photo"
+                  >
+                    <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                  <button
+                    onClick={() => setSelectedPhotoIdx((prev) => (prev + 1) % (profile.photos?.length || 1))}
+                    className="p-1.5 sm:p-2 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md transition-all active:scale-95 shadow-md"
+                    aria-label="Next photo"
+                  >
+                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                </div>
+              )}
+
+              <div className="absolute top-3 left-3 flex flex-col gap-1 items-start z-10">
                 {(profile.isNew || (profile.createdAt && (new Date().getTime() - new Date(profile.createdAt).getTime()) < 14 * 24 * 60 * 60 * 1000)) && (
                   <div className="bg-gradient-to-r from-rose-600 to-pink-600 border border-rose-300 text-white text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg animate-pulse">
                     <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
@@ -156,6 +178,14 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Photo indicator badge */}
+              {(profile.photos?.length || 0) > 1 && (
+                <div className="absolute bottom-2.5 right-2.5 bg-black/75 backdrop-blur-md border border-white/10 text-white text-[10px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 z-10">
+                  <Camera className="w-3 h-3 text-rose-400" />
+                  <span>Photo {selectedPhotoIdx + 1} of {profile.photos?.length}</span>
+                </div>
+              )}
             </div>
 
             {/* Thumbnail Row */}
@@ -165,8 +195,8 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                   <button
                     key={idx}
                     onClick={() => setSelectedPhotoIdx(idx)}
-                    className={`w-16 h-16 rounded-xl overflow-hidden shrink-0 border-2 transition-all ${
-                      idx === selectedPhotoIdx ? 'border-amber-400 ring-2 ring-amber-400/30' : 'border-slate-800 opacity-60 hover:opacity-100'
+                    className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 border-2 transition-all ${
+                      idx === selectedPhotoIdx ? 'border-amber-400 ring-2 ring-amber-400/30 scale-105' : 'border-slate-800 opacity-60 hover:opacity-100'
                     }`}
                   >
                     <img
@@ -182,7 +212,7 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
           </div>
 
           {/* Right Side: Profile Info & Bouncer Clearance Report */}
-          <div className="w-full md:w-1/2 p-6 overflow-y-auto flex flex-col justify-between">
+          <div className="w-full md:w-1/2 p-4 sm:p-6 overflow-y-auto flex flex-col justify-between">
             <div>
               {/* Header: Name, Age, Location */}
               <div className="mb-4">
@@ -218,7 +248,7 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
               </div>
 
               {/* Specs Grid */}
-              <div className="grid grid-cols-3 gap-3 mb-6 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-6 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
                 <div className="flex items-center gap-2 text-xs">
                   <Award className="w-4 h-4 text-amber-400 shrink-0" />
                   <div>
@@ -232,7 +262,7 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                   <div>
                     <div className="text-[10px] text-slate-500 uppercase">Children</div>
                     <div className="font-semibold text-slate-200">
-                      👶 {profile.childrenCount === 0 ? 'No children' : `${profile.childrenCount} child${profile.childrenCount > 1 ? 'ren' : ''}`}
+                      👶 {profile.childrenCount === 0 ? 'No children' : `${profile.childrenCount} kid${profile.childrenCount > 1 ? 's' : ''}`}
                     </div>
                   </div>
                 </div>
@@ -243,6 +273,20 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                     <div className="text-[10px] text-slate-500 uppercase">Dating Intent</div>
                     <div className="font-semibold text-amber-300">
                       {profile.intent === 'Marriage' ? '💍 Marriage' : '😂 Funny'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <HeartPulse className="w-4 h-4 text-rose-500 shrink-0" />
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase font-bold">HIV Status</div>
+                    <div className={`font-black tracking-wide ${
+                      formatHivStatus(profile.hivStatus) === 'HIV-'
+                        ? 'text-emerald-400'
+                        : 'text-purple-400'
+                    }`}>
+                      {formatHivStatus(profile.hivStatus)}
                     </div>
                   </div>
                 </div>

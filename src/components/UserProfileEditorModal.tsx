@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User as UserIcon, ShieldCheck, Camera, Sparkles, X, Check, Heart, MapPin, Briefcase, Baby, Upload, Mail, Phone, Wallet, PlusCircle, ArrowUpRight, DollarSign, CreditCard, Smartphone } from 'lucide-react';
+import { User as UserIcon, ShieldCheck, Camera, Sparkles, X, Check, Heart, MapPin, Briefcase, Baby, Upload, Mail, Phone, Wallet, PlusCircle, ArrowUpRight, DollarSign, CreditCard, Smartphone, Building2, Landmark } from 'lucide-react';
 import { User, DatingIntent } from '../types';
-import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
+import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getCitiesByProvince, getSubLocationsForCity, getProvinceForCity } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
 import { capitalizeName } from '../utils/format';
 
@@ -24,10 +24,15 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   const [name, setName] = useState(currentUser?.name || '');
   const [email, setEmail] = useState(currentUser?.email || '');
   const [age, setAge] = useState(currentUser?.age || 25);
-  const [city, setCity] = useState(currentUser?.city || 'Harare');
+  const initialCity = currentUser?.city || 'Harare';
+  const initialProv = currentUser?.province || getProvinceForCity(initialCity) || 'Harare Metropolitan';
+
+  const [province, setProvince] = useState<string>(initialProv);
+  const [city, setCity] = useState(initialCity);
   const [subLocation, setSubLocation] = useState(currentUser?.subLocation || 'Borrowdale');
   const [childrenCount, setChildrenCount] = useState<number>(currentUser?.childrenCount ?? 0);
   const [intent, setIntent] = useState<DatingIntent>(currentUser?.intent || 'Marriage');
+  const [hivStatus, setHivStatus] = useState<string>(currentUser?.hivStatus ? (currentUser.hivStatus.includes('+') ? 'HIV+' : 'HIV-') : 'HIV-');
   const [bio, setBio] = useState(currentUser?.bio || '');
   const [whatsappNumber, setWhatsappNumber] = useState(currentUser?.whatsappNumber || '+263 77 123 4567');
   const [gender, setGender] = useState<'female' | 'male' | 'non-binary'>(currentUser?.gender || 'female');
@@ -54,10 +59,14 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
       setName(currentUser.name || '');
       setEmail(currentUser.email || '');
       setAge(currentUser.age || 25);
-      setCity(currentUser.city || 'Harare');
+      const curCity = currentUser.city || 'Harare';
+      const curProv = currentUser.province || getProvinceForCity(curCity) || 'Harare Metropolitan';
+      setProvince(curProv);
+      setCity(curCity);
       setSubLocation(currentUser.subLocation || 'Borrowdale');
       setChildrenCount(currentUser.childrenCount ?? 0);
       setIntent(currentUser.intent || 'Marriage');
+      setHivStatus(currentUser.hivStatus ? (currentUser.hivStatus.includes('+') ? 'HIV+' : 'HIV-') : 'HIV-');
       setBio(currentUser.bio || '');
       setWhatsappNumber(currentUser.whatsappNumber || '+263 77 123 4567');
       setGender(currentUser.gender || 'female');
@@ -69,9 +78,34 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
     }
   }, [currentUser]);
 
+  // Available cities for chosen province
+  const availableCities = getCitiesByProvince(province);
+
   // Available sub-locations for chosen city
   const activeCityData = ZIMBABWE_LOCATIONS.find(l => l.city.toLowerCase() === city.toLowerCase());
   const availableSubLocations = activeCityData ? activeCityData.subLocations : ['CBD'];
+
+  // Handle Province change
+  const handleProvinceChange = (newProv: string) => {
+    setProvince(newProv);
+    const citiesInProv = getCitiesByProvince(newProv);
+    if (citiesInProv.length > 0) {
+      const firstCity = citiesInProv[0];
+      setCity(firstCity.city);
+      setSubLocation(firstCity.subLocations.length > 0 ? firstCity.subLocations[0] : 'Central');
+    }
+  };
+
+  // Handle City change
+  const handleCityChange = (newCity: string) => {
+    setCity(newCity);
+    const autoProv = getProvinceForCity(newCity);
+    if (autoProv) setProvince(autoProv);
+    const cityData = ZIMBABWE_LOCATIONS.find(l => l.city.toLowerCase() === newCity.toLowerCase());
+    if (cityData && cityData.subLocations.length > 0) {
+      setSubLocation(cityData.subLocations[0]);
+    }
+  };
 
   if (!isOpen || !currentUser) return null;
 
@@ -131,18 +165,20 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const interests = interestsText.split(',').map(i => i.trim()).filter(Boolean);
-    const fullLocation = `${city} (${subLocation}), Zimbabwe`;
+    const fullLocation = `${city} (${subLocation}), ${province}, Zimbabwe`;
     const photos = [photo1, photo2, photo3].filter(Boolean);
     const formattedName = capitalizeName(name);
     onSaveProfile({
       name: formattedName,
       email,
       age: Number(age),
+      province,
       city,
       subLocation,
       location: fullLocation,
       childrenCount: Number(childrenCount),
       intent,
+      hivStatus,
       bio,
       whatsappNumber,
       gender,
@@ -588,47 +624,72 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 </select>
               </div>
 
-              {/* Zimbabwe City */}
-              <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  📍 Zimbabwe City
-                </label>
-                <select
-                  value={city}
-                  onChange={e => {
-                    const nextCity = e.target.value;
-                    setCity(nextCity);
-                    const nextData = ZIMBABWE_LOCATIONS.find(l => l.city === nextCity);
-                    if (nextData && nextData.subLocations.length > 0) {
-                      setSubLocation(nextData.subLocations[0]);
-                    }
-                  }}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
-                >
-                  {ZIMBABWE_LOCATIONS.map(loc => (
-                    <option key={loc.city} value={loc.city}>
-                      {loc.city}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* 3-Tier Zimbabwe Location Selector */}
+              <div className="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-4 space-y-3 sm:col-span-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                    <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                    Zimbabwe Location (Province → City → Suburb)
+                  </span>
+                  <span className="text-[10px] font-bold text-amber-400/90 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                    {province}
+                  </span>
+                </div>
 
-              {/* Sub-location / Suburb */}
-              <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  🏘️ Sub-location / Suburb
-                </label>
-                <select
-                  value={subLocation}
-                  onChange={e => setSubLocation(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
-                >
-                  {availableSubLocations.map(sub => (
-                    <option key={sub} value={sub}>
-                      {sub}
-                    </option>
-                  ))}
-                </select>
+                {/* 1. Zimbabwe Province */}
+                <div>
+                  <label className="block font-bold text-slate-400 uppercase tracking-wider text-[10px] mb-1">
+                    🏛️ 1. Province (10 Provinces)
+                  </label>
+                  <select
+                    value={province}
+                    onChange={e => handleProvinceChange(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-semibold focus:outline-none focus:border-amber-500"
+                  >
+                    {ZIMBABWE_PROVINCES.map(p => (
+                      <option key={p.name} value={p.name}>
+                        {p.name} ({p.citiesCount} urban centres)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. City & 3. Suburb */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-400 uppercase tracking-wider text-[10px] mb-1">
+                      📍 2. City / Town / Centre
+                    </label>
+                    <select
+                      value={city}
+                      onChange={e => handleCityChange(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-semibold focus:outline-none focus:border-amber-500"
+                    >
+                      {availableCities.map(loc => (
+                        <option key={loc.city} value={loc.city}>
+                          {loc.city} ({loc.type || 'Town'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-400 uppercase tracking-wider text-[10px] mb-1">
+                      🏘️ 3. Sub-location / Suburb
+                    </label>
+                    <select
+                      value={subLocation}
+                      onChange={e => setSubLocation(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-semibold focus:outline-none focus:border-amber-500"
+                    >
+                      {availableSubLocations.map(sub => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {/* Dating Intent: Marriage or Funny */}
@@ -643,6 +704,21 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 >
                   <option value="Marriage">💍 Seeking Marriage</option>
                   <option value="Funny">😂 Funny & Good Vibe</option>
+                </select>
+              </div>
+
+              {/* HIV Status */}
+              <div>
+                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  🩺 HIV Status
+                </label>
+                <select
+                  value={hivStatus}
+                  onChange={e => setHivStatus(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 font-bold rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-rose-500"
+                >
+                  <option value="HIV-">🛡️ HIV- (Negative)</option>
+                  <option value="HIV+">💜 HIV+ (Positive)</option>
                 </select>
               </div>
 

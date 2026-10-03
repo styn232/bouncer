@@ -15,6 +15,7 @@ export interface SingleProfile {
   name: string;
   age: number;
   location: string; // full display location string e.g. "Harare (Borrowdale), Zimbabwe"
+  province?: string; // e.g. "Harare Metropolitan", "Midlands", etc.
   city?: string; // e.g. "Harare"
   subLocation?: string; // e.g. "Borrowdale"
   bio: string;
@@ -32,6 +33,7 @@ export interface SingleProfile {
   compatibilityScore: number; // e.g. 98
   height: string;
   relationshipGoal: string; // e.g. "Marriage", "VIP Lounge dates", etc.
+  hivStatus?: string; // e.g. "Negative", "Positive", "Undisclosed"
   isFeatured?: boolean;
   isNew?: boolean;
   viewsCount?: number;
@@ -70,6 +72,7 @@ export interface User {
   name: string;
   age: number;
   location: string;
+  province?: string;
   city?: string;
   subLocation?: string;
   role: 'user' | 'admin';
@@ -83,6 +86,7 @@ export interface User {
   seeking?: 'female' | 'male' | 'everyone';
   childrenCount?: number;
   intent?: DatingIntent;
+  hivStatus?: string;
   interests?: string[];
   purchasedProfileIds?: string[]; // IDs of profile WhatsApp numbers unlocked after payment
   unlockedSinglesCount?: number; // Total number of singles unlocked
@@ -290,5 +294,22 @@ export interface NotificationItem {
   type: 'like' | 'match' | 'message' | 'verification' | 'system';
   read: boolean;
   createdAt: string;
+  targetGender?: 'male' | 'female' | 'all';
+  gender?: 'male' | 'female' | string;
+  photo?: string;
+  profileId?: string;
+}
+
+// Centralized Loading and Synchronization State
+export interface CentralizedLoadingState {
+  isInitialLoading: boolean;      // Initial app bootstrapping
+  isProfilesLoading: boolean;     // First load of profiles (grid is empty)
+  isFilterUpdating: boolean;      // Non-blocking filter / search update
+  isBackgroundSyncing: boolean;   // Silent background sync (social, transactions, orders, stats)
+  isSocialLoading: boolean;       // Social data loading
+  isActionLoading: boolean;       // Mutation or action in progress
+  activeRequestsCount: number;    // Number of active network requests
+  lastSyncedAt: Date | null;      // Last sync completion timestamp
+  error?: string | null;          // Last network error if any
 }
 

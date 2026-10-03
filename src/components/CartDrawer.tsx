@@ -85,8 +85,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           reference: ref, 
-          profileIds: cartItems.map(i => i.profileId),
-          autoApproveTest: autoApprove || isTestMode
+          profileIds: cartItems.map(i => i.profileId)
         })
       });
       const data = await res.json();

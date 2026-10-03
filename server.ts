@@ -17,6 +17,7 @@ import {
   INITIAL_VERIFICATIONS
 } from './src/data/mockData';
 import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, VerificationSubmission, ReportItem, AdCampaign, NotificationItem, SiteSettings } from './src/types';
+import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getProvinceForCity, ZIMBABWE_LOCATIONS_CSV } from './src/data/zimbabweLocations';
 import { Paynow } from 'paynow';
 
 function capitalizeName(str?: string): string {
@@ -35,193 +36,7 @@ function capitalizeName(str?: string): string {
     .join(' ');
 }
 
-const DEFAULT_STARTER_PROFILES: SingleProfile[] = [
-  {
-    id: 'p_chiedza',
-    name: 'Chiedza Moyo',
-    age: 26,
-    city: 'Harare',
-    subLocation: 'Avondale',
-    location: 'Harare (Avondale), Zimbabwe',
-    childrenCount: 0,
-    intent: 'Marriage',
-    gender: 'female',
-    seeking: 'male',
-    whatsappNumber: '+263 77 234 5678',
-    bio: 'Software engineer passionate about family, faith, culture and good coffee. Looking for someone genuine and intentional.',
-    photos: [
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=800'
-    ],
-    interests: ['Tech', 'Faith', 'Coffee', 'Travel'],
-    bouncerStatus: 'verified',
-    bouncerNotes: 'Physical ID & selfie cross-verified by Bouncer Team.',
-    compatibilityScore: 97,
-    height: "5'7\"",
-    relationshipGoal: 'Marriage & Building a Family',
-    isOnline: true,
-    isFeatured: true,
-    averageRating: 5.0,
-    reviews: [
-      {
-        id: 'rev_1',
-        reviewerName: 'Tendai C.',
-        rating: 5,
-        comment: 'Very polite, genuine, and authentic person. Bouncer clearance gave me total peace of mind.',
-        createdAt: new Date().toISOString()
-      }
-    ],
-    viewsCount: 0,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'p_tendai',
-    name: 'Tendai Chiweshe',
-    age: 29,
-    city: 'Harare',
-    subLocation: 'Borrowdale',
-    location: 'Harare (Borrowdale), Zimbabwe',
-    childrenCount: 0,
-    intent: 'Marriage',
-    gender: 'male',
-    seeking: 'female',
-    whatsappNumber: '+263 78 345 6789',
-    bio: 'Architect & entrepreneur who values meaningful conversation, fitness, and family foundations. Ready for true long-term love.',
-    photos: [
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=800'
-    ],
-    interests: ['Architecture', 'Fitness', 'Fine Dining', 'Business'],
-    bouncerStatus: 'vip_approved',
-    bouncerNotes: 'VIP Verified member. Identity, profession & background confirmed.',
-    compatibilityScore: 95,
-    height: "6'1\"",
-    relationshipGoal: 'Marriage',
-    isOnline: true,
-    isFeatured: true,
-    averageRating: 5.0,
-    reviews: [],
-    viewsCount: 0,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'p_tariro',
-    name: 'Tariro Ndlovu',
-    age: 24,
-    city: 'Bulawayo',
-    subLocation: 'Kumalo',
-    location: 'Bulawayo (Kumalo), Zimbabwe',
-    childrenCount: 0,
-    intent: 'Marriage',
-    gender: 'female',
-    seeking: 'male',
-    whatsappNumber: '+263 71 456 7890',
-    bio: 'Chartered accountant with a love for literature, acoustic music, and laughter. Looking for my best friend and partner.',
-    photos: [
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&q=80&w=800'
-    ],
-    interests: ['Reading', 'Acoustic Music', 'Baking', 'Finance'],
-    bouncerStatus: 'verified',
-    bouncerNotes: 'Bouncer verified with photo & live verification.',
-    compatibilityScore: 93,
-    height: "5'6\"",
-    relationshipGoal: 'Serious Relationship leading to Marriage',
-    isOnline: false,
-    isFeatured: false,
-    averageRating: 4.9,
-    reviews: [],
-    viewsCount: 0,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'p_farai',
-    name: 'Farai Mukamuri',
-    age: 31,
-    city: 'Harare',
-    subLocation: 'Mount Pleasant',
-    location: 'Harare (Mount Pleasant), Zimbabwe',
-    childrenCount: 1,
-    intent: 'Marriage',
-    gender: 'male',
-    seeking: 'female',
-    whatsappNumber: '+263 77 567 8901',
-    bio: 'Dedicated pediatrician and loving father of one. Looking for a compassionate partner with deep family values.',
-    photos: [
-      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=800'
-    ],
-    interests: ['Medicine', 'Cooking', 'Outdoors', 'Jazz'],
-    bouncerStatus: 'verified',
-    bouncerNotes: 'Medical professional credentials & identity verified.',
-    compatibilityScore: 91,
-    height: "5'11\"",
-    relationshipGoal: 'Marriage',
-    isOnline: true,
-    isFeatured: false,
-    averageRating: 5.0,
-    reviews: [],
-    viewsCount: 0,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'p_ruvarashe',
-    name: 'Ruvarashe Gumbo',
-    age: 27,
-    city: 'Mutare',
-    subLocation: 'Morningside',
-    location: 'Mutare (Morningside), Zimbabwe',
-    childrenCount: 0,
-    intent: 'Funny',
-    gender: 'female',
-    seeking: 'male',
-    whatsappNumber: '+263 78 678 9012',
-    bio: 'Graphic designer who loves spontaneous road trips, humor, photography, and good vibes!',
-    photos: [
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=800'
-    ],
-    interests: ['Graphic Design', 'Photography', 'Travel', 'Comedy'],
-    bouncerStatus: 'verified',
-    bouncerNotes: 'Verified Single by Bouncer security check.',
-    compatibilityScore: 94,
-    height: "5'5\"",
-    relationshipGoal: 'Genuine connections & good vibes',
-    isOnline: false,
-    isFeatured: false,
-    averageRating: 4.8,
-    reviews: [],
-    viewsCount: 0,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'p_takudzwa',
-    name: 'Takudzwa Sibanda',
-    age: 30,
-    city: 'Victoria Falls',
-    subLocation: 'Chinotimba',
-    location: 'Victoria Falls (Chinotimba), Zimbabwe',
-    childrenCount: 0,
-    intent: 'Marriage',
-    gender: 'male',
-    seeking: 'female',
-    whatsappNumber: '+263 77 789 0123',
-    bio: 'Eco-tourism specialist & safari guide. Love nature, fitness, and building a peaceful, grounded life with someone special.',
-    photos: [
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=800'
-    ],
-    interests: ['Eco-tourism', 'Wildlife', 'Hiking', 'Cooking'],
-    bouncerStatus: 'verified',
-    bouncerNotes: 'Bouncer identity verified & cleared.',
-    compatibilityScore: 96,
-    height: "6'0\"",
-    relationshipGoal: 'Marriage',
-    isOnline: true,
-    isFeatured: true,
-    averageRating: 5.0,
-    reviews: [],
-    viewsCount: 0,
-    createdAt: new Date().toISOString()
-  }
-];
+const DEFAULT_STARTER_PROFILES: SingleProfile[] = [];
 
 async function startServer() {
   const app = express();
@@ -322,12 +137,8 @@ async function startServer() {
   let ads: AdCampaign[] = [...INITIAL_ADS];
   let verifications: VerificationSubmission[] = [...INITIAL_VERIFICATIONS];
   let reports: ReportItem[] = [];
-  let userLikes: Record<string, string[]> = {
-    'usr_demo': ['p_tendai']
-  };
-  let userMatches: Record<string, string[]> = {
-    'usr_demo': ['p_tendai']
-  };
+  let userLikes: Record<string, string[]> = {};
+  let userMatches: Record<string, string[]> = {};
 
   function loadPersistentData() {
     try {
@@ -688,23 +499,29 @@ async function startServer() {
   });
 
   app.post('/api/auth/register', (req, res) => {
-    const { email, name, age, city, subLocation, location, gender, childrenCount, intent, bio, whatsappNumber } = req.body;
+    const { email, name, age, province, city, subLocation, location, gender, childrenCount, intent, bio, whatsappNumber, hivStatus } = req.body;
     if (!email || !name) {
       return res.status(400).json({ error: 'Name and email are required.' });
     }
 
     const formattedName = capitalizeName(name);
+    const normalizedHiv = hivStatus && (hivStatus.includes('+') || hivStatus.toLowerCase().includes('pos')) ? 'HIV+' : 'HIV-';
+    const selectedCity = city || 'Harare';
+    const selectedSubLocation = subLocation || 'Borrowdale';
+    const selectedProvince = province || getProvinceForCity(selectedCity);
 
     const newUser: User = {
       id: `usr_${Date.now()}`,
       email,
       name: formattedName,
       age: Number(age) || 25,
-      city: city || 'Harare',
-      subLocation: subLocation || 'Borrowdale',
-      location: location || `${city || 'Harare'} (${subLocation || 'Borrowdale'}), Zimbabwe`,
+      province: selectedProvince,
+      city: selectedCity,
+      subLocation: selectedSubLocation,
+      location: location || `${selectedCity} (${selectedSubLocation}), Zimbabwe`,
       childrenCount: Number(childrenCount) || 0,
       intent: intent || 'Marriage',
+      hivStatus: normalizedHiv,
       role: 'user',
       subscriptionPlan: 'free',
       subscriptionStatus: 'active',
@@ -726,11 +543,13 @@ async function startServer() {
       id: `p_${Date.now()}`,
       name: newUser.name,
       age: newUser.age,
+      province: newUser.province,
       city: newUser.city,
       subLocation: newUser.subLocation,
       location: newUser.location,
       childrenCount: newUser.childrenCount,
       intent: newUser.intent,
+      hivStatus: newUser.hivStatus,
       seeking: newUser.gender === 'male' ? 'female' : 'male',
       bio: newUser.bio || 'Recently joined single seeking genuine connections.',
       whatsappNumber: newUser.whatsappNumber,
@@ -750,15 +569,39 @@ async function startServer() {
 
     profiles.unshift(newProfile);
 
-    // Broadcast notification to ALL users when new single registers
+    // Broadcast gender-targeted notification:
+    // If male registered -> send to females!
+    // If female registered -> send to males!
+    const regGender = (newUser.gender || 'female').toLowerCase();
+    const isMale = regGender === 'male';
+    const isFemale = regGender === 'female';
+    const targetGender: 'male' | 'female' | 'all' = isMale ? 'female' : (isFemale ? 'male' : 'all');
+
+    const regCity = newUser.city || newUser.subLocation || 'Harare';
+    const regAge = newUser.age || 25;
+
+    const notifTitle = isMale
+      ? '❤️ New Gentleman Alert!'
+      : (isFemale ? '❤️ New Lady Alert!' : '❤️ New Single Alert!');
+
+    const notifMessage = isMale
+      ? `A new gentleman (${regAge}, ${regCity}) has just registered! Check out his profile.`
+      : (isFemale 
+          ? `A new lady (${regAge}, ${regCity}) has just registered! Check out her profile.`
+          : `New Single, ${regAge} and ${regCity} has signed up`);
+
     const newNotif: NotificationItem = {
       id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       userId: 'all',
-      title: '🔥 New Single Joined!',
-      message: `${newUser.name}, ${newUser.age} from ${newUser.location} just joined Dating With Bouncer! Check out their profile.`,
+      title: notifTitle,
+      message: notifMessage,
       type: 'system',
       read: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      targetGender,
+      gender: regGender as any,
+      profileId: newProfile.id,
+      photo: newProfile.photos?.[0] || currentUser.avatar
     };
     notifications.unshift(newNotif);
     saveAppData();
@@ -767,14 +610,18 @@ async function startServer() {
   });
 
   app.put('/api/auth/profile', (req, res) => {
-    const { name, email, whatsappNumber, age, city, subLocation, childrenCount, intent, location, bio, gender, seeking, interests, avatar, photos, bouncerVerified } = req.body;
+    const { name, email, whatsappNumber, age, province, city, subLocation, childrenCount, intent, location, bio, gender, seeking, interests, avatar, photos, bouncerVerified, hivStatus } = req.body;
     if (!currentUser) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
+    const selectedCity = city || currentUser.city || 'Harare';
+    const selectedSubLocation = subLocation || currentUser.subLocation || 'Borrowdale';
+    const selectedProvince = province || (city ? getProvinceForCity(city) : (currentUser.province || getProvinceForCity(selectedCity)));
     const fullLocation = location || (city && subLocation ? `${city} (${subLocation}), Zimbabwe` : currentUser.location);
     const validPhotos = Array.isArray(photos) && photos.length > 0 ? photos : (avatar ? [avatar] : undefined);
     const formattedName = name ? capitalizeName(name) : undefined;
+    const normalizedHiv = hivStatus ? (hivStatus.includes('+') || hivStatus.toLowerCase().includes('pos') ? 'HIV+' : 'HIV-') : undefined;
 
     currentUser = {
       ...currentUser,
@@ -782,10 +629,12 @@ async function startServer() {
       ...(email && { email }),
       ...(whatsappNumber && { whatsappNumber }),
       ...(age && { age: Number(age) }),
+      province: selectedProvince,
       ...(city && { city }),
       ...(subLocation && { subLocation }),
       ...(childrenCount !== undefined && { childrenCount: Number(childrenCount) }),
       ...(intent && { intent }),
+      ...(normalizedHiv && { hivStatus: normalizedHiv }),
       location: fullLocation,
       ...(bio && { bio }),
       ...(gender && { gender }),
@@ -813,11 +662,13 @@ async function startServer() {
         ...profiles[pIdx],
         name: currentUser.name,
         age: currentUser.age,
+        province: selectedProvince,
         city: currentUser.city || profiles[pIdx].city,
         subLocation: currentUser.subLocation || profiles[pIdx].subLocation,
         location: currentUser.location,
         childrenCount: currentUser.childrenCount ?? profiles[pIdx].childrenCount,
         intent: currentUser.intent || profiles[pIdx].intent,
+        hivStatus: currentUser.hivStatus || profiles[pIdx].hivStatus || 'HIV-',
         whatsappNumber: currentUser.whatsappNumber || profiles[pIdx].whatsappNumber,
         bio: currentUser.bio || profiles[pIdx].bio,
         gender: currentUser.gender || profiles[pIdx].gender,
@@ -831,11 +682,13 @@ async function startServer() {
         id: `p_${Date.now()}`,
         name: currentUser.name,
         age: currentUser.age,
+        province: selectedProvince,
         city: currentUser.city || 'Harare',
         subLocation: currentUser.subLocation || 'Borrowdale',
         location: currentUser.location,
         childrenCount: currentUser.childrenCount || 0,
         intent: currentUser.intent || 'Marriage',
+        hivStatus: currentUser.hivStatus || 'HIV-',
         bio: currentUser.bio || 'Single looking for love.',
         photos: validPhotos && validPhotos.length > 0 ? validPhotos : [currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'],
         interests: currentUser.interests || ['Coffee', 'Travel'],
@@ -860,17 +713,19 @@ async function startServer() {
   // API ROUTE 3: Profiles Endpoint (Name, Age, Location, Intent, Children, Bouncer Filters)
   app.get('/api/profiles', (req, res) => {
     let result = [...profiles];
-    const { search, gender, bouncerStatus, location, city, subLocation, minAge, maxAge, childrenCount, intent } = req.query;
+    const { search, gender, bouncerStatus, location, province, city, subLocation, minAge, maxAge, childrenCount, intent, hivStatus } = req.query;
 
     if (search) {
       const q = (search as string).toLowerCase().trim();
       result = result.filter(
         p => p.name.toLowerCase().includes(q) ||
              p.location.toLowerCase().includes(q) ||
+             (p.province && p.province.toLowerCase().includes(q)) ||
              (p.city && p.city.toLowerCase().includes(q)) ||
              (p.subLocation && p.subLocation.toLowerCase().includes(q)) ||
              p.bio.toLowerCase().includes(q) ||
              p.intent.toLowerCase().includes(q) ||
+             (p.hivStatus && p.hivStatus.toLowerCase().includes(q)) ||
              (p.relationshipGoal && p.relationshipGoal.toLowerCase().includes(q)) ||
              (p.bouncerStatus && p.bouncerStatus.toLowerCase().includes(q)) ||
              (p.interests && p.interests.some(i => i.toLowerCase().includes(q)))
@@ -883,6 +738,14 @@ async function startServer() {
 
     if (bouncerStatus && bouncerStatus !== 'all') {
       result = result.filter(p => p.bouncerStatus === bouncerStatus);
+    }
+
+    if (province && province !== 'all') {
+      const targetProv = (province as string).toLowerCase().trim();
+      result = result.filter(p => {
+        const prov = (p.province || getProvinceForCity(p.city)).toLowerCase().trim();
+        return prov === targetProv;
+      });
     }
 
     if (city && city !== 'all') {
@@ -921,6 +784,17 @@ async function startServer() {
       result = result.filter(p => p.intent === intent);
     }
 
+    if (hivStatus && hivStatus !== 'all') {
+      const target = (hivStatus as string).toLowerCase().trim();
+      if (target.includes('+') || target.includes('pos')) {
+        result = result.filter(p => p.hivStatus && (p.hivStatus.includes('+') || p.hivStatus.toLowerCase().includes('pos')));
+      } else if (target.includes('-') || target.includes('neg')) {
+        result = result.filter(p => p.hivStatus && (p.hivStatus.includes('-') || p.hivStatus.toLowerCase().includes('neg')));
+      } else {
+        result = result.filter(p => p.hivStatus && p.hivStatus.toLowerCase() === target);
+      }
+    }
+
     // Mask/hide WhatsApp contact numbers from public API response unless caller is Admin
     const sanitizedResult = result.map(p => {
       if (currentUser && currentUser.role === 'admin') {
@@ -934,6 +808,17 @@ async function startServer() {
     });
 
     res.json(sanitizedResult);
+  });
+
+  // API ROUTE 3b: Zimbabwe Location Database & CSV export
+  app.get('/api/locations', (req, res) => {
+    res.json({
+      provinces: ZIMBABWE_PROVINCES,
+      locations: ZIMBABWE_LOCATIONS,
+      totalCities: ZIMBABWE_LOCATIONS.length,
+      totalSubLocations: ZIMBABWE_LOCATIONS.reduce((acc, curr) => acc + curr.subLocations.length, 0),
+      csv: ZIMBABWE_LOCATIONS_CSV
+    });
   });
 
   app.get('/api/profiles/:id', (req, res) => {
@@ -980,20 +865,26 @@ async function startServer() {
 
   // Admin / User Add Profile
   app.post('/api/profiles', (req, res) => {
-    const { name, age, location, city, subLocation, childrenCount, intent, bio, photos, interests, gender, seeking, height, relationshipGoal, bouncerStatus, bouncerNotes, whatsappNumber } = req.body;
+    const { name, age, location, province, city, subLocation, childrenCount, intent, bio, photos, interests, gender, seeking, height, relationshipGoal, bouncerStatus, bouncerNotes, whatsappNumber, hivStatus } = req.body;
     if (!name || !age || !location) {
       return res.status(400).json({ error: 'Name, Age, and Location are required.' });
     }
+
+    const selectedCity = city || 'Harare';
+    const selectedSubLocation = subLocation || 'Avondale';
+    const selectedProvince = province || getProvinceForCity(selectedCity);
 
     const newProfile: SingleProfile = {
       id: `p_${Date.now()}`,
       name,
       age: Number(age),
       location,
-      city: city || 'Harare',
-      subLocation: subLocation || 'Avondale',
+      province: selectedProvince,
+      city: selectedCity,
+      subLocation: selectedSubLocation,
       childrenCount: childrenCount !== undefined ? Number(childrenCount) : 0,
       intent: intent || 'Marriage',
+      hivStatus: hivStatus ? (hivStatus.includes('+') ? 'HIV+' : 'HIV-') : 'HIV-',
       reviews: [],
       averageRating: 5.0,
       bio: bio || 'Fresh profile on Dating with Bouncer.',
@@ -1014,15 +905,39 @@ async function startServer() {
 
     profiles.unshift(newProfile);
 
-    // Broadcast notification to ALL users
+    // Broadcast gender-targeted notification:
+    // If male registered -> send to females!
+    // If female registered -> send to males!
+    const singleGender = (newProfile.gender || 'female').toLowerCase();
+    const isMale = singleGender === 'male';
+    const isFemale = singleGender === 'female';
+    const targetGender: 'male' | 'female' | 'all' = isMale ? 'female' : (isFemale ? 'male' : 'all');
+
+    const singleCity = newProfile.city || newProfile.location || 'Harare';
+    const singleAge = newProfile.age || 25;
+
+    const notifTitle = isMale
+      ? '❤️ New Gentleman Alert!'
+      : (isFemale ? '❤️ New Lady Alert!' : '❤️ New Single Alert!');
+
+    const notifMessage = isMale
+      ? `A new gentleman (${singleAge}, ${singleCity}) has just registered! Check out his profile.`
+      : (isFemale
+          ? `A new lady (${singleAge}, ${singleCity}) has just registered! Check out her profile.`
+          : `New Single, ${singleAge} and ${singleCity} has signed up`);
+
     const newNotif: NotificationItem = {
       id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       userId: 'all',
-      title: '🔥 New Single Joined!',
-      message: `${newProfile.name}, ${newProfile.age} from ${newProfile.location} just joined Dating With Bouncer! Check out their profile.`,
+      title: notifTitle,
+      message: notifMessage,
       type: 'system',
       read: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      targetGender,
+      gender: singleGender as any,
+      profileId: newProfile.id,
+      photo: newProfile.photos?.[0]
     };
     notifications.unshift(newNotif);
     saveAppData();
@@ -1066,7 +981,15 @@ async function startServer() {
     if (idx === -1) {
       return res.status(404).json({ error: 'Profile not found' });
     }
-    profiles[idx] = { ...profiles[idx], ...req.body };
+    const currentProf = profiles[idx];
+    const newCity = req.body.city || currentProf.city;
+    const newProv = req.body.province || (req.body.city ? getProvinceForCity(req.body.city) : currentProf.province || getProvinceForCity(newCity));
+
+    profiles[idx] = {
+      ...currentProf,
+      ...req.body,
+      province: newProv
+    };
     saveAppData();
     res.json({ success: true, profile: profiles[idx] });
   });
@@ -1202,6 +1125,7 @@ async function startServer() {
       location,
       childrenCount,
       intent,
+      hivStatus,
       bio,
       gender,
       seeking,
@@ -1272,6 +1196,7 @@ async function startServer() {
       location: fullLocation,
       ...(childrenCount !== undefined && { childrenCount: Number(childrenCount) }),
       ...(intent && { intent }),
+      ...(hivStatus && { hivStatus }),
       ...(bio !== undefined && { bio }),
       ...(gender && { gender }),
       ...(seeking && { seeking }),
@@ -1296,6 +1221,7 @@ async function startServer() {
         location: users[uIdx].location,
         childrenCount: users[uIdx].childrenCount ?? profiles[pIdx].childrenCount,
         intent: users[uIdx].intent || profiles[pIdx].intent,
+        hivStatus: users[uIdx].hivStatus || profiles[pIdx].hivStatus,
         whatsappNumber: users[uIdx].whatsappNumber || profiles[pIdx].whatsappNumber,
         bio: users[uIdx].bio || profiles[pIdx].bio,
         gender: users[uIdx].gender || profiles[pIdx].gender,
@@ -1624,7 +1550,7 @@ async function startServer() {
   // POST /api/payment/verify-and-get-numbers - Returns WhatsApp contact numbers ONLY after Paynow confirms Paid
   app.post('/api/payment/verify-and-get-numbers', async (req, res) => {
     try {
-      const { reference, profileIds, autoApproveTest } = req.body;
+      const { reference, profileIds } = req.body;
 
       if (!reference) {
         return res.status(400).json({ success: false, paid: false, error: 'Reference parameter is required' });
@@ -1633,11 +1559,6 @@ async function startServer() {
       const tx = transactions.find(t => t.reference === reference || t.id === reference);
       if (!tx) {
         return res.status(404).json({ success: false, paid: false, error: 'Transaction reference not found' });
-      }
-
-      // If test mode or autoApproveTest requested, auto-succeed test payment
-      if (tx.status !== 'succeeded' && (autoApproveTest || IS_PAYNOW_TEST_MODE)) {
-        activateUserSubscription(tx);
       }
 
       // If transaction is not marked succeeded yet and has a pollUrl, poll Paynow
@@ -2205,8 +2126,38 @@ async function startServer() {
   // ==========================================
   // NOTIFICATIONS ENDPOINTS
   // ==========================================
-  app.get('/api/notifications', (_req, res) => {
-    res.json(notifications);
+  app.get('/api/notifications', (req, res) => {
+    const userGender = (req.query.gender as string)?.toLowerCase();
+    const userId = req.query.userId as string;
+    const role = req.query.role as string;
+
+    // Admins see all notifications
+    if (role === 'admin') {
+      return res.json(notifications);
+    }
+
+    // Filter notifications based on targetGender:
+    // If a male registered, targetGender is 'female' -> only sent to females
+    // If a female registered, targetGender is 'male' -> only sent to males
+    const filtered = notifications.filter(n => {
+      // Direct personal notifications for this user
+      if (n.userId && n.userId !== 'all') {
+        return n.userId === userId;
+      }
+
+      // If notification has a specific target gender:
+      if (n.targetGender && n.targetGender !== 'all') {
+        if (userGender) {
+          return n.targetGender === userGender;
+        }
+        // Visitor without selected gender sees all or general
+        return true;
+      }
+
+      return true;
+    });
+
+    res.json(filtered);
   });
 
   app.post('/api/notifications/:id/read', (req, res) => {
@@ -2214,6 +2165,48 @@ async function startServer() {
     if (notif) notif.read = true;
     saveAppData();
     res.json({ success: true });
+  });
+
+  app.post('/api/notifications/clear', (_req, res) => {
+    notifications = [];
+    saveAppData();
+    res.json({ success: true });
+  });
+
+  app.post('/api/notifications/test-new-single', (req, res) => {
+    const age = Number(req.body?.age) || 24;
+    const location = req.body?.city || req.body?.location || 'Harare';
+    const gender = ((req.body?.gender as string) || 'male').toLowerCase();
+    const isMale = gender === 'male';
+    const isFemale = gender === 'female';
+    const targetGender: 'male' | 'female' | 'all' = isMale ? 'female' : (isFemale ? 'male' : 'all');
+
+    const notifTitle = isMale
+      ? '❤️ New Gentleman Alert!'
+      : (isFemale ? '❤️ New Lady Alert!' : '❤️ New Single Alert!');
+
+    const notifMessage = isMale
+      ? `A new gentleman (${age}, ${location}) has just registered! Check out his profile.`
+      : (isFemale
+          ? `A new lady (${age}, ${location}) has just registered! Check out her profile.`
+          : `New Single, ${age} and ${location} has signed up`);
+
+    const testNotif: NotificationItem = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      userId: 'all',
+      title: notifTitle,
+      message: notifMessage,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString(),
+      targetGender,
+      gender: gender as any,
+      profileId: req.body?.profileId,
+      photo: req.body?.photo || (isMale ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400' : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400')
+    };
+    notifications.unshift(testNotif);
+    saveAppData();
+    res.json({ success: true, notification: testNotif });
   });
 
   // ==========================================

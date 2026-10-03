@@ -53,6 +53,17 @@ export function formatFullName(firstName?: string, surname?: string, maxLength: 
 }
 
 /**
+ * Normalizes and formats HIV status strictly to "HIV+" or "HIV-"
+ * Handles legacy values like "Negative", "Positive", "HIV-", "HIV+", etc.
+ */
+export function formatHivStatus(status?: string): 'HIV+' | 'HIV-' {
+  if (!status) return 'HIV-';
+  const clean = status.trim().toLowerCase();
+  if (clean.includes('+') || clean.includes('pos')) return 'HIV+';
+  return 'HIV-';
+}
+
+/**
  * Mask WhatsApp number for non-subscribers while clearly demonstrating it is verified & protected
  * Example: "+263 77 123 4567" -> "+263 77 ••• ••67"
  */

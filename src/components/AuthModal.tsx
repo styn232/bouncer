@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, X, User as UserIcon, Lock, Mail, Sparkles, Check, Baby, MapPin, Upload, Flame, Globe } from 'lucide-react';
-import { ZIMBABWE_LOCATIONS } from '../data/zimbabweLocations';
+import { ShieldCheck, X, User as UserIcon, Lock, Mail, Sparkles, Check, Baby, MapPin, Upload, Flame, Globe, HeartPulse, Building2, Landmark } from 'lucide-react';
+import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getCitiesByProvince, getSubLocationsForCity, getProvinceForCity } from '../data/zimbabweLocations';
 import { DatingIntent } from '../types';
 import { compressImageFile } from '../utils/imageCompressor';
 import { capitalizeName } from '../utils/format';
@@ -41,10 +41,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [age, setAge] = useState(25);
   const [gender, setGender] = useState('female');
   const [childrenCount, setChildrenCount] = useState(0);
+  const [province, setProvince] = useState<string>('Harare Metropolitan');
   const [city, setCity] = useState('Harare');
   const [subLocation, setSubLocation] = useState('Borrowdale');
   const [intent, setIntent] = useState<DatingIntent>('Marriage');
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [hivStatus, setHivStatus] = useState<'HIV-' | 'HIV+'>('HIV-');
   const [avatar, setAvatar] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
 
   // Admin form state
@@ -53,9 +55,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Available cities in chosen province
+  const availableCities = getCitiesByProvince(province);
+
   // Sub-locations for selected city
   const activeCityData = ZIMBABWE_LOCATIONS.find((l) => l.city.toLowerCase() === city.toLowerCase());
   const availableSubLocations = activeCityData ? activeCityData.subLocations : ['CBD'];
+
+  // Handle Province Change
+  const handleProvinceChange = (newProv: string) => {
+    setProvince(newProv);
+    const citiesInProv = getCitiesByProvince(newProv);
+    if (citiesInProv.length > 0) {
+      const firstCity = citiesInProv[0];
+      setCity(firstCity.city);
+      setSubLocation(firstCity.subLocations.length > 0 ? firstCity.subLocations[0] : 'Central');
+    }
+  };
+
+  // Handle City Change
+  const handleCityChange = (newCity: string) => {
+    setCity(newCity);
+    const autoProv = getProvinceForCity(newCity);
+    if (autoProv) setProvince(autoProv);
+    const cityData = ZIMBABWE_LOCATIONS.find((l) => l.city.toLowerCase() === newCity.toLowerCase());
+    if (cityData && cityData.subLocations.length > 0) {
+      setSubLocation(cityData.subLocations[0]);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -97,6 +124,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               name: fbUser.displayName || (userRole === 'admin' ? 'Bouncer Admin' : 'Member'),
               role: userRole,
               avatar: fbUser.photoURL || avatar,
+              hivStatus: 'HIV-',
               subscriptionPlan: userRole === 'admin' ? 'vip_15_singles' : 'free',
               bouncerVerified: userRole === 'admin',
               createdAt: new Date().toISOString()
@@ -326,7 +354,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           // Fallback to server registration
         }
 
-        const fullLocation = `${city} (${subLocation}), Zimbabwe`;
+        const fullLocation = `${city} (${subLocation}), ${province}, Zimbabwe`;
 
         // Save in Firestore
         const formattedName = capitalizeName(name);
@@ -339,10 +367,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             age: Number(age),
             gender,
             childrenCount: Number(childrenCount),
+            province,
             city,
             subLocation,
             location: fullLocation,
             intent,
+            hivStatus,
             whatsappNumber,
             avatar,
             role: 'user',
@@ -364,10 +394,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             age: Number(age),
             gender,
             childrenCount: Number(childrenCount),
+            province,
             city,
             subLocation,
             location: fullLocation,
             intent,
+            hivStatus,
             whatsappNumber,
             avatar
           })
@@ -841,46 +873,71 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* 3-Tier Zimbabwe Location Selector */}
+                <div className="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-3 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-extrabold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                      <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                      Zimbabwe Location
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {province}
+                    </span>
+                  </div>
+
+                  {/* 1. Province */}
                   <div>
-                    <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      📍 Zimbabwe City
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      🏛️ 1. Province (10 Provinces)
                     </label>
                     <select
-                      value={city}
-                      onChange={(e) => {
-                        const nextCity = e.target.value;
-                        setCity(nextCity);
-                        const nextData = ZIMBABWE_LOCATIONS.find((l) => l.city === nextCity);
-                        if (nextData && nextData.subLocations.length > 0) {
-                          setSubLocation(nextData.subLocations[0]);
-                        }
-                      }}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                      value={province}
+                      onChange={(e) => handleProvinceChange(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500 font-semibold"
                     >
-                      {ZIMBABWE_LOCATIONS.map((loc) => (
-                        <option key={loc.city} value={loc.city}>
-                          {loc.city}
+                      {ZIMBABWE_PROVINCES.map((p) => (
+                        <option key={p.name} value={p.name}>
+                          {p.name} ({p.citiesCount} urban centres)
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      🏘️ Sub-location
-                    </label>
-                    <select
-                      value={subLocation}
-                      onChange={(e) => setSubLocation(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                    >
-                      {availableSubLocations.map((sub) => (
-                        <option key={sub} value={sub}>
-                          {sub}
-                        </option>
-                      ))}
-                    </select>
+                  {/* 2. City & 3. Suburb in 2 Columns */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        📍 2. City / Town
+                      </label>
+                      <select
+                        value={city}
+                        onChange={(e) => handleCityChange(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500 font-semibold"
+                      >
+                        {availableCities.map((loc) => (
+                          <option key={loc.city} value={loc.city}>
+                            {loc.city} ({loc.type || 'Town'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        🏘️ 3. Suburb / Area
+                      </label>
+                      <select
+                        value={subLocation}
+                        onChange={(e) => setSubLocation(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-500 font-semibold"
+                      >
+                        {availableSubLocations.map((sub) => (
+                          <option key={sub} value={sub}>
+                            {sub}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -896,6 +953,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <option value="Marriage">💍 Seeking Marriage</option>
                     <option value="Funny">😂 Funny & Good Vibe</option>
                   </select>
+                </div>
+
+                {/* HIV STATUS SELECTION ON SIGN UP */}
+                <div className="bg-slate-950/90 border border-rose-900/40 rounded-2xl p-3.5 space-y-2">
+                  <label className="block font-bold text-rose-200 uppercase tracking-wider text-xs flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <HeartPulse className="w-4 h-4 text-rose-400" />
+                      <span>HIV Status</span>
+                      <span className="text-rose-500 font-black">*</span>
+                    </span>
+                    <span className="text-[10px] text-rose-300/70 font-normal">Choose HIV+ or HIV-</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setHivStatus('HIV-')}
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        hivStatus === 'HIV-'
+                          ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 ring-2 ring-emerald-500/40 shadow-sm'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-emerald-400/30" />
+                      <span>HIV-</span>
+                      <span className="text-[10px] opacity-75 font-normal">(Negative)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHivStatus('HIV+')}
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        hivStatus === 'HIV+'
+                          ? 'bg-purple-500/20 border-purple-400 text-purple-300 ring-2 ring-purple-500/40 shadow-sm'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full bg-purple-400 ring-2 ring-purple-400/30" />
+                      <span>HIV+</span>
+                      <span className="text-[10px] opacity-75 font-normal">(Positive)</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <Check className="w-3 h-3 text-rose-400 shrink-0" />
+                    <span>Honest HIV disclosure fosters safe, genuine dating on Dating with Bouncer.</span>
+                  </p>
                 </div>
               </>
             )}

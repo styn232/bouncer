@@ -1,1 +1,41 @@
 @import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #0e040c;
+    color: #fff1f2;
+    selection-background-color: #f43f5e;
+    selection-color: #ffffff;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Custom Romantic Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #140510;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #4a1532;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #e11d48;
+  }
+}
+
+/* Subtle Romantic Pulse & Glow Animations */
+@keyframes heartFloat {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.04);
+  }
+}
+
+.animate-romantic-pulse {
+  animation: heartFloat 3s ease-in-out infinite;
+}

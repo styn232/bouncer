@@ -1,12 +1,13 @@
 import React, { useRef } from 'react';
 import { motion } from 'motion/react';
-import { Crown, Sparkles, ChevronLeft, ChevronRight, MapPin, Star, Eye, UserCheck, Check, Lock, ShieldCheck } from 'lucide-react';
+import { Crown, Sparkles, ChevronLeft, ChevronRight, MapPin, Star, Eye, UserCheck, Check, Lock, ShieldCheck, Camera } from 'lucide-react';
 import { SingleProfile, User } from '../types';
 import { formatDisplayName, capitalizeName } from '../utils/format';
 
 interface FeaturedSinglesProps {
   profiles: SingleProfile[];
   onViewDetails: (profile: SingleProfile) => void;
+  onViewPhotos?: (profile: SingleProfile, initialIdx?: number) => void;
   onAddToCart?: (profile: SingleProfile) => void;
   cartProfileIds?: string[];
   currentUser?: User | null;
@@ -15,6 +16,7 @@ interface FeaturedSinglesProps {
 export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
   profiles,
   onViewDetails,
+  onViewPhotos,
   onAddToCart,
   cartProfileIds = [],
   currentUser
@@ -120,8 +122,12 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
             >
               {/* Photo Area */}
               <div
-                onClick={() => onViewDetails(profile)}
+                onClick={() => {
+                  if (onViewPhotos) onViewPhotos(profile);
+                  else onViewDetails(profile);
+                }}
                 className="relative aspect-[4/3] bg-slate-900 cursor-pointer overflow-hidden"
+                title="Tap to view photos"
               >
                 <img
                   src={profile.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
@@ -139,7 +145,13 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
                   </span>
                 </div>
 
-                <div className="absolute top-2 right-2">
+                <div className="absolute top-2 right-2 flex items-center gap-1">
+                  {(profile.photos?.length || 0) > 1 && (
+                    <span className="bg-slate-950/85 backdrop-blur-md text-slate-200 border border-slate-700 font-bold text-[9px] px-1.5 py-0.5 rounded-lg flex items-center gap-0.5">
+                      <Camera className="w-2.5 h-2.5 text-rose-400" />
+                      {profile.photos?.length}
+                    </span>
+                  )}
                   <span className="bg-slate-950/85 backdrop-blur-md text-amber-300 border border-amber-500/30 font-bold text-[9px] px-1.5 py-0.5 rounded-lg flex items-center gap-0.5">
                     <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
                     {(profile.averageRating || 5.0).toFixed(1)}
@@ -180,6 +192,17 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
 
                 {/* Bottom Quick Buttons */}
                 <div className="flex items-center gap-1.5 pt-2 border-t border-slate-800">
+                  {onViewPhotos && (
+                    <button
+                      type="button"
+                      onClick={() => onViewPhotos(profile)}
+                      className="px-2 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 text-[10px] font-extrabold uppercase flex items-center justify-center gap-1 transition-colors"
+                      title="View photos before choosing"
+                    >
+                      <Camera className="w-3 h-3 text-rose-400" />
+                      <span>Photos</span>
+                    </button>
+                  )}
                   {onAddToCart && (
                     <button
                       type="button"
