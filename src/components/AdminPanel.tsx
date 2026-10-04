@@ -94,6 +94,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editBouncerNotes, setEditBouncerNotes] = useState('');
   const [editHeight, setEditHeight] = useState("5'7\"");
   const [editRelationshipGoal, setEditRelationshipGoal] = useState('Marriage / Long-term');
+  const [editRole, setEditRole] = useState<'user' | 'featured' | 'admin'>('user');
+  const [editIsFeatured, setEditIsFeatured] = useState<boolean>(false);
 
   // Admin User Profile & Wallet Editor Modal state
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<any | null>(null);
@@ -112,6 +114,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editUserBio, setEditUserBio] = useState('');
   const [editUserBouncerVerified, setEditUserBouncerVerified] = useState(false);
   const [editUserSubscriptionPlan, setEditUserSubscriptionPlan] = useState<SubscriptionPlanId>('free');
+  const [editUserRole, setEditUserRole] = useState<'user' | 'featured' | 'admin'>('user');
+  const [editUserIsFeatured, setEditUserIsFeatured] = useState<boolean>(false);
   const [editUserWalletBalance, setEditUserWalletBalance] = useState<number>(0);
   const [editUserWalletAdjustmentReason, setEditUserWalletAdjustmentReason] = useState('');
   const [isUserEditSubmitting, setIsUserEditSubmitting] = useState(false);
@@ -134,6 +138,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditUserBio(u.bio || '');
     setEditUserBouncerVerified(Boolean(u.bouncerVerified));
     setEditUserSubscriptionPlan(u.plan || u.subscriptionPlan || 'free');
+    setEditUserRole(u.role || (u.isFeatured ? 'featured' : 'user'));
+    setEditUserIsFeatured(Boolean(u.isFeatured || u.role === 'featured'));
     setEditUserWalletBalance(Number(u.walletBalance || 0));
     setEditUserWalletAdjustmentReason('');
     setIsUserEditModalOpen(true);
@@ -167,6 +173,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           bio: editUserBio,
           bouncerVerified: editUserBouncerVerified,
           subscriptionPlan: editUserSubscriptionPlan,
+          role: editUserRole,
+          isFeatured: editUserIsFeatured || editUserRole === 'featured',
           walletBalance: Number(editUserWalletBalance),
           walletAdjustmentReason: editUserWalletAdjustmentReason || 'Admin Profile Edit'
         })
@@ -206,6 +214,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditBouncerNotes(p.bouncerNotes || '');
     setEditHeight(p.height || "5'7\"");
     setEditRelationshipGoal(p.relationshipGoal || 'Marriage / Long-term');
+    setEditRole(p.role || (p.isFeatured ? 'featured' : 'user'));
+    setEditIsFeatured(Boolean(p.isFeatured || p.role === 'featured'));
     setIsEditModalOpen(true);
   };
 
@@ -244,7 +254,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       bouncerStatus: editBouncerStatus,
       bouncerNotes: editBouncerNotes,
       height: editHeight,
-      relationshipGoal: editRelationshipGoal
+      relationshipGoal: editRelationshipGoal,
+      role: editRole,
+      isFeatured: editIsFeatured || editRole === 'featured'
     });
 
     setIsEditModalOpen(false);
@@ -256,6 +268,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Upgrade state dictionary for subscription table dropdowns
   const [upgradePlanState, setUpgradePlanState] = useState<Record<string, SubscriptionPlanId>>({});
+  const [upgradeRoleState, setUpgradeRoleState] = useState<Record<string, 'user' | 'featured' | 'admin'>>({});
 
   // Available cities & sub-locations for New Profile
   const availableCitiesForNew = getCitiesByProvince(newProvince);
@@ -366,7 +379,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       const res = await fetch(`/api/admin/users/${userId}/upgrade`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': 'admin'
+        },
         body: JSON.stringify({ planId: targetPlan, bouncerVerified: true })
       });
       if (res.ok) {
@@ -376,6 +392,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
     } catch (err) {
       alert('Error connecting to server.');
+    }
+  };
+
+  const handleUpgradeUserRole = async (targetId: string, targetRole: 'user' | 'featured' | 'admin', isFeatured?: boolean) => {
+    try {
+      const res = await fetch(`/api/admin/users/${targetId}/role`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': 'admin'
+        },
+        body: JSON.stringify({
+          role: targetRole,
+          isFeatured: isFeatured !== undefined ? isFeatured : targetRole === 'featured'
+        })
+      });
+      if (res.ok) {
+        onRefreshData();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || 'Failed to update user role.');
+      }
+    } catch (err) {
+      alert('Error connecting to server to update role.');
     }
   };
 
@@ -422,7 +462,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (!window.confirm(`Are you sure you want to remove user "${userName}" and their profile?`)) return;
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'x-user-role': 'admin' }
       });
       if (res.ok) {
         onDeleteProfile(userId);
@@ -671,7 +712,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           }`}
         >
           <Key className="w-4 h-4" />
-          Firebase & Staff Admins
+          Admin & Featured Roles
         </button>
       </div>
 
@@ -708,11 +749,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <th className="p-3">Name, Age & Location</th>
                   <th className="p-3">Views</th>
                   <th className="p-3">Bouncer Badge</th>
+                  <th className="p-3">Role & Spotlight Upgrade</th>
                   <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80">
-                {filteredProfiles.map((p) => (
+                {filteredProfiles.map((p) => {
+                  const isFeaturedProf = Boolean(p.isFeatured || p.role === 'featured');
+                  const isAdminProf = p.role === 'admin';
+                  return (
                   <tr key={p.id} className="hover:bg-slate-800/40 transition-colors">
                     <td className="p-3">
                       <img
@@ -723,7 +768,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       />
                     </td>
                     <td className="p-3 font-semibold text-white">
-                      <div className="text-sm">{p.name}, <span className="text-amber-400">{p.age}</span></div>
+                      <div className="text-sm flex items-center gap-1.5 flex-wrap">
+                        <span>{p.name}, <span className="text-amber-400">{p.age}</span></span>
+                        {isAdminProf && (
+                          <span className="bg-rose-600/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">
+                            🛡️ Admin Role
+                          </span>
+                        )}
+                        {isFeaturedProf && (
+                          <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">
+                            ⭐ Featured Role
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-slate-400 font-normal">📍 {p.location}</div>
                     </td>
                     <td className="p-3 font-semibold text-amber-300">
@@ -744,6 +801,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </span>
                       )}
                     </td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleUpgradeUserRole(p.id, isFeaturedProf ? 'user' : 'featured', !isFeaturedProf)}
+                          className={`px-2.5 py-1 rounded-xl text-[10px] font-extrabold uppercase transition-all flex items-center gap-1 cursor-pointer ${
+                            isFeaturedProf
+                              ? 'bg-amber-500 text-slate-950 shadow-sm'
+                              : 'bg-slate-950 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          }`}
+                          title={isFeaturedProf ? 'Remove Featured Role' : 'Upgrade to Featured Role'}
+                        >
+                          <Crown className="w-3 h-3" />
+                          <span>{isFeaturedProf ? 'Featured ✓' : 'Make Featured'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpgradeUserRole(p.id, isAdminProf ? 'user' : 'admin', isFeaturedProf)}
+                          className={`px-2.5 py-1 rounded-xl text-[10px] font-extrabold uppercase transition-all flex items-center gap-1 cursor-pointer ${
+                            isAdminProf
+                              ? 'bg-rose-600 text-white shadow-sm'
+                              : 'bg-slate-950 hover:bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                          }`}
+                          title={isAdminProf ? 'Demote to Member Role' : 'Upgrade to Admin Role'}
+                        >
+                          <ShieldCheck className="w-3 h-3" />
+                          <span>{isAdminProf ? 'Admin ✓' : 'Make Admin'}</span>
+                        </button>
+                      </div>
+                    </td>
                     <td className="p-3 text-right space-x-1">
                       <button
                         onClick={() => handleOpenEditModal(p)}
@@ -761,7 +848,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -872,6 +960,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <tr>
                   <th className="p-3">User & Contact</th>
                   <th className="p-3">Current Plan</th>
+                  <th className="p-3">User Role (Admin / Featured)</th>
                   <th className="p-3">Bouncer Verified</th>
                   <th className="p-3">Wallet Funds ($)</th>
                   <th className="p-3">Upgrade Membership</th>
@@ -891,6 +980,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   })
                   .map((u, idx) => {
                     const currentSelectedPlan = upgradePlanState[u.id] || u.plan || 'starter_3_or_4';
+                    const currentUserRole: 'user' | 'featured' | 'admin' = u.role || (u.isFeatured ? 'featured' : 'user');
+                    const selectedRoleForUpgrade = upgradeRoleState[u.id] || currentUserRole;
                     const customAmountStr = fundInputState[u.id] || '';
                     const customAmountNum = parseFloat(customAmountStr) || 0;
                     const userBalance = u.walletBalance !== undefined ? u.walletBalance : 0;
@@ -898,7 +989,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     return (
                       <tr key={u.id || idx} className="hover:bg-emerald-50/50">
                         <td className="p-3 font-semibold text-slate-900">
-                          <div className="text-sm font-bold text-slate-900">{u.name}</div>
+                          <div className="text-sm font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+                            <span>{u.name}</span>
+                            {currentUserRole === 'admin' && (
+                              <span className="bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">
+                                🛡️ Admin
+                              </span>
+                            )}
+                            {(currentUserRole === 'featured' || u.isFeatured) && (
+                              <span className="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">
+                                ⭐ Featured
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[10px] text-slate-500 font-normal">{u.email}</div>
                           {u.whatsappNumber && (
                             <div className="text-[10px] text-emerald-700 font-mono flex items-center gap-1 mt-0.5">
@@ -920,6 +1023,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           }`}>
                             {u.plan ? u.plan.replace(/_/g, ' ') : 'Free Pass'}
                           </span>
+                        </td>
+                        <td className="p-3">
+                          <div className="space-y-1.5 min-w-[200px]">
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                value={selectedRoleForUpgrade}
+                                onChange={(e) => setUpgradeRoleState({ ...upgradeRoleState, [u.id]: e.target.value as 'user' | 'featured' | 'admin' })}
+                                className="bg-slate-50 border border-emerald-200 rounded-xl px-2 py-1 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              >
+                                <option value="user">👤 Standard Member</option>
+                                <option value="featured">⭐ Featured Role</option>
+                                <option value="admin">🛡️ Admin Role</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => handleUpgradeUserRole(u.id, selectedRoleForUpgrade, selectedRoleForUpgrade === 'featured')}
+                                className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[10px] uppercase tracking-wider shrink-0 shadow-xs cursor-pointer"
+                              >
+                                Set Role
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleUpgradeUserRole(u.id, 'featured', true)}
+                                className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer ${
+                                  currentUserRole === 'featured' || u.isFeatured
+                                    ? 'bg-amber-500 text-slate-950'
+                                    : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                                }`}
+                              >
+                                ⭐ Featured Role
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpgradeUserRole(u.id, 'admin', Boolean(u.isFeatured))}
+                                className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer ${
+                                  currentUserRole === 'admin'
+                                    ? 'bg-rose-600 text-white'
+                                    : 'bg-rose-100 hover:bg-rose-200 text-rose-900 border border-rose-300'
+                                }`}
+                              >
+                                🛡️ Admin Role
+                              </button>
+                            </div>
+                          </div>
                         </td>
                         <td className="p-3">
                           {u.bouncerVerified ? (
@@ -1701,9 +1850,111 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
-      {/* TAB 7: FIREBASE & STAFF ADMINS MANAGEMENT */}
+      {/* TAB 7: ADMIN & FEATURED ROLE UPGRADES + FIREBASE STAFF MANAGEMENT */}
       {activeTab === 'admins' && (
         <div className="space-y-6">
+          {/* Upgrade Users to Admin Role or Featured Role Card */}
+          <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-6 shadow-2xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-5">
+              <div>
+                <h3 className="text-xl font-extrabold text-white font-serif flex items-center gap-2">
+                  <Crown className="w-5 h-5 text-amber-400" />
+                  Upgrade Users to Admin Role & Featured Role
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Promote any registered user to <strong className="text-rose-400">Admin Role</strong> (full backend & management privileges) or <strong className="text-amber-300">Featured Role</strong> (spotlight visibility).
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold">
+                  🛡️ Admins: {userSubscriptions.filter(u => u.role === 'admin').length}
+                </span>
+                <span className="px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold">
+                  ⭐ Featured: {userSubscriptions.filter(u => u.role === 'featured' || u.isFeatured).length}
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="p-3">User Name & Email</th>
+                    <th className="p-3">Current Role</th>
+                    <th className="p-3">Featured Spotlight</th>
+                    <th className="p-3 text-right">Upgrade / Assign Role</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/80">
+                  {userSubscriptions.map((u) => {
+                    const uRole: 'user' | 'featured' | 'admin' = u.role || (u.isFeatured ? 'featured' : 'user');
+                    const uFeatured = Boolean(u.isFeatured || u.role === 'featured');
+                    return (
+                      <tr key={u.id} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="p-3">
+                          <div className="font-bold text-white text-sm">{u.name}</div>
+                          <div className="text-[11px] text-slate-400">{u.email}</div>
+                        </td>
+                        <td className="p-3">
+                          {uRole === 'admin' ? (
+                            <span className="bg-rose-600/20 text-rose-300 border border-rose-500/40 px-2.5 py-1 rounded-full font-black text-[10px] uppercase">
+                              🛡️ Admin Role
+                            </span>
+                          ) : uRole === 'featured' ? (
+                            <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-full font-black text-[10px] uppercase">
+                              ⭐ Featured Role
+                            </span>
+                          ) : (
+                            <span className="bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-bold text-[10px] uppercase">
+                              👤 Standard Member
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {uFeatured ? (
+                            <span className="text-amber-300 font-bold flex items-center gap-1">
+                              <Sparkles className="w-3.5 h-3.5" /> Active in Featured Spotlight
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">Standard Listing</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleUpgradeUserRole(u.id, uFeatured ? 'user' : 'featured', !uFeatured)}
+                              className={`px-3 py-1.5 rounded-xl font-extrabold text-[10px] uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
+                                uFeatured
+                                  ? 'bg-amber-500 text-slate-950 shadow-md'
+                                  : 'bg-slate-950 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                              }`}
+                            >
+                              <Crown className="w-3.5 h-3.5" />
+                              <span>{uFeatured ? 'Featured Role Active' : 'Upgrade to Featured Role'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpgradeUserRole(u.id, uRole === 'admin' ? 'user' : 'admin', uFeatured)}
+                              className={`px-3 py-1.5 rounded-xl font-extrabold text-[10px] uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
+                                uRole === 'admin'
+                                  ? 'bg-rose-600 text-white shadow-md'
+                                  : 'bg-slate-950 hover:bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                              }`}
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>{uRole === 'admin' ? 'Admin Role Active' : 'Upgrade to Admin Role'}</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           {/* Firebase Backend & Database Health Widget */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-5">
@@ -2385,6 +2636,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3 bg-slate-950/80 p-3 rounded-xl border border-amber-500/30">
+                <div>
+                  <label className="block text-amber-400 font-bold mb-1">👑 User Role Assignment</label>
+                  <select
+                    value={editRole}
+                    onChange={e => {
+                      const nextR = e.target.value as 'user' | 'featured' | 'admin';
+                      setEditRole(nextR);
+                      if (nextR === 'featured') setEditIsFeatured(true);
+                    }}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
+                  >
+                    <option value="user">👤 Standard Member</option>
+                    <option value="featured">⭐ Featured Role</option>
+                    <option value="admin">🛡️ Admin Role</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-amber-400 font-bold mb-1">⭐ Featured Spotlight</label>
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-slate-200 font-semibold pt-2">
+                    <input
+                      type="checkbox"
+                      checked={editIsFeatured}
+                      onChange={e => setEditIsFeatured(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-500 bg-slate-900 border-slate-700"
+                    />
+                    <span>Show in Featured Spotlight</span>
+                  </label>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 font-bold mb-1">Height</label>
@@ -2915,6 +3198,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         className="w-4 h-4 rounded text-emerald-600 bg-slate-950 border-slate-800 focus:ring-emerald-500"
                       />
                       <span>Verified Profile</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 bg-slate-950/80 p-3 rounded-xl border border-amber-500/30">
+                <div>
+                  <label className="block text-amber-400 font-bold mb-1">👑 Account Role (Upgrade User)</label>
+                  <select
+                    value={editUserRole}
+                    onChange={e => {
+                      const nextR = e.target.value as 'user' | 'featured' | 'admin';
+                      setEditUserRole(nextR);
+                      if (nextR === 'featured') setEditUserIsFeatured(true);
+                    }}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="user">👤 Standard Member</option>
+                    <option value="featured">⭐ Featured Role</option>
+                    <option value="admin">🛡️ Admin Role</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-amber-400 font-bold mb-1">⭐ Featured Spotlight</label>
+                  <div className="flex items-center gap-3 pt-2">
+                    <label className="inline-flex items-center gap-2 cursor-pointer text-slate-200 font-semibold">
+                      <input
+                        type="checkbox"
+                        checked={editUserIsFeatured}
+                        onChange={e => setEditUserIsFeatured(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-800"
+                      />
+                      <span>Featured Single Status</span>
                     </label>
                   </div>
                 </div>

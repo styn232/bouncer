@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShieldCheck, X, User as UserIcon, Lock, Mail, Sparkles, Check, Baby, MapPin, Upload, Flame, Globe, HeartPulse, Building2, Landmark } from 'lucide-react';
 import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getCitiesByProvince, getSubLocationsForCity, getProvinceForCity } from '../data/zimbabweLocations';
@@ -17,22 +17,36 @@ import {
   getDoc 
 } from '../lib/firebase';
 
+export type AuthModalMode = 'user' | 'admin' | 'user_login' | 'user_register' | 'admin_login';
+
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (user: any) => void;
-  initialMode?: 'user' | 'admin';
+  initialMode?: AuthModalMode;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   onLoginSuccess,
-  initialMode = 'user'
+  initialMode = 'user_login'
 }) => {
-  const [mode, setMode] = useState<'user_login' | 'user_register' | 'admin_login' | 'admin_register'>(
-    initialMode === 'admin' ? 'admin_login' : 'user_login'
+  const resolveMode = (m: AuthModalMode): 'user_login' | 'user_register' => {
+    if (m === 'user_register') return 'user_register';
+    return 'user_login';
+  };
+
+  const [mode, setMode] = useState<'user_login' | 'user_register'>(
+    resolveMode(initialMode)
   );
+
+  useEffect(() => {
+    if (isOpen) {
+      setMode(resolveMode(initialMode));
+      setErrorMsg('');
+    }
+  }, [isOpen, initialMode]);
 
   // User form states
   const [email, setEmail] = useState('');
@@ -48,9 +62,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [hivStatus, setHivStatus] = useState<'HIV-' | 'HIV+'>('HIV-');
   const [avatar, setAvatar] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
-
-  // Admin form state
-  const [adminKey, setAdminKey] = useState('');
 
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -100,13 +111,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const fbUser = result.user;
-      const isAdminMode = mode === 'admin_login' || mode === 'admin_register';
 
-      // Check or create Firestore document
-      let userRole: 'admin' | 'user' = isAdminMode ? 'admin' : 'user';
-      if (fbUser.email && (fbUser.email.toLowerCase() === 'admin@bouncer.date' || fbUser.email.toLowerCase() === 'jobsatespace@gmail.com')) {
-        userRole = 'admin';
-      }
+      const normalizedFbEmail = (fbUser.email || '').toLowerCase().trim();
+      const isSuperAdminEmail = normalizedFbEmail === 'jobsatespace@gmail.com' || normalizedFbEmail === 'admin@bouncer.date';
+      let userRole: 'admin' | 'featured' | 'user' = isSuperAdminEmail ? 'admin' : 'user';
 
       if (db) {
         try {
@@ -114,38 +122,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           const userSnap = await getDoc(userDocRef);
 
           if (userSnap.exists()) {
-            const data = userSnap.data();
-            if (data.role === 'admin') userRole = 'admin';
+            const existingData = userSnap.data();
+            if (existingData?.role === 'admin' || isSuperAdminEmail) {
+              userRole = 'admin';
+            } else if (existingData?.role === 'featured') {
+              userRole = 'featured';
+            }
           } else {
             await setDoc(userDocRef, {
               id: fbUser.uid,
               uid: fbUser.uid,
               email: fbUser.email,
-              name: fbUser.displayName || (userRole === 'admin' ? 'Bouncer Admin' : 'Member'),
+              name: fbUser.displayName || (userRole === 'admin' ? 'Super Admin' : 'Member'),
               role: userRole,
               avatar: fbUser.photoURL || avatar,
               hivStatus: 'HIV-',
-              subscriptionPlan: userRole === 'admin' ? 'vip_15_singles' : 'free',
+              subscriptionPlan: userRole === 'admin' ? 'vip_30_singles' : 'free',
               bouncerVerified: userRole === 'admin',
               createdAt: new Date().toISOString()
             }, { merge: true });
-
-            if (userRole === 'admin') {
-              await setDoc(doc(db, 'admin_accounts', fbUser.uid), {
-                uid: fbUser.uid,
-                email: fbUser.email,
-                name: fbUser.displayName || 'Bouncer Admin',
-                role: 'admin',
-                createdAt: new Date().toISOString()
-              }, { merge: true });
-            }
           }
         } catch (dbErr) {
           console.warn('Firestore user profile sync warning:', dbErr);
         }
       }
 
-      // Sync with Express backend to unlock backend access
+      // Sync with Express backend
       const syncRes = await fetch('/api/auth/firebase-sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -154,8 +156,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email: fbUser.email,
           name: fbUser.displayName,
           role: userRole,
-          avatar: fbUser.photoURL,
-          adminKey: adminKey || 'admin123'
+          avatar: fbUser.photoURL
         })
       });
 
@@ -164,14 +165,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onLoginSuccess(syncData.user);
         onClose();
       } else {
-        // Fallback local user object
         onLoginSuccess({
           id: fbUser.uid,
           email: fbUser.email || '',
           name: fbUser.displayName || 'Google User',
           role: userRole,
           avatar: fbUser.photoURL || avatar,
-          subscriptionPlan: userRole === 'admin' ? 'vip_15_singles' : 'free',
+          subscriptionPlan: userRole === 'admin' ? 'vip_30_singles' : 'free',
           bouncerVerified: userRole === 'admin'
         });
         onClose();
@@ -190,139 +190,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      if (mode === 'admin_register') {
-        // 1. Create Admin in Firebase Auth
-        let fbUid = `usr_admin_${Date.now()}`;
-        const pwdToUse = password || adminKey || 'AdminSecure2025!';
-
-        try {
-          const userCred = await createUserWithEmailAndPassword(auth, email, pwdToUse);
-          fbUid = userCred.user.uid;
-        } catch (authErr: any) {
-          // If already exists or in preview offline mode, attempt login or proceed
-          if (authErr.code === 'auth/email-already-in-use') {
-            try {
-              const userCred = await signInWithEmailAndPassword(auth, email, pwdToUse);
-              fbUid = userCred.user.uid;
-            } catch {
-              // Proceed with backend sync
-            }
-          }
-        }
-
-        // 2. Write Admin Record into Firestore
-        try {
-          await setDoc(doc(db, 'users', fbUid), {
-            id: fbUid,
-            uid: fbUid,
-            email,
-            name,
-            role: 'admin',
-            subscriptionPlan: 'vip_15_singles',
-            bouncerVerified: true,
-            createdAt: new Date().toISOString()
-          }, { merge: true });
-
-          await setDoc(doc(db, 'admin_accounts', fbUid), {
-            uid: fbUid,
-            email,
-            name,
-            role: 'admin',
-            createdAt: new Date().toISOString()
-          }, { merge: true });
-        } catch (dbErr) {
-          console.warn('Firestore write warning:', dbErr);
-        }
-
-        // 3. Sync with Express backend to unlock backend opening
-        const res = await fetch('/api/auth/firebase-sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid: fbUid,
-            name,
-            email,
-            role: 'admin',
-            adminKey: adminKey || 'admin123'
-          })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          onLoginSuccess(data.user);
-          onClose();
-        } else {
-          // Fallback registration endpoint
-          const fallbackRes = await fetch('/api/auth/admin/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, email, adminKey: adminKey || 'admin123' })
-          });
-          if (fallbackRes.ok) {
-            const data = await fallbackRes.json();
-            onLoginSuccess(data.user);
-            onClose();
-          } else {
-            const data = await fallbackRes.json();
-            setErrorMsg(data.error || 'Failed to create Admin account. Check Security Passcode.');
-          }
-        }
-      } else if (mode === 'admin_login') {
-        // Admin authentication with Firebase Auth & Backend
+      if (mode === 'user_login') {
+        // Standard Sign In (also works for Super Admin jobsatespace@gmail.com, upgraded Admins, and Featured users)
         let fbUid = '';
-        const pwdToUse = password || adminKey || 'AdminSecure2025!';
-
-        try {
-          const userCred = await signInWithEmailAndPassword(auth, email, pwdToUse);
-          fbUid = userCred.user.uid;
-        } catch (authErr) {
-          // Fallback to server verification
-        }
-
-        // Sync with backend to open backend session
-        const res = await fetch('/api/auth/firebase-sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid: fbUid,
-            email,
-            role: 'admin',
-            adminKey: adminKey || 'admin123'
-          })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          onLoginSuccess(data.user);
-          onClose();
-        } else {
-          // Legacy admin login fallback
-          const legRes = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email,
-              role: 'admin',
-              adminKey
-            })
-          });
-
-          if (legRes.ok) {
-            const data = await legRes.json();
-            onLoginSuccess(data.user);
-            onClose();
-          } else {
-            const data = await legRes.json();
-            setErrorMsg(data.error || 'Invalid Admin Credentials or Security Passcode.');
-          }
-        }
-      } else if (mode === 'user_login') {
-        // Standard User Login with Firebase Auth
-        let fbUid = '';
-        if (password) {
+        let fbDisplayName = '';
+        if (password && auth) {
           try {
             const userCred = await signInWithEmailAndPassword(auth, email, password);
             fbUid = userCred.user.uid;
+            fbDisplayName = userCred.user.displayName || '';
           } catch {
             // Proceed to backend check
           }
@@ -331,16 +207,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, role: 'user' })
+          body: JSON.stringify({ email, password })
         });
 
         if (res.ok) {
           const data = await res.json();
           onLoginSuccess(data.user);
           onClose();
+        } else if (fbUid) {
+          const syncRes = await fetch('/api/auth/firebase-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              uid: fbUid,
+              email,
+              name: fbDisplayName || email.split('@')[0]
+            })
+          });
+          if (syncRes.ok) {
+            const syncData = await syncRes.json();
+            onLoginSuccess(syncData.user);
+            onClose();
+          } else {
+            setErrorMsg('Account not found. Please click "Sign Up" to create an account first.');
+          }
         } else {
           const data = await res.json();
-          setErrorMsg(data.error || 'Account not found. Please click "Create Account" to sign up first.');
+          setErrorMsg(data.error || 'Account not found. Please click "Sign Up" to create an account first.');
         }
       } else {
         // User Register with Firebase Auth + Firestore
@@ -447,27 +340,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <X className="w-5 h-5" />
           </button>
 
-          {/* Tab Selection Bar */}
+          {/* Tab Selection Bar: Sign In & Sign Up Only */}
           <div className="flex rounded-2xl bg-slate-950 p-1 border border-slate-800 mb-6">
             <button
               onClick={() => {
                 setMode('user_login');
                 setErrorMsg('');
               }}
-              className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
                 mode === 'user_login'
                   ? 'bg-amber-500 text-slate-950 shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Log In
+              Sign In
             </button>
             <button
               onClick={() => {
                 setMode('user_register');
                 setErrorMsg('');
               }}
-              className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
                 mode === 'user_register'
                   ? 'bg-amber-500 text-slate-950 shadow-md'
                   : 'text-slate-400 hover:text-white'
@@ -475,59 +368,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             >
               Sign Up
             </button>
-            <button
-              onClick={() => {
-                setMode('admin_login');
-                setErrorMsg('');
-              }}
-              className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${
-                mode === 'admin_login' || mode === 'admin_register'
-                  ? 'bg-rose-600 text-white shadow-md'
-                  : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Staff / Admin
-            </button>
           </div>
 
           {/* Title Header */}
           <div className="text-center mb-6">
             <h2 className="text-2xl font-extrabold text-white font-serif">
-              {mode === 'admin_login'
-                ? 'Admin Portal Sign In'
-                : mode === 'admin_register'
-                ? 'Create Firebase Admin Account'
-                : mode === 'user_login'
-                ? 'Log In to Dating With Bouncer'
-                : 'Sign Up to Dating With Bouncer'}
+              {mode === 'user_login' ? 'Welcome — Sign In' : 'Welcome — Sign Up'}
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              {mode === 'admin_login' || mode === 'admin_register'
-                ? 'Firebase authenticated backend access for administration.'
-                : 'Sign up or log in to browse vetted singles and unlock contacts.'}
+              {mode === 'user_login'
+                ? 'Sign in to your account or switch to Sign Up to register as a new member.'
+                : 'Create your single profile to browse vetted singles and unlock contacts.'}
             </p>
-
-            {/* Sub-toggle for Admin mode */}
-            {(mode === 'admin_login' || mode === 'admin_register') && (
-              <div className="flex justify-center gap-4 mt-3 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setMode('admin_login')}
-                  className={`font-bold hover:underline ${mode === 'admin_login' ? 'text-rose-400 underline' : 'text-slate-400'}`}
-                >
-                  Admin Sign In
-                </button>
-                <span className="text-slate-600">•</span>
-                <button
-                  type="button"
-                  onClick={() => setMode('admin_register')}
-                  className={`font-bold hover:underline ${mode === 'admin_register' ? 'text-rose-400 underline' : 'text-slate-400'}`}
-                >
-                  Create Admin via Firebase
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Quick Firebase Google Auth Button */}
@@ -556,7 +408,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              <span>Continue with Firebase Google Sign In</span>
+              <span>Continue with Google Sign In</span>
             </button>
 
             <div className="flex items-center my-4">
@@ -573,119 +425,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            {/* CREATE ADMIN ACCOUNT FIELDS */}
-            {mode === 'admin_register' && (
-              <>
-                <div>
-                  <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Admin Full Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Chief Bouncer Admin"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-rose-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Admin Email Address
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="jobsatespace@gmail.com"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white focus:outline-none focus:border-rose-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Firebase Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Create secure admin password"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white focus:outline-none focus:border-rose-500 font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Security Passcode
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type="password"
-                      value={adminKey}
-                      onChange={(e) => setAdminKey(e.target.value)}
-                      placeholder="admin123 or bouncer2025"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white focus:outline-none focus:border-rose-500 font-mono"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">Default development passcode: <code className="text-amber-400">admin123</code></p>
-                </div>
-              </>
-            )}
-
-            {/* ADMIN LOGIN FIELDS */}
-            {mode === 'admin_login' && (
-              <>
-                <div>
-                  <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Admin Email Address
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="jobsatespace@gmail.com"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white focus:outline-none focus:border-rose-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Password / Admin Passcode
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input
-                      type="password"
-                      required
-                      value={adminKey || password}
-                      onChange={(e) => {
-                        setAdminKey(e.target.value);
-                        setPassword(e.target.value);
-                      }}
-                      placeholder="Enter password or passcode"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white focus:outline-none focus:border-rose-500 font-mono"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">Default development passcode: <code className="text-amber-400">admin123</code></p>
-                </div>
-              </>
-            )}
-
             {/* USER LOGIN FIELDS */}
             {mode === 'user_login' && (
               <>
@@ -1004,24 +743,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 ${
-                mode === 'admin_login' || mode === 'admin_register'
-                  ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/50'
-                  : 'bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950'
-              }`}
+              className="w-full py-3 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950"
             >
               {isSubmitting ? (
-                <span>Processing with Firebase...</span>
-              ) : mode === 'admin_register' ? (
-                <>
-                  <ShieldCheck className="w-4 h-4" />
-                  Create Admin via Firebase
-                </>
-              ) : mode === 'admin_login' ? (
-                <>
-                  <ShieldCheck className="w-4 h-4" />
-                  Sign In to Admin Portal
-                </>
+                <span>Processing...</span>
               ) : mode === 'user_login' ? (
                 <>
                   <UserIcon className="w-4 h-4" />
@@ -1030,7 +755,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  Create Vetted Singles Account
+                  Sign Up & Create Single Profile
                 </>
               )}
             </button>

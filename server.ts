@@ -154,6 +154,19 @@ async function startServer() {
         if (Array.isArray(data.users) && data.users.length > 0) {
           users = data.users;
         }
+        // Ensure the pre-registered Admin account is always present on startup
+        const hasStartupAdmin = users.some(
+          u => u.role === 'admin' || (u.email && u.email.toLowerCase() === MOCK_ADMIN_USER.email.toLowerCase())
+        );
+        if (!hasStartupAdmin) {
+          users.unshift({ ...MOCK_ADMIN_USER, role: 'admin' });
+        } else {
+          users = users.map(u =>
+            u.email && u.email.toLowerCase() === MOCK_ADMIN_USER.email.toLowerCase()
+              ? { ...u, role: 'admin', bouncerVerified: true }
+              : u
+          );
+        }
         if (Array.isArray(data.transactions)) transactions = data.transactions;
         if (Array.isArray(data.matchOrders)) matchOrders = data.matchOrders;
         if (Array.isArray(data.reels)) reels = data.reels;
@@ -326,7 +339,9 @@ async function startServer() {
 
   // API ROUTE 2: Auth Endpoints
   app.get('/api/auth/me', (_req, res) => {
-    res.json({ user: currentUser });
+    // Security: Do not auto-login visitors with a shared global server user.
+    // Visitors must explicitly sign in or sign up on every visit.
+    res.json({ user: null });
   });
 
   app.post('/api/auth/sync', (req, res) => {
@@ -334,7 +349,7 @@ async function startServer() {
     if (!user || !user.id) {
       return res.status(400).json({ error: 'No user data provided' });
     }
-    const existing = users.find(u => u.id === user.id || (u.email && u.email.toLowerCase() === user.email.toLowerCase()));
+    const existing = users.find(u => u.id === user.id || (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase()));
     if (existing) {
       currentUser = existing;
     } else {
@@ -346,23 +361,8 @@ async function startServer() {
   });
 
   const isAuthorizedAdmin = (req: express.Request): boolean => {
-    const emailHeader = (req.headers['x-user-email'] as string || '').toLowerCase().trim();
     const roleHeader = (req.headers['x-user-role'] as string || '').toLowerCase().trim();
-    
-    if (emailHeader === 'jobsatespace@gmail.com' || emailHeader === 'admin@bouncer.date') {
-      return true;
-    }
-    if (roleHeader === 'admin') {
-      return true;
-    }
-    if (currentUser && (
-      currentUser.role === 'admin' || 
-      currentUser.email?.toLowerCase() === 'jobsatespace@gmail.com' || 
-      currentUser.email?.toLowerCase() === 'admin@bouncer.date'
-    )) {
-      return true;
-    }
-    return false;
+    return roleHeader === 'admin';
   };
 
   // Firebase Auth Sync & Backend Opening Endpoint
@@ -373,24 +373,31 @@ async function startServer() {
     }
 
     const normalizedEmail = (email || '').toLowerCase().trim();
-    
-    // Check if user is admin via role, key, or known admin email
-    const isAdminAccount = 
-      role === 'admin' ||
-      normalizedEmail === 'admin@bouncer.date' ||
-      normalizedEmail === 'jobsatespace@gmail.com' ||
-      (adminKey && ['admin123', 'bouncer2025', 'admin', 'pass'].includes(adminKey.toLowerCase()));
+    const hasValidAdminKey = Boolean(adminKey && ['admin123', 'bouncer2025', 'admin', 'pass'].includes(String(adminKey).toLowerCase().trim()));
+    const existingByEmailOrUid = users.find(u => (uid && u.id === uid) || (u.email && u.email.toLowerCase() === normalizedEmail));
+    const isPreExistingAdmin = Boolean(
+      (existingByEmailOrUid && existingByEmailOrUid.role === 'admin') ||
+      normalizedEmail === MOCK_ADMIN_USER.email.toLowerCase() ||
+      normalizedEmail === 'admin@bouncer.date'
+    );
 
-    const effectiveRole = isAdminAccount ? 'admin' : 'user';
+    if (role === 'admin' && !hasValidAdminKey && !isPreExistingAdmin) {
+      return res.status(401).json({ error: 'Invalid Admin credentials or account is not authorized as Admin.' });
+    }
 
-    let existing = users.find(u => u.id === uid || (u.email && u.email.toLowerCase() === normalizedEmail));
+    const isAdminAccount = isPreExistingAdmin || (role === 'admin' && hasValidAdminKey);
+    const effectiveRole: 'user' | 'featured' | 'admin' = isAdminAccount
+      ? 'admin'
+      : (existingByEmailOrUid?.role || 'user');
+
+    let existing = existingByEmailOrUid;
 
     if (existing) {
       if (isAdminAccount) {
         existing.role = 'admin';
         existing.bouncerVerified = true;
         if (existing.subscriptionPlan === 'free') {
-          existing.subscriptionPlan = 'vip_15_singles';
+          existing.subscriptionPlan = 'vip_30_singles';
         }
       }
       if (name && !existing.name) existing.name = name;
@@ -400,10 +407,11 @@ async function startServer() {
       const newUser: User = {
         id: uid || `usr_${Date.now()}`,
         email: normalizedEmail,
-        name: name || (isAdminAccount ? 'Firebase Admin' : 'Firebase Member'),
+        name: name || (isAdminAccount ? 'Super Admin' : normalizedEmail.split('@')[0] || 'Member'),
         age: 28,
         role: effectiveRole,
-        subscriptionPlan: isAdminAccount ? 'vip_15_singles' : 'free',
+        isFeatured: effectiveRole === 'featured',
+        subscriptionPlan: isAdminAccount ? 'vip_30_singles' : 'free',
         subscriptionStatus: 'active',
         avatar: avatar || photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
         city: 'Harare',
@@ -429,67 +437,39 @@ async function startServer() {
     });
   });
 
-  // Admin Account Registration
-  app.post('/api/auth/admin/register', (req, res) => {
-    const { name, email, adminKey } = req.body;
-    if (!email || !name) {
-      return res.status(400).json({ error: 'Name and email are required for Admin account.' });
-    }
-    if (adminKey && !['admin123', 'bouncer2025', 'admin', 'pass'].includes(adminKey.toLowerCase())) {
-      return res.status(401).json({ error: 'Invalid Security Passcode for Admin registration.' });
-    }
-
-    const newAdmin: User = {
-      id: `usr_admin_${Date.now()}`,
-      email,
-      name,
-      age: 30,
-      role: 'admin',
-      subscriptionPlan: 'vip_15_singles',
-      subscriptionStatus: 'active',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
-      bouncerVerified: true,
-      city: 'Harare',
-      subLocation: 'HQ',
-      location: 'Harare HQ, Zimbabwe',
-      childrenCount: 0,
-      intent: 'Marriage',
-      createdAt: new Date().toISOString()
-    };
-
-    users.push(newAdmin);
-    currentUser = newAdmin;
-    saveAppData();
-    res.json({ success: true, user: currentUser, token: 'admin_session_token' });
-  });
-
   app.post('/api/auth/login', (req, res) => {
-    const { email, role, adminKey } = req.body;
-    
-    // Admin login path
-    if (role === 'admin' || (email && email.toLowerCase().includes('admin'))) {
-      if (adminKey && !['admin123', 'bouncer2025', 'admin', 'pass'].includes(adminKey.toLowerCase())) {
-        return res.status(401).json({ error: 'Invalid Admin Passcode.' });
-      }
-      const existingAdmin = users.find(u => u.role === 'admin' && u.email.toLowerCase() === (email || '').toLowerCase()) || MOCK_ADMIN_USER;
-      currentUser = existingAdmin;
-      return res.json({ success: true, user: currentUser, token: 'admin_session_token' });
+    const { email, password } = req.body;
+    const normalizedEmail = (email || '').toLowerCase().trim();
+
+    // Standard Sign In path (supports regular users, featured users, and Super Admin / upgraded admins signing in)
+    if (!normalizedEmail) {
+      return res.status(400).json({ error: 'Email address is required to sign in.' });
     }
 
-    // Standard User login path
-    if (!email) {
-      return res.status(400).json({ error: 'Email address is required to log in.' });
-    }
-
-    const found = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const found = users.find(u => u.email.toLowerCase() === normalizedEmail);
     if (found) {
+      if (found.role === 'admin' || normalizedEmail === MOCK_ADMIN_USER.email.toLowerCase() || normalizedEmail === 'admin@bouncer.date') {
+        found.role = 'admin';
+        found.bouncerVerified = true;
+        currentUser = found;
+        return res.json({ success: true, user: currentUser, token: 'admin_session_token' });
+      }
       currentUser = found;
       return res.json({ success: true, user: currentUser, token: 'user_session_token' });
     }
 
+    // Check if signing in with the pre-registered Super Admin email
+    if (normalizedEmail === MOCK_ADMIN_USER.email.toLowerCase() || normalizedEmail === 'admin@bouncer.date') {
+      if (!password) {
+        return res.status(401).json({ error: 'Password is required to sign in.' });
+      }
+      currentUser = { ...MOCK_ADMIN_USER, role: 'admin' };
+      return res.json({ success: true, user: currentUser, token: 'admin_session_token' });
+    }
+
     // Strict non-demo behavior when email is not found
     return res.status(404).json({
-      error: 'No account found with this email. Please click "Create Account" to sign up first!'
+      error: 'No account found with this email. Please click "Sign Up" to create an account first!'
     });
   });
 
@@ -796,8 +776,9 @@ async function startServer() {
     }
 
     // Mask/hide WhatsApp contact numbers from public API response unless caller is Admin
+    const isAdminReq = isAuthorizedAdmin(req);
     const sanitizedResult = result.map(p => {
-      if (currentUser && currentUser.role === 'admin') {
+      if (isAdminReq) {
         return p;
       }
       const { whatsappNumber, ...rest } = p;
@@ -826,7 +807,7 @@ async function startServer() {
     if (!profile) {
       return res.status(404).json({ error: 'Profile not found' });
     }
-    if (currentUser && currentUser.role === 'admin') {
+    if (isAuthorizedAdmin(req)) {
       return res.json(profile);
     }
     const { whatsappNumber, ...rest } = profile;
@@ -990,6 +971,18 @@ async function startServer() {
       ...req.body,
       province: newProv
     };
+
+    // Sync role and featured status with linked user account if present
+    const uIdx = users.findIndex(u => u.id === profiles[idx].id || u.name.toLowerCase() === currentProf.name.toLowerCase());
+    if (uIdx !== -1) {
+      if (req.body.role !== undefined) {
+        users[uIdx].role = req.body.role;
+      }
+      if (req.body.isFeatured !== undefined) {
+        users[uIdx].isFeatured = Boolean(req.body.isFeatured);
+      }
+    }
+
     saveAppData();
     res.json({ success: true, profile: profiles[idx] });
   });
@@ -1131,6 +1124,8 @@ async function startServer() {
       seeking,
       bouncerVerified,
       subscriptionPlan,
+      role,
+      isFeatured,
       walletBalance,
       walletAdjustmentReason
     } = req.body;
@@ -1202,6 +1197,8 @@ async function startServer() {
       ...(seeking && { seeking }),
       ...(bouncerVerified !== undefined && { bouncerVerified: Boolean(bouncerVerified) }),
       ...(subscriptionPlan && { subscriptionPlan }),
+      ...(role && { role }),
+      ...(isFeatured !== undefined ? { isFeatured: Boolean(isFeatured) } : role === 'featured' ? { isFeatured: true } : {}),
       walletBalance: newBalance
     };
 
@@ -1226,7 +1223,11 @@ async function startServer() {
         bio: users[uIdx].bio || profiles[pIdx].bio,
         gender: users[uIdx].gender || profiles[pIdx].gender,
         seeking: users[uIdx].seeking || profiles[pIdx].seeking,
-        bouncerStatus: users[uIdx].bouncerVerified ? 'verified' : profiles[pIdx].bouncerStatus
+        role: users[uIdx].role,
+        isFeatured: Boolean(users[uIdx].isFeatured || users[uIdx].role === 'featured'),
+        bouncerStatus: users[uIdx].isFeatured || users[uIdx].role === 'featured'
+          ? 'vip_approved'
+          : (users[uIdx].bouncerVerified ? 'verified' : profiles[pIdx].bouncerStatus)
       };
     }
 
@@ -1299,12 +1300,12 @@ async function startServer() {
     });
   });
 
-  // Admin: Upgrade User Subscription & Bouncer Status
+  // Admin: Upgrade User Subscription, Role (Admin / Featured / User) & Bouncer Status
   app.put('/api/admin/users/:id/upgrade', (req, res) => {
     if (!isAuthorizedAdmin(req)) {
       return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
     }
-    const { planId, bouncerVerified } = req.body;
+    const { planId, bouncerVerified, role, isFeatured } = req.body;
     const userId = req.params.id;
     
     const uIdx = users.findIndex(u => u.id === userId || u.email.toLowerCase() === userId.toLowerCase());
@@ -1312,13 +1313,39 @@ async function startServer() {
       return res.status(404).json({ error: 'User account not found' });
     }
 
-    users[uIdx].subscriptionPlan = (planId as SubscriptionPlanId) || 'starter_3_or_4';
-    users[uIdx].subscriptionStatus = 'active';
-    users[uIdx].subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    if (planId) {
+      users[uIdx].subscriptionPlan = (planId as SubscriptionPlanId) || 'starter_3_or_4';
+      users[uIdx].subscriptionStatus = 'active';
+      users[uIdx].subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    }
+    if (role) {
+      users[uIdx].role = role as 'user' | 'featured' | 'admin';
+      if (role === 'featured') {
+        users[uIdx].isFeatured = true;
+      } else if (role === 'user' && isFeatured === undefined) {
+        users[uIdx].isFeatured = false;
+      }
+    }
+    if (isFeatured !== undefined) {
+      users[uIdx].isFeatured = Boolean(isFeatured);
+      if (isFeatured && users[uIdx].role === 'user') {
+        users[uIdx].role = 'featured';
+      }
+    }
     if (bouncerVerified !== undefined) {
       users[uIdx].bouncerVerified = !!bouncerVerified;
     } else {
       users[uIdx].bouncerVerified = true;
+    }
+
+    // Sync with SingleProfile if matched
+    const pIdx = profiles.findIndex(p => p.id === users[uIdx].id || p.name.toLowerCase() === users[uIdx].name.toLowerCase());
+    if (pIdx !== -1) {
+      profiles[pIdx].role = users[uIdx].role;
+      profiles[pIdx].isFeatured = Boolean(users[uIdx].isFeatured || users[uIdx].role === 'featured');
+      if (profiles[pIdx].isFeatured) {
+        profiles[pIdx].bouncerStatus = 'vip_approved';
+      }
     }
 
     // Also update current logged in user if it's the same user
@@ -1327,7 +1354,113 @@ async function startServer() {
     }
 
     saveAppData();
-    res.json({ success: true, user: users[uIdx], message: `Successfully upgraded user ${users[uIdx].name} to ${users[uIdx].subscriptionPlan}` });
+    res.json({ success: true, user: users[uIdx], message: `Successfully upgraded user ${users[uIdx].name}` });
+  });
+
+  // Admin: Upgrade / Change User or Profile Role (admin, featured, user)
+  app.put('/api/admin/users/:id/role', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const { role, isFeatured } = req.body;
+    const targetId = req.params.id;
+
+    let uIdx = users.findIndex(u => u.id === targetId || (u.email && u.email.toLowerCase() === targetId.toLowerCase()));
+    const pIdx = profiles.findIndex(p => p.id === targetId || (uIdx !== -1 && p.name.toLowerCase() === users[uIdx].name.toLowerCase()));
+
+    // If Admin is upgrading a SingleProfile that doesn't yet have a User account record, create one so they can log in with that role
+    if (uIdx === -1 && pIdx !== -1) {
+      const prof = profiles[pIdx];
+      const slug = prof.name.toLowerCase().replace(/[^a-z0-9]/g, '.');
+      const newLinkedUser: User = {
+        id: prof.id,
+        email: `${slug}@bouncer.date`,
+        name: prof.name,
+        age: prof.age,
+        role: (role as 'user' | 'featured' | 'admin') || 'user',
+        isFeatured: isFeatured !== undefined ? Boolean(isFeatured) : role === 'featured',
+        subscriptionPlan: role === 'admin' || role === 'featured' ? 'vip_30_singles' : 'free',
+        subscriptionStatus: 'active',
+        avatar: prof.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        province: prof.province,
+        city: prof.city,
+        subLocation: prof.subLocation,
+        location: prof.location,
+        childrenCount: prof.childrenCount,
+        intent: prof.intent,
+        hivStatus: prof.hivStatus,
+        whatsappNumber: prof.whatsappNumber,
+        bio: prof.bio,
+        gender: prof.gender,
+        seeking: prof.seeking,
+        bouncerVerified: true,
+        createdAt: new Date().toISOString()
+      };
+      users.push(newLinkedUser);
+      uIdx = users.length - 1;
+    }
+
+    if (uIdx === -1 && pIdx === -1) {
+      return res.status(404).json({ error: 'User or profile not found.' });
+    }
+
+    const effectiveRole: 'user' | 'featured' | 'admin' = role || (isFeatured ? 'featured' : 'user');
+    const effectiveFeatured: boolean = isFeatured !== undefined ? Boolean(isFeatured) : effectiveRole === 'featured';
+
+    if (uIdx !== -1) {
+      users[uIdx].role = effectiveRole;
+      users[uIdx].isFeatured = effectiveFeatured;
+      if (effectiveRole === 'admin' || effectiveRole === 'featured' || effectiveFeatured) {
+        users[uIdx].bouncerVerified = true;
+      }
+      if (effectiveRole === 'admin' && users[uIdx].subscriptionPlan === 'free') {
+        users[uIdx].subscriptionPlan = 'vip_30_singles';
+      }
+
+      notifications.unshift({
+        id: `notif_role_${Date.now()}`,
+        userId: users[uIdx].id,
+        title: effectiveRole === 'admin'
+          ? '🛡️ Upgraded to Admin Role!'
+          : effectiveFeatured
+          ? '⭐ Upgraded to Featured Single!'
+          : '👤 Account Role Updated',
+        message: effectiveRole === 'admin'
+          ? 'An Administrator has upgraded your account to Admin Role with full Bouncer Control Panel rights.'
+          : effectiveFeatured
+          ? 'An Administrator has upgraded your profile to Featured Single status in the Spotlight!'
+          : 'Your account role has been updated to Standard Member.',
+        type: 'system',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    if (pIdx !== -1) {
+      profiles[pIdx].role = effectiveRole;
+      profiles[pIdx].isFeatured = effectiveFeatured;
+      if (effectiveFeatured || effectiveRole === 'featured' || effectiveRole === 'admin') {
+        profiles[pIdx].bouncerStatus = 'vip_approved';
+      }
+    } else if (uIdx !== -1) {
+      // Also check by name match if pIdx wasn't found by ID
+      const nameMatchIdx = profiles.findIndex(p => p.name.toLowerCase() === users[uIdx].name.toLowerCase());
+      if (nameMatchIdx !== -1) {
+        profiles[nameMatchIdx].role = effectiveRole;
+        profiles[nameMatchIdx].isFeatured = effectiveFeatured;
+        if (effectiveFeatured || effectiveRole === 'featured' || effectiveRole === 'admin') {
+          profiles[nameMatchIdx].bouncerStatus = 'vip_approved';
+        }
+      }
+    }
+
+    saveAppData();
+    res.json({
+      success: true,
+      user: uIdx !== -1 ? users[uIdx] : null,
+      profile: pIdx !== -1 ? profiles[pIdx] : null,
+      message: `Role updated to ${effectiveRole.toUpperCase()}${effectiveFeatured ? ' (Featured)' : ''}`
+    });
   });
 
   // Admin: Delete/Remove User Account & Profile
@@ -1800,6 +1933,8 @@ async function startServer() {
       name: u.name,
       email: u.email,
       whatsappNumber: u.whatsappNumber,
+      role: u.role || 'user',
+      isFeatured: Boolean(u.isFeatured || u.role === 'featured'),
       plan: u.subscriptionPlan,
       status: u.subscriptionStatus,
       expiresAt: u.subscriptionExpiresAt || 'N/A',

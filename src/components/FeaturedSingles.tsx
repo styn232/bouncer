@@ -23,10 +23,16 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Filter profiles that are explicitly marked as featured or VIP approved
-  const featuredProfiles = profiles.filter(
-    (p) => p.isFeatured || (p as any).featured || p.bouncerStatus === 'vip_approved'
-  );
+  // Filter profiles that are explicitly marked as featured role, isFeatured, or VIP approved
+  const featuredProfiles = profiles
+    .filter((p) => p.role === 'featured' || p.isFeatured || (p as any).featured || p.bouncerStatus === 'vip_approved')
+    .sort((a, b) => {
+      const aExplicit = Boolean(a.role === 'featured' || a.isFeatured);
+      const bExplicit = Boolean(b.role === 'featured' || b.isFeatured);
+      if (aExplicit && !bExplicit) return -1;
+      if (!aExplicit && bExplicit) return 1;
+      return 0;
+    });
 
   // If no explicitly tagged featured profiles, take the highest rated/VIP profiles as spotlight
   const displayList = featuredProfiles.length > 0

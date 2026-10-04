@@ -78,11 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const logoUrl = siteSettings?.logoUrl;
   const iconUrl = siteSettings?.iconUrl;
 
-  const isAdmin = currentUser && (
-    currentUser.role === 'admin' || 
-    currentUser.email?.toLowerCase() === 'jobsatespace@gmail.com' || 
-    currentUser.email?.toLowerCase() === 'admin@bouncer.date'
-  );
+  const isAdmin = currentUser?.role === 'admin';
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -272,16 +268,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               <>
                 <button
                   onClick={onOpenLogin}
-                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 transition-all"
+                  className="px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 transition-all cursor-pointer"
                 >
-                  Log In
+                  Sign In
                 </button>
 
                 <button
                   onClick={onOpenRegister}
-                  className="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white shadow-lg transition-all"
+                  className="px-3 sm:px-3.5 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white shadow-lg transition-all cursor-pointer"
                 >
-                  Create Account
+                  Sign Up
                 </button>
               </>
             ) : (
@@ -585,7 +581,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
 
-        {currentUser && (
+        {currentUser ? (
           <button
             onClick={() => handleNavigate('profile')}
             className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-all ${
@@ -595,6 +591,23 @@ export const Navbar: React.FC<NavbarProps> = ({
             <UserIcon className="w-5 h-5" />
             <span>Profile</span>
           </button>
+        ) : (
+          <>
+            <button
+              onClick={onOpenLogin}
+              className="flex flex-col items-center gap-1 text-[10px] font-bold text-slate-300 hover:text-white transition-all active:scale-105"
+            >
+              <UserIcon className="w-5 h-5 text-amber-400" />
+              <span>Sign In</span>
+            </button>
+            <button
+              onClick={onOpenRegister}
+              className="flex flex-col items-center gap-1 text-[10px] font-extrabold text-rose-400 hover:text-rose-300 transition-all active:scale-105"
+            >
+              <Sparkles className="w-5 h-5 text-rose-500" />
+              <span>Sign Up</span>
+            </button>
+          </>
         )}
 
         {isAdmin && (

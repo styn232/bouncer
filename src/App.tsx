@@ -11,7 +11,7 @@ import { PhotoGalleryModal } from './components/PhotoGalleryModal';
 import { PaymentModal } from './components/PaymentModal';
 import { UserProfileEditorModal } from './components/UserProfileEditorModal';
 import { AdminPanel } from './components/AdminPanel';
-import { AuthModal } from './components/AuthModal';
+import { AuthModal, AuthModalMode } from './components/AuthModal';
 import { ToastNotification, Toast } from './components/ToastNotification';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { PushNotificationBanner } from './components/PushNotificationBanner';
@@ -131,7 +131,7 @@ export default function App() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalInitialMode, setAuthModalInitialMode] = useState<'user' | 'admin'>('user');
+  const [authModalInitialMode, setAuthModalInitialMode] = useState<AuthModalMode>('user_login');
 
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [isSafetyModalOpen, setIsSafetyModalOpen] = useState(false);
@@ -467,77 +467,18 @@ export default function App() {
     }
   }, [activeConvId]);
 
-  // Firebase Auth & Session Synchronization
+  // Security: Ensure every visit starts signed out so users can Sign Up or Sign In fresh on every visit
   useEffect(() => {
-    if (!auth) return;
-    let unsubscribe: any = null;
-    try {
-      unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-        if (fbUser) {
-          try {
-            let userRole: 'user' | 'admin' = 
-              (fbUser.email && (fbUser.email.toLowerCase() === 'admin@bouncer.date' || fbUser.email.toLowerCase() === 'jobsatespace@gmail.com')) 
-                ? 'admin' 
-                : 'user';
-
-            let userData: any = {
-              id: fbUser.uid,
-              uid: fbUser.uid,
-              email: fbUser.email || '',
-              name: fbUser.displayName || (userRole === 'admin' ? 'Bouncer Admin' : 'Member'),
-              avatar: fbUser.photoURL || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80`,
-              role: userRole,
-              subscriptionPlan: userRole === 'admin' ? 'vip_15_singles' : 'free',
-              bouncerVerified: userRole === 'admin'
-            };
-
-            if (db) {
-              try {
-                const userSnap = await getDoc(doc(db, 'users', fbUser.uid));
-                if (userSnap && typeof userSnap.exists === 'function' && userSnap.exists()) {
-                  const docData = userSnap.data();
-                  userData = { ...userData, ...docData };
-                }
-              } catch (e) {
-                console.warn('Could not read user doc from Firestore:', e);
-              }
-            }
-
-            setCurrentUser(userData);
-            localStorage.setItem('bouncer_logged_user', JSON.stringify(userData));
-
-            // Sync with backend
-            fetch('/api/auth/firebase-sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                uid: fbUser.uid,
-                email: fbUser.email,
-                name: userData.name,
-                role: userData.role,
-                avatar: userData.avatar
-              })
-            }).catch(() => {});
-          } catch (err) {
-            console.error('Firebase onAuthStateChanged sync error:', err);
-          }
-        }
-      });
-    } catch (err) {
-      console.warn('Firebase auth state subscription error:', err);
+    localStorage.removeItem('bouncer_logged_user');
+    setCurrentUser(null);
+    if (auth) {
+      signOut(auth).catch(() => {});
     }
-
-    return () => {
-      if (typeof unsubscribe === 'function') {
-        try {
-          unsubscribe();
-        } catch {}
-      }
-    };
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
   }, []);
 
   // Optimized Fetch Auth, Settings & Admin Data with Parallelism, In-Memory Caching & Deduplication
-  const fetchInitialData = async (options?: { force?: boolean; silent?: boolean }) => {
+  const fetchInitialData = async (options?: { force?: boolean; silent?: boolean; sessionUser?: User | null }) => {
     if (options?.silent) {
       updateLoading({ isBackgroundSyncing: true });
     } else {
@@ -546,41 +487,11 @@ export default function App() {
 
     try {
       await dataCache.dedupe('initial_data_fetch', async () => {
-        // 1. Session Persistence Check
-        const savedUserStr = localStorage.getItem('bouncer_logged_user');
-        let currentSessionUser: User | null = currentUser;
+        const currentSessionUser: User | null = options?.sessionUser !== undefined ? options.sessionUser : currentUser;
 
-        if (savedUserStr) {
-          try {
-            const savedUser = JSON.parse(savedUserStr);
-            if (savedUser && (savedUser.id || savedUser.email)) {
-              currentSessionUser = savedUser;
-              setCurrentUser(savedUser);
-              // Non-blocking sync with server
-              fetch('/api/auth/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user: savedUser })
-              }).catch(() => {});
-            }
-          } catch (e) {
-            localStorage.removeItem('bouncer_logged_user');
-          }
-        } else {
-          const meRes = await fetch('/api/auth/me').catch(() => null);
-          if (meRes && meRes.ok) {
-            const data = await meRes.json().catch(() => null);
-            if (data && data.user && (data.user.id || data.user.email)) {
-              currentSessionUser = data.user;
-              setCurrentUser(data.user);
-              localStorage.setItem('bouncer_logged_user', JSON.stringify(data.user));
-            }
-          }
-        }
-
-        // 2. Prepare parallel background requests
-        const isUserAdmin = currentSessionUser?.role === 'admin' || (currentUser?.role === 'admin');
-        const adminEmail = currentSessionUser?.email || currentUser?.email || 'jobsatespace@gmail.com';
+        // Prepare parallel background requests
+        const isUserAdmin = currentSessionUser?.role === 'admin';
+        const adminEmail = currentSessionUser?.email || '';
 
         const fetchers: Promise<any>[] = [];
 
@@ -695,7 +606,10 @@ export default function App() {
   const handleApprovePayment = async (txId: string) => {
     try {
       updateLoading({ isActionLoading: true });
-      const res = await fetch(`/api/admin/payments/${txId}/approve`, { method: 'PUT' });
+      const res = await fetch(`/api/admin/payments/${txId}/approve`, {
+        method: 'PUT',
+        headers: { 'x-user-role': currentUser?.role || '' }
+      });
       if (res.ok) {
         addToast('Payment Approved! 💳', 'User subscription plan activated successfully.', 'success');
         dataCache.invalidateAll();
@@ -712,7 +626,10 @@ export default function App() {
   const handleRejectPayment = async (txId: string) => {
     try {
       updateLoading({ isActionLoading: true });
-      const res = await fetch(`/api/admin/payments/${txId}/reject`, { method: 'PUT' });
+      const res = await fetch(`/api/admin/payments/${txId}/reject`, {
+        method: 'PUT',
+        headers: { 'x-user-role': currentUser?.role || '' }
+      });
       if (res.ok) {
         addToast('Payment Rejected ❌', 'Transaction rejected by admin.', 'info');
         dataCache.invalidateAll();
@@ -763,7 +680,7 @@ export default function App() {
   // Handle Tab Selection with Admin Auth Gate
   const handleSelectTab = (tab: MainTabType) => {
     if (tab === 'admin' && currentUser?.role !== 'admin') {
-      setAuthModalInitialMode('admin');
+      setAuthModalInitialMode('admin_login');
       setIsAuthModalOpen(true);
       return;
     }
@@ -1049,7 +966,10 @@ export default function App() {
       updateLoading({ isActionLoading: true });
       const res = await fetch(`/api/admin/profiles/${id}/bouncer-status`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser?.role || ''
+        },
         body: JSON.stringify({ status, notes })
       });
       if (res.ok) {
@@ -1130,22 +1050,16 @@ export default function App() {
           onOpenVerification={() => setIsVerificationModalOpen(true)}
           onOpenEditProfile={() => setIsUserModalOpen(true)}
           onOpenAuth={() => {
-            if (!currentUser) {
-              setAuthModalInitialMode('user');
-              setIsAuthModalOpen(true);
-            }
+            setAuthModalInitialMode('user_login');
+            setIsAuthModalOpen(true);
           }}
           onOpenLogin={() => {
-            if (!currentUser) {
-              setAuthModalInitialMode('user');
-              setIsAuthModalOpen(true);
-            }
+            setAuthModalInitialMode('user_login');
+            setIsAuthModalOpen(true);
           }}
           onOpenRegister={() => {
-            if (!currentUser) {
-              setAuthModalInitialMode('user');
-              setIsAuthModalOpen(true);
-            }
+            setAuthModalInitialMode('user_register');
+            setIsAuthModalOpen(true);
           }}
           onOpenPayment={() => setIsPaymentModalOpen(true)}
         />
@@ -1153,6 +1067,45 @@ export default function App() {
       {/* Main Body View Switching */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 md:pb-8 space-y-4 sm:space-y-6">
         
+        {/* Visitor Sign Up / Sign In Prompt Banner */}
+        {!currentUser && (
+          <div className="bg-gradient-to-r from-rose-950/90 via-slate-900/95 to-amber-950/80 border border-rose-500/30 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0">
+                <UserCheck className="w-5 h-5 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-xs sm:text-sm font-extrabold text-white">
+                  Welcome to Dating With Bouncer
+                </h3>
+                <p className="text-[11px] text-rose-200/80">
+                  Sign up to create your single profile or sign in to your account to connect with vetted singles.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => {
+                  setAuthModalInitialMode('user_login');
+                  setIsAuthModalOpen(true);
+                }}
+                className="flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white transition-all cursor-pointer"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => {
+                  setAuthModalInitialMode('user_register');
+                  setIsAuthModalOpen(true);
+                }}
+                className="flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white shadow-md transition-all cursor-pointer"
+              >
+                Sign Up Now
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* DISCOVER & HOME TAB: DIRECT SINGLES DIRECTORY */}
         {(activeTab === 'discover' || activeTab === 'home') && (
           <div className="space-y-6">
@@ -1647,10 +1600,8 @@ export default function App() {
         onAddToCart={handleAddToCart}
         onClose={() => setSelectedProfileModal(null)}
         onOpenAuth={() => {
-          if (!currentUser) {
-            setAuthModalInitialMode('user');
-            setIsAuthModalOpen(true);
-          }
+          setAuthModalInitialMode('user_login');
+          setIsAuthModalOpen(true);
         }}
       />
 
@@ -1693,14 +1644,15 @@ export default function App() {
         initialMode={authModalInitialMode}
         onLoginSuccess={(user) => {
           setCurrentUser(user);
-          localStorage.setItem('bouncer_logged_user', JSON.stringify(user));
+          dataCache.invalidateAll();
           if (user?.role === 'admin') {
             setActiveTab('admin');
             addToast('Welcome Admin 🛡️', 'Authenticated to Bouncer Admin Backend.', 'bouncer');
           } else {
-            addToast('Welcome Back! 👋', `Logged in as ${user.name}`, 'success');
+            addToast('Welcome! 👋', `Signed in as ${user.name}`, 'success');
           }
-          fetchInitialData();
+          fetchInitialData({ force: true, sessionUser: user });
+          fetchProfiles({ force: true, silent: true });
         }}
       />
 
@@ -1813,7 +1765,7 @@ export default function App() {
                 if (currentUser?.role === 'admin') {
                   setActiveTab('admin');
                 } else {
-                  setAuthModalInitialMode('admin');
+                  setAuthModalInitialMode('admin_login');
                   setIsAuthModalOpen(true);
                 }
               }}

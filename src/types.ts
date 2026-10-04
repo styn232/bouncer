@@ -34,6 +34,7 @@ export interface SingleProfile {
   height: string;
   relationshipGoal: string; // e.g. "Marriage", "VIP Lounge dates", etc.
   hivStatus?: string; // e.g. "Negative", "Positive", "Undisclosed"
+  role?: 'user' | 'featured' | 'admin';
   isFeatured?: boolean;
   isNew?: boolean;
   viewsCount?: number;
@@ -75,7 +76,8 @@ export interface User {
   province?: string;
   city?: string;
   subLocation?: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'featured' | 'admin';
+  isFeatured?: boolean;
   subscriptionPlan: SubscriptionPlanId;
   subscriptionStatus: 'active' | 'canceled' | 'none';
   subscriptionExpiresAt?: string;
