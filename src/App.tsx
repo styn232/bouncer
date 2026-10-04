@@ -1651,7 +1651,7 @@ export default function App() {
           } else {
             addToast('Welcome! 👋', `Signed in as ${user.name}`, 'success');
           }
-          fetchInitialData({ force: true, sessionUser: user });
+          fetchInitialData({ force: true, silent: true, sessionUser: user });
           fetchProfiles({ force: true, silent: true });
         }}
       />

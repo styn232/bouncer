@@ -479,64 +479,98 @@ async function startServer() {
   });
 
   app.post('/api/auth/register', (req, res) => {
-    const { email, name, age, province, city, subLocation, location, gender, childrenCount, intent, bio, whatsappNumber, hivStatus } = req.body;
+    const { id, email, name, age, province, city, subLocation, location, gender, childrenCount, intent, bio, whatsappNumber, hivStatus, avatar } = req.body;
     if (!email || !name) {
       return res.status(400).json({ error: 'Name and email are required.' });
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase();
     const formattedName = capitalizeName(name);
     const normalizedHiv = hivStatus && (hivStatus.includes('+') || hivStatus.toLowerCase().includes('pos')) ? 'HIV+' : 'HIV-';
     const selectedCity = city || 'Harare';
     const selectedSubLocation = subLocation || 'Borrowdale';
     const selectedProvince = province || getProvinceForCity(selectedCity);
+    const userAvatar = avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
+    const isSuperAdmin = normalizedEmail === MOCK_ADMIN_USER.email.toLowerCase() || normalizedEmail === 'admin@bouncer.date';
 
-    const newUser: User = {
-      id: `usr_${Date.now()}`,
-      email,
-      name: formattedName,
-      age: Number(age) || 25,
-      province: selectedProvince,
-      city: selectedCity,
-      subLocation: selectedSubLocation,
-      location: location || `${selectedCity} (${selectedSubLocation}), Zimbabwe`,
-      childrenCount: Number(childrenCount) || 0,
-      intent: intent || 'Marriage',
-      hivStatus: normalizedHiv,
-      role: 'user',
-      subscriptionPlan: 'free',
-      subscriptionStatus: 'active',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-      bio: bio || 'New single on Dating with Bouncer!',
-      whatsappNumber: whatsappNumber || '+263 77 123 4567',
-      gender: gender || 'female',
-      interests: ['Dating', 'Coffee', 'Music'],
-      bouncerVerified: false,
-      walletBalance: 0,
-      createdAt: new Date().toISOString()
-    };
+    // Check if user with this email already exists
+    const existingIdx = users.findIndex(u => u.email && u.email.toLowerCase() === normalizedEmail);
+    let registeredUser: User;
 
-    users.push(newUser);
-    currentUser = newUser;
+    if (existingIdx !== -1) {
+      const existingUser = users[existingIdx];
+      registeredUser = {
+        ...existingUser,
+        name: formattedName || existingUser.name,
+        age: Number(age) || existingUser.age || 25,
+        province: selectedProvince,
+        city: selectedCity,
+        subLocation: selectedSubLocation,
+        location: location || `${selectedCity} (${selectedSubLocation}), Zimbabwe`,
+        childrenCount: childrenCount !== undefined ? Number(childrenCount) : (existingUser.childrenCount || 0),
+        intent: intent || existingUser.intent || 'Marriage',
+        hivStatus: normalizedHiv,
+        role: isSuperAdmin ? 'admin' : (existingUser.role || 'user'),
+        avatar: avatar || existingUser.avatar || userAvatar,
+        whatsappNumber: whatsappNumber || existingUser.whatsappNumber || '+263 77 123 4567',
+        gender: gender || existingUser.gender || 'female'
+      };
+      users[existingIdx] = registeredUser;
+    } else {
+      registeredUser = {
+        id: id || `usr_${Date.now()}`,
+        email: String(email).trim(),
+        name: formattedName,
+        age: Number(age) || 25,
+        province: selectedProvince,
+        city: selectedCity,
+        subLocation: selectedSubLocation,
+        location: location || `${selectedCity} (${selectedSubLocation}), Zimbabwe`,
+        childrenCount: Number(childrenCount) || 0,
+        intent: intent || 'Marriage',
+        hivStatus: normalizedHiv,
+        role: isSuperAdmin ? 'admin' : 'user',
+        subscriptionPlan: isSuperAdmin ? 'vip_30_singles' : 'free',
+        subscriptionStatus: 'active',
+        avatar: userAvatar,
+        bio: bio || 'New single on Dating with Bouncer!',
+        whatsappNumber: whatsappNumber || '+263 77 123 4567',
+        gender: gender || 'female',
+        interests: ['Dating', 'Coffee', 'Music'],
+        bouncerVerified: isSuperAdmin,
+        walletBalance: 0,
+        createdAt: new Date().toISOString()
+      };
+      users.push(registeredUser);
+    }
 
-    // Auto-create SingleProfile so user displays in directory
+    currentUser = registeredUser;
+
+    // Auto-create or update SingleProfile so user displays in directory immediately
+    const existingProfIdx = profiles.findIndex(
+      p => p.id === `p_${registeredUser.id}` || (p.name.toLowerCase() === registeredUser.name.toLowerCase() && p.whatsappNumber === registeredUser.whatsappNumber)
+    );
+
     const newProfile: SingleProfile = {
-      id: `p_${Date.now()}`,
-      name: newUser.name,
-      age: newUser.age,
-      province: newUser.province,
-      city: newUser.city,
-      subLocation: newUser.subLocation,
-      location: newUser.location,
-      childrenCount: newUser.childrenCount,
-      intent: newUser.intent,
-      hivStatus: newUser.hivStatus,
-      seeking: newUser.gender === 'male' ? 'female' : 'male',
-      bio: newUser.bio || 'Recently joined single seeking genuine connections.',
-      whatsappNumber: newUser.whatsappNumber,
-      photos: [newUser.avatar],
-      interests: newUser.interests || ['Dating'],
-      gender: newUser.gender || 'female',
-      bouncerStatus: 'pending_check',
+      id: existingProfIdx !== -1 ? profiles[existingProfIdx].id : `p_${Date.now()}`,
+      name: registeredUser.name,
+      age: registeredUser.age,
+      province: registeredUser.province,
+      city: registeredUser.city,
+      subLocation: registeredUser.subLocation,
+      location: registeredUser.location,
+      childrenCount: registeredUser.childrenCount,
+      intent: registeredUser.intent,
+      hivStatus: registeredUser.hivStatus,
+      role: registeredUser.role,
+      isFeatured: registeredUser.role === 'featured' || Boolean(registeredUser.isFeatured),
+      seeking: registeredUser.gender === 'male' ? 'female' : 'male',
+      bio: registeredUser.bio || 'Recently joined single seeking genuine connections.',
+      whatsappNumber: registeredUser.whatsappNumber || '+263 77 123 4567',
+      photos: [registeredUser.avatar],
+      interests: registeredUser.interests || ['Dating'],
+      gender: registeredUser.gender || 'female',
+      bouncerStatus: registeredUser.bouncerVerified ? 'verified' : 'pending_check',
       bouncerNotes: 'Awaiting Bouncer identity and photo review.',
       compatibilityScore: 92,
       height: "5'7\"",
@@ -547,18 +581,22 @@ async function startServer() {
       createdAt: new Date().toISOString()
     };
 
-    profiles.unshift(newProfile);
+    if (existingProfIdx !== -1) {
+      profiles[existingProfIdx] = newProfile;
+    } else {
+      profiles.unshift(newProfile);
+    }
 
     // Broadcast gender-targeted notification:
     // If male registered -> send to females!
     // If female registered -> send to males!
-    const regGender = (newUser.gender || 'female').toLowerCase();
+    const regGender = (registeredUser.gender || 'female').toLowerCase();
     const isMale = regGender === 'male';
     const isFemale = regGender === 'female';
     const targetGender: 'male' | 'female' | 'all' = isMale ? 'female' : (isFemale ? 'male' : 'all');
 
-    const regCity = newUser.city || newUser.subLocation || 'Harare';
-    const regAge = newUser.age || 25;
+    const regCity = registeredUser.city || registeredUser.subLocation || 'Harare';
+    const regAge = registeredUser.age || 25;
 
     const notifTitle = isMale
       ? '❤️ New Gentleman Alert!'
@@ -584,9 +622,9 @@ async function startServer() {
       photo: newProfile.photos?.[0] || currentUser.avatar
     };
     notifications.unshift(newNotif);
-    saveAppData();
 
     res.json({ success: true, user: currentUser, profile: newProfile });
+    setImmediate(() => saveAppData());
   });
 
   app.put('/api/auth/profile', (req, res) => {

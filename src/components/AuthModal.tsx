@@ -97,6 +97,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Helper to prevent Firebase/Firestore promises from hanging indefinitely
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error('Operation timed out')), ms)
+      )
+    ]);
+  };
+
   // Handle Google Sign-In with Firebase
   const handleGoogleSignIn = async () => {
     setErrorMsg('');
@@ -119,7 +129,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (db) {
         try {
           const userDocRef = doc(db, 'users', fbUser.uid);
-          const userSnap = await getDoc(userDocRef);
+          const userSnap = await withTimeout(getDoc(userDocRef), 1500);
 
           if (userSnap.exists()) {
             const existingData = userSnap.data();
@@ -129,7 +139,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               userRole = 'featured';
             }
           } else {
-            await setDoc(userDocRef, {
+            // Non-blocking Firestore write so UI never hangs
+            setDoc(userDocRef, {
               id: fbUser.uid,
               uid: fbUser.uid,
               email: fbUser.email,
@@ -140,7 +151,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               subscriptionPlan: userRole === 'admin' ? 'vip_30_singles' : 'free',
               bouncerVerified: userRole === 'admin',
               createdAt: new Date().toISOString()
-            }, { merge: true });
+            }, { merge: true }).catch(() => {});
           }
         } catch (dbErr) {
           console.warn('Firestore user profile sync warning:', dbErr);
@@ -191,98 +202,72 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       if (mode === 'user_login') {
-        // Standard Sign In (also works for Super Admin jobsatespace@gmail.com, upgraded Admins, and Featured users)
-        let fbUid = '';
-        let fbDisplayName = '';
-        if (password && auth) {
-          try {
-            const userCred = await signInWithEmailAndPassword(auth, email, password);
-            fbUid = userCred.user.uid;
-            fbDisplayName = userCred.user.displayName || '';
-          } catch {
-            // Proceed to backend check
-          }
-        }
-
+        // 1. Check backend immediately for fast Sign In (works for Super Admin, Admins, Featured, and Registered Users)
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ email: email.trim(), password })
         });
 
         if (res.ok) {
           const data = await res.json();
+          if (password && auth) {
+            signInWithEmailAndPassword(auth, email.trim(), password).catch(() => {});
+          }
           onLoginSuccess(data.user);
           onClose();
-        } else if (fbUid) {
+          return;
+        }
+
+        // 2. Fallback: Check Firebase Auth with a short timeout in case user only exists in Firebase
+        let fbUid = '';
+        let fbDisplayName = '';
+        if (password && auth) {
+          try {
+            const userCred = await withTimeout(
+              signInWithEmailAndPassword(auth, email.trim(), password),
+              2500
+            );
+            fbUid = userCred.user.uid;
+            fbDisplayName = userCred.user.displayName || '';
+          } catch {
+            // Proceed to error message
+          }
+        }
+
+        if (fbUid) {
           const syncRes = await fetch('/api/auth/firebase-sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               uid: fbUid,
-              email,
-              name: fbDisplayName || email.split('@')[0]
+              email: email.trim(),
+              name: fbDisplayName || email.trim().split('@')[0]
             })
           });
           if (syncRes.ok) {
             const syncData = await syncRes.json();
             onLoginSuccess(syncData.user);
             onClose();
-          } else {
-            setErrorMsg('Account not found. Please click "Sign Up" to create an account first.');
+            return;
           }
-        } else {
-          const data = await res.json();
-          setErrorMsg(data.error || 'Account not found. Please click "Sign Up" to create an account first.');
         }
+
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(errData.error || 'Account not found. Please click "Sign Up" to create an account first.');
       } else {
-        // User Register with Firebase Auth + Firestore
-        let fbUid = `usr_${Date.now()}`;
-        const pwdToUse = password || 'UserPass2025!';
-
-        try {
-          const userCred = await createUserWithEmailAndPassword(auth, email, pwdToUse);
-          fbUid = userCred.user.uid;
-        } catch {
-          // Fallback to server registration
-        }
-
+        // Instant User Registration via Backend + Non-blocking background Firebase/Firestore sync
+        const cleanEmail = email.trim();
+        const formattedName = capitalizeName(name.trim() || cleanEmail.split('@')[0]);
         const fullLocation = `${city} (${subLocation}), ${province}, Zimbabwe`;
-
-        // Save in Firestore
-        const formattedName = capitalizeName(name);
-        try {
-          await setDoc(doc(db, 'users', fbUid), {
-            id: fbUid,
-            uid: fbUid,
-            email,
-            name: formattedName,
-            age: Number(age),
-            gender,
-            childrenCount: Number(childrenCount),
-            province,
-            city,
-            subLocation,
-            location: fullLocation,
-            intent,
-            hivStatus,
-            whatsappNumber,
-            avatar,
-            role: 'user',
-            subscriptionPlan: 'free',
-            bouncerVerified: false,
-            createdAt: new Date().toISOString()
-          }, { merge: true });
-        } catch (dbErr) {
-          console.warn('Firestore user write warning:', dbErr);
-        }
+        const generatedId = `usr_${Date.now()}`;
 
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id: fbUid,
-            email,
+            id: generatedId,
+            email: cleanEmail,
             name: formattedName,
             age: Number(age),
             gender,
@@ -293,18 +278,67 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             location: fullLocation,
             intent,
             hivStatus,
-            whatsappNumber,
+            whatsappNumber: whatsappNumber.trim(),
             avatar
           })
         });
 
         if (res.ok) {
           const data = await res.json();
-          onLoginSuccess(data.user);
+          const createdUser = data.user;
+
+          // Non-blocking background sync with Firebase Auth & Firestore so Sign Up finishes immediately
+          const pwdToUse = password && password.length >= 6 ? password : `${password || 'Pass'}2025!`;
+          (async () => {
+            try {
+              let fbUid = createdUser?.id || generatedId;
+              if (auth) {
+                try {
+                  const userCred = await withTimeout(
+                    createUserWithEmailAndPassword(auth, cleanEmail, pwdToUse),
+                    3000
+                  );
+                  fbUid = userCred.user.uid;
+                } catch {
+                  // Ignore if already exists or Firebase email auth is unavailable
+                }
+              }
+              if (db) {
+                await withTimeout(
+                  setDoc(doc(db, 'users', fbUid), {
+                    id: fbUid,
+                    uid: fbUid,
+                    email: cleanEmail,
+                    name: formattedName,
+                    age: Number(age),
+                    gender,
+                    childrenCount: Number(childrenCount),
+                    province,
+                    city,
+                    subLocation,
+                    location: fullLocation,
+                    intent,
+                    hivStatus,
+                    whatsappNumber: whatsappNumber.trim(),
+                    avatar,
+                    role: createdUser?.role || 'user',
+                    subscriptionPlan: createdUser?.subscriptionPlan || 'free',
+                    bouncerVerified: Boolean(createdUser?.bouncerVerified),
+                    createdAt: new Date().toISOString()
+                  }, { merge: true }),
+                  2500
+                );
+              }
+            } catch {
+              // Silent background sync catch
+            }
+          })();
+
+          onLoginSuccess(createdUser);
           onClose();
         } else {
-          const data = await res.json();
-          setErrorMsg(data.error || 'Registration failed. Email may already be in use.');
+          const data = await res.json().catch(() => ({}));
+          setErrorMsg(data.error || 'Registration failed. Please check your details and try again.');
         }
       }
     } catch (err) {
