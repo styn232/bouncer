@@ -94,8 +94,12 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
     if (n.userId && n.userId !== 'all' && currentUser?.id) {
       return n.userId === currentUser.id;
     }
-    if (n.targetGender && n.targetGender !== 'all' && userGender) {
-      return n.targetGender === userGender;
+    if (userGender === 'male') {
+      if (n.gender && n.gender.toLowerCase() === 'male') return false;
+      if (n.targetGender && n.targetGender !== 'all' && n.targetGender !== 'male') return false;
+    } else if (userGender === 'female') {
+      if (n.gender && n.gender.toLowerCase() === 'female') return false;
+      if (n.targetGender && n.targetGender !== 'all' && n.targetGender !== 'female') return false;
     }
     return true;
   });

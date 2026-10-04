@@ -367,7 +367,7 @@ async function startServer() {
 
   // Firebase Auth Sync & Backend Opening Endpoint
   app.post('/api/auth/firebase-sync', (req, res) => {
-    const { uid, email, name, role, adminKey, avatar, photoURL } = req.body;
+    const { uid, email, name, role, adminKey, avatar, photoURL, gender } = req.body;
     if (!email && !uid) {
       return res.status(400).json({ error: 'Firebase UID or email is required.' });
     }
@@ -419,7 +419,7 @@ async function startServer() {
         location: 'Harare, Zimbabwe',
         childrenCount: 0,
         intent: 'Marriage',
-        gender: 'female',
+        gender: isAdminAccount ? undefined : (gender || 'female'),
         bouncerVerified: isAdminAccount,
         createdAt: new Date().toISOString()
       };

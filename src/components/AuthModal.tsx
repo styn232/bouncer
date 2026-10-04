@@ -501,6 +501,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {/* USER REGISTER FIELDS */}
             {mode === 'user_register' && (
               <>
+                {/* Prominent Gender Selection on Sign Up */}
+                <div className="bg-slate-950/90 border border-rose-500/40 rounded-2xl p-3.5 space-y-2">
+                  <label className="block font-bold text-rose-200 uppercase tracking-wider text-xs flex items-center justify-between">
+                    <span>Select Your Gender <span className="text-rose-500 font-black">*</span></span>
+                    <span className="text-[10px] text-amber-300 font-bold">
+                      {gender === 'male' ? '👨 Men see Ladies only' : '👩 Ladies see Men only'}
+                    </span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGender('female');
+                        if (avatar.includes('1507003211169-0a1dd7228f2d')) {
+                          setAvatar('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
+                        }
+                      }}
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                        gender === 'female'
+                          ? 'bg-rose-500/20 border-rose-400 text-rose-200 ring-2 ring-rose-500/40 shadow-sm'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="text-sm">👩 Lady (Female)</span>
+                      <span className="text-[10px] font-medium opacity-80">Shows Single Men Only</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGender('male');
+                        if (avatar.includes('1534528741775-53994a69daeb')) {
+                          setAvatar('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=800');
+                        }
+                      }}
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                        gender === 'male'
+                          ? 'bg-amber-500/20 border-amber-400 text-amber-200 ring-2 ring-amber-500/40 shadow-sm'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="text-sm">👨 Man (Male)</span>
+                      <span className="text-[10px] font-medium opacity-80">Shows Single Ladies Only</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Profile Photo File Upload */}
                 <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2">
                   <label className="block font-bold text-amber-400 uppercase tracking-wider text-[10px]">
@@ -623,9 +669,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       onChange={(e) => setGender(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
                     >
-                      <option value="female">Female</option>
-                      <option value="male">Male</option>
-                      <option value="non-binary">Non-binary</option>
+                      <option value="female">👩 Lady (Female)</option>
+                      <option value="male">👨 Man (Male)</option>
                     </select>
                   </div>
 

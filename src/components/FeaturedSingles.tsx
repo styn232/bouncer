@@ -23,8 +23,17 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Strictly enforce opposite-gender visibility: Men only see Ladies, Ladies only see Men
+  const viewerGender = (currentUser?.gender || '').toLowerCase();
+  const oppositeGenderProfiles = profiles.filter((p) => {
+    const profGender = (p.gender || 'female').toLowerCase();
+    if (viewerGender === 'male') return profGender === 'female';
+    if (viewerGender === 'female') return profGender === 'male';
+    return true;
+  });
+
   // Filter profiles that are explicitly marked as featured role, isFeatured, or VIP approved
-  const featuredProfiles = profiles
+  const featuredProfiles = oppositeGenderProfiles
     .filter((p) => p.role === 'featured' || p.isFeatured || (p as any).featured || p.bouncerStatus === 'vip_approved')
     .sort((a, b) => {
       const aExplicit = Boolean(a.role === 'featured' || a.isFeatured);
@@ -37,7 +46,7 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
   // If no explicitly tagged featured profiles, take the highest rated/VIP profiles as spotlight
   const displayList = featuredProfiles.length > 0
     ? featuredProfiles
-    : profiles.slice(0, 8);
+    : oppositeGenderProfiles.slice(0, 8);
 
   if (displayList.length === 0) return null;
 

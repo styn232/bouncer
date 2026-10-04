@@ -29,6 +29,7 @@ interface SinglesFilterBarProps {
   setSortByStars?: (stars: boolean) => void;
   onReset: () => void;
   totalResults: number;
+  viewerGender?: string;
 }
 
 export const SinglesFilterBar: React.FC<SinglesFilterBarProps> = ({
@@ -57,7 +58,8 @@ export const SinglesFilterBar: React.FC<SinglesFilterBarProps> = ({
   sortByStars = true,
   setSortByStars,
   onReset,
-  totalResults
+  totalResults,
+  viewerGender
 }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [internalProvince, setInternalProvince] = useState(selectedProvince);
@@ -288,19 +290,35 @@ export const SinglesFilterBar: React.FC<SinglesFilterBarProps> = ({
 
       {/* Gender Filter */}
       <div>
-        <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-1.5">
-          Gender
+        <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+          <span>Gender</span>
+          {(viewerGender === 'male' || viewerGender === 'female') && (
+            <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded">
+              {viewerGender === 'male' ? 'Men see Ladies' : 'Ladies see Men'}
+            </span>
+          )}
         </label>
-        <select
-          value={selectedGender}
-          onChange={(e) => setSelectedGender(e.target.value)}
-          className="w-full bg-slate-50 border border-emerald-200 text-slate-900 rounded-xl px-3 py-2 text-xs appearance-none focus:outline-none focus:border-emerald-500 font-semibold"
-        >
-          <option value="all">All Genders</option>
-          <option value="female">Single Ladies Only</option>
-          <option value="male">Single Gentlemen Only</option>
-          <option value="non-binary">Non-binary Singles</option>
-        </select>
+        {viewerGender === 'male' ? (
+          <div className="w-full bg-rose-50 border border-rose-300 text-rose-950 rounded-xl px-3 py-2 text-xs font-extrabold flex items-center justify-between">
+            <span>👩 Single Ladies Only</span>
+            <span className="text-[10px] bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">Matched</span>
+          </div>
+        ) : viewerGender === 'female' ? (
+          <div className="w-full bg-amber-50 border border-amber-300 text-amber-950 rounded-xl px-3 py-2 text-xs font-extrabold flex items-center justify-between">
+            <span>👨 Single Gentlemen Only</span>
+            <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">Matched</span>
+          </div>
+        ) : (
+          <select
+            value={selectedGender}
+            onChange={(e) => setSelectedGender(e.target.value)}
+            className="w-full bg-slate-50 border border-emerald-200 text-slate-900 rounded-xl px-3 py-2 text-xs appearance-none focus:outline-none focus:border-emerald-500 font-semibold"
+          >
+            <option value="all">All Genders</option>
+            <option value="female">👩 Single Ladies Only</option>
+            <option value="male">👨 Single Gentlemen Only</option>
+          </select>
+        )}
       </div>
 
       {/* Number of Children Filter */}

@@ -999,11 +999,22 @@ export default function App() {
     setSelectedBouncerStatus('all');
   };
 
+  // Active signed-in user's gender for strict opposite-gender matching (Men see Ladies, Ladies see Men)
+  const activeViewerGender = (currentUser?.gender || '').toLowerCase();
+
   // Filter and Sort Profiles
   const displayedProfiles = profiles
     .filter((p) => {
+      const profGender = (p.gender || 'female').toLowerCase();
+      // Strict rule: Men only see Ladies, and Ladies only see Men
+      if (activeViewerGender === 'male') {
+        return profGender === 'female';
+      }
+      if (activeViewerGender === 'female') {
+        return profGender === 'male';
+      }
       if (selectedGender !== 'all') {
-        return p.gender === selectedGender;
+        return profGender === selectedGender.toLowerCase();
       }
       return true;
     })
@@ -1173,6 +1184,7 @@ export default function App() {
                 setSortByStars={setSortByStars}
                 onReset={handleResetFilters}
                 totalResults={displayedProfiles.length}
+                viewerGender={activeViewerGender}
               />
 
               <div className="flex-1 w-full space-y-4">
@@ -1285,7 +1297,12 @@ export default function App() {
         {/* TAB 7: WHO LIKED ME */}
         {activeTab === 'wholikedme' && (
           <WhoLikedMe
-            likers={likers}
+            likers={likers.filter((p) => {
+              const profGender = (p.gender || 'female').toLowerCase();
+              if (activeViewerGender === 'male') return profGender === 'female';
+              if (activeViewerGender === 'female') return profGender === 'male';
+              return true;
+            })}
             currentUser={currentUser}
             onOpenUpgrade={() => setIsPaymentModalOpen(true)}
             onSelectProfile={(p) => setSelectedProfileModal(p)}
