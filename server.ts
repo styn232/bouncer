@@ -189,31 +189,67 @@ async function startServer() {
     }
   }
 
+  let saveTimer: NodeJS.Timeout | null = null;
   function saveAppData() {
-    try {
-      const payload = {
-        siteSettings,
-        profiles,
-        users,
-        transactions,
-        matchOrders,
-        reels,
-        stories,
-        posts,
-        conversations,
-        messages,
-        notifications,
-        verifications,
-        ads,
-        reports,
-        userLikes,
-        userMatches,
-        lastUpdated: new Date().toISOString()
-      };
-      fs.writeFileSync(STORAGE_FILE, JSON.stringify(payload, null, 2), 'utf-8');
-    } catch (err) {
-      console.error('[Storage] Error saving persistent storage:', err);
+    if (saveTimer) {
+      clearTimeout(saveTimer);
     }
+    saveTimer = setTimeout(async () => {
+      try {
+        const payload = {
+          siteSettings,
+          profiles,
+          users,
+          transactions,
+          matchOrders,
+          reels,
+          stories,
+          posts,
+          conversations,
+          messages,
+          notifications,
+          verifications,
+          ads,
+          reports,
+          userLikes,
+          userMatches,
+          lastUpdated: new Date().toISOString()
+        };
+        await fs.promises.writeFile(STORAGE_FILE, JSON.stringify(payload), 'utf-8');
+      } catch (err) {
+        console.error('[Storage] Error saving persistent storage:', err);
+      }
+    }, 80);
+  }
+
+  function getAdminProfileSummary() {
+    const adminUser =
+      users.find(u => u.email?.toLowerCase() === 'jobsatespace@gmail.com') ||
+      users.find(u => u.role === 'admin') ||
+      MOCK_ADMIN_USER;
+    const adminProf = profiles.find(
+      p => p.role === 'admin' || p.name.toLowerCase() === (adminUser.name || '').toLowerCase()
+    );
+    const avatarUrl =
+      adminProf?.photos?.[0] ||
+      adminUser?.avatar ||
+      siteSettings?.logoUrl ||
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800';
+
+    return {
+      id: adminUser.id || 'usr_admin',
+      name: adminUser.name || 'Super Admin',
+      email: adminUser.email || 'jobsatespace@gmail.com',
+      role: 'Super Admin & Head Bouncer',
+      location: adminUser.location || 'Harare HQ, Zimbabwe',
+      city: adminUser.city || 'Harare',
+      avatar: avatarUrl,
+      bouncerVerified: true,
+      bio: adminUser.bio || 'Head Bouncer and Dating Platform Administrator for DATING WITH BOUNCER Zimbabwe.',
+      summaryTitle: 'Summary of DATING WITH BOUNCER',
+      summaryText:
+        "DATING WITH BOUNCER is Zimbabwe's #1 Bouncer-vetted singles & matchmaking platform across all 10 provinces (Harare, Bulawayo, Mutare, Gweru, Victoria Falls & 60+ centres). Every profile is verified for identity, honest HIV disclosure (HIV- / HIV+), and dating intent (Seeking Marriage or Funny & Good Vibe). Men exclusively see Single Ladies, and Ladies exclusively see Single Gentlemen. Add your chosen singles to your Cart ($3 for 1 Single, $6 for 2–3 Singles, $10 for 4–10 Singles, or $15 VIP 30+ Singles), pay via Paynow, and unlock direct private WhatsApp contact numbers."
+    };
   }
 
   function findTransaction(refQuery: string | undefined): PaymentTransaction | undefined {
@@ -292,6 +328,68 @@ async function startServer() {
 
   app.get('/api/settings', (_req, res) => {
     res.json(siteSettings);
+  });
+
+  // Admin Profile Link Preview & Summary Endpoint
+  app.get('/api/admin-profile-preview', (_req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=30');
+    res.json(getAdminProfileSummary());
+  });
+
+  // Dynamic OpenGraph Image Endpoint for Admin Profile Link Previews
+  app.get('/api/og-admin-image', (_req, res) => {
+    try {
+      const adminSummary = getAdminProfileSummary();
+      const imgSource = adminSummary.avatar;
+
+      if (imgSource && imgSource.startsWith('data:image/')) {
+        const matches = imgSource.match(/^data:image\/([a-zA-Z0-9.+]+);base64,(.+)$/);
+        if (matches) {
+          const mimeType = `image/${matches[1].toLowerCase()}`;
+          const buffer = Buffer.from(matches[2], 'base64');
+          res.setHeader('Content-Type', mimeType);
+          res.setHeader('Cache-Control', 'public, max-age=300');
+          return res.send(buffer);
+        }
+      }
+
+      if (imgSource && imgSource.startsWith('/uploads/')) {
+        const localFile = path.join(uploadsDir, path.basename(imgSource));
+        if (fs.existsSync(localFile)) {
+          res.setHeader('Cache-Control', 'public, max-age=300');
+          return res.sendFile(localFile);
+        }
+      }
+
+      if (imgSource && (imgSource.startsWith('http://') || imgSource.startsWith('https://'))) {
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        return res.redirect(302, imgSource);
+      }
+
+      return res.redirect(302, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=1200');
+    } catch {
+      return res.redirect(302, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=1200');
+    }
+  });
+
+  // Fast Single-Request Bootstrap Endpoint for High Site Speed
+  app.get('/api/bootstrap', (req, res) => {
+    const isAdminReq = isAuthorizedAdmin(req);
+    const sanitizedProfiles = profiles.map(p => {
+      if (isAdminReq) return p;
+      const { whatsappNumber, ...rest } = p;
+      return { ...rest, whatsappNumber: undefined };
+    });
+
+    res.json({
+      siteSettings,
+      profiles: sanitizedProfiles,
+      plans: SUBSCRIPTION_PLANS,
+      adminPreview: getAdminProfileSummary(),
+      transactions: transactions.slice(0, 50),
+      matchOrders: matchOrders.slice(0, 50),
+      notifications: notifications.slice(0, 40)
+    });
   });
 
   app.put('/api/settings', (req, res) => {

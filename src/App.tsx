@@ -53,6 +53,45 @@ export default function App() {
     iconUrl: ''
   });
 
+  // Admin Profile Link Preview & Summary State
+  const [adminPreview, setAdminPreview] = useState<{
+    name: string;
+    email: string;
+    role: string;
+    location: string;
+    avatar: string;
+    bio: string;
+    summaryTitle: string;
+    summaryText: string;
+  }>({
+    name: 'Super Admin',
+    email: 'jobsatespace@gmail.com',
+    role: 'Super Admin & Head Bouncer',
+    location: 'Harare HQ, Zimbabwe',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800',
+    bio: 'Head Bouncer and Dating Platform Administrator for DATING WITH BOUNCER Zimbabwe.',
+    summaryTitle: 'Summary of DATING WITH BOUNCER',
+    summaryText:
+      "DATING WITH BOUNCER is Zimbabwe's #1 Bouncer-vetted singles & matchmaking platform across all 10 provinces (Harare, Bulawayo, Mutare, Gweru, Victoria Falls & 60+ centres). Every profile is verified for identity, honest HIV disclosure (HIV- / HIV+), and dating intent (Seeking Marriage or Funny & Good Vibe). Men exclusively see Single Ladies, and Ladies exclusively see Single Gentlemen. Add your chosen singles to your Cart ($3 for 1 Single, $6 for 2–3 Singles, $10 for 4–10 Singles, or $15 VIP 30+ Singles), pay via Paynow, and unlock direct private WhatsApp contact numbers."
+  });
+
+  // Sync OpenGraph / Link Preview Meta Tags with Admin Profile & Summary
+  useEffect(() => {
+    const titleText = `${adminPreview.name} • ${siteSettings.siteName || 'DATING WITH BOUNCER'} | Official Admin Profile & Summary`;
+    document.title = titleText;
+    const setMeta = (id: string, content: string) => {
+      const el = document.getElementById(id) as HTMLMetaElement | null;
+      if (el) el.content = content;
+    };
+    setMeta('og-title', titleText);
+    setMeta('twitter-title', titleText);
+    setMeta('og-description', adminPreview.summaryText);
+    setMeta('twitter-description', adminPreview.summaryText);
+    const ogImgUrl = `${window.location.origin}/api/og-admin-image`;
+    setMeta('og-image', ogImgUrl);
+    setMeta('twitter-image', ogImgUrl);
+  }, [adminPreview, siteSettings.siteName]);
+
   const handleUpdateSiteSettings = async (updated: Partial<{ siteName: string; tagline: string; logoUrl: string; iconUrl: string }>) => {
     setSiteSettings(prev => ({ ...prev, ...updated }));
     if (updated.siteName) {
@@ -477,7 +516,7 @@ export default function App() {
     fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
   }, []);
 
-  // Optimized Fetch Auth, Settings & Admin Data with Parallelism, In-Memory Caching & Deduplication
+  // Fast Single-Request Bootstrap for Instant Site Speed
   const fetchInitialData = async (options?: { force?: boolean; silent?: boolean; sessionUser?: User | null }) => {
     if (options?.silent) {
       updateLoading({ isBackgroundSyncing: true });
@@ -488,115 +527,74 @@ export default function App() {
     try {
       await dataCache.dedupe('initial_data_fetch', async () => {
         const currentSessionUser: User | null = options?.sessionUser !== undefined ? options.sessionUser : currentUser;
-
-        // Prepare parallel background requests
         const isUserAdmin = currentSessionUser?.role === 'admin';
         const adminEmail = currentSessionUser?.email || '';
 
-        const fetchers: Promise<any>[] = [];
+        // Single fast bootstrap request instead of 6+ separate sequential calls
+        const bootRes = await fetch('/api/bootstrap', {
+          headers: isUserAdmin ? { 'x-user-role': 'admin', 'x-user-email': adminEmail } : undefined
+        }).catch(() => null);
 
-        // Site Settings (Cache TTL: 5 min)
-        const cachedSettings = !options?.force ? dataCache.get<any>('settings') : null;
-        if (cachedSettings) {
-          setSiteSettings(cachedSettings);
-          if (cachedSettings.siteName) document.title = cachedSettings.siteName;
-        } else {
-          fetchers.push(
-            fetch('/api/settings')
-              .then(r => r.ok ? r.json() : null)
-              .then(st => {
-                if (st && st.siteName) {
-                  setSiteSettings(st);
-                  dataCache.set('settings', st);
-                  document.title = st.siteName;
-                }
-              })
-              .catch(() => null)
-          );
+        if (bootRes && bootRes.ok) {
+          const boot = await bootRes.json().catch(() => null);
+          if (boot) {
+            if (boot.siteSettings?.siteName) {
+              setSiteSettings(boot.siteSettings);
+              dataCache.set('settings', boot.siteSettings);
+            }
+            if (Array.isArray(boot.profiles)) {
+              setProfiles(boot.profiles);
+              updateLoading({ isProfilesLoading: false, isFilterUpdating: false });
+            }
+            if (Array.isArray(boot.plans)) {
+              setSubscriptionPlans(boot.plans);
+              dataCache.set('plans', boot.plans);
+            }
+            if (boot.adminPreview) {
+              setAdminPreview(boot.adminPreview);
+            }
+            if (Array.isArray(boot.transactions)) {
+              setTransactions(boot.transactions);
+            }
+            if (Array.isArray(boot.matchOrders)) {
+              setMatchOrders(boot.matchOrders);
+            }
+            if (Array.isArray(boot.notifications)) {
+              setNotifications(boot.notifications);
+            }
+          }
         }
 
-        // Subscription Plans (Cache TTL: 5 min)
-        const cachedPlans = !options?.force ? dataCache.get<any>('plans') : null;
-        if (cachedPlans) {
-          setSubscriptionPlans(cachedPlans);
-        } else {
-          fetchers.push(
-            fetch('/api/subscriptions/plans')
-              .then(r => r.ok ? r.json() : null)
-              .then(plans => {
-                if (Array.isArray(plans)) {
-                  setSubscriptionPlans(plans);
-                  dataCache.set('plans', plans);
-                }
-              })
-              .catch(() => null)
-          );
-        }
-
-        // Admin Stats & Subscriptions (Only fetched if admin)
+        // Admin Stats & Subscriptions (Only fetched in parallel if admin)
         if (isUserAdmin) {
-          fetchers.push(
+          await Promise.allSettled([
             fetch('/api/admin/stats', {
-              headers: {
-                'x-user-role': 'admin',
-                'x-user-email': adminEmail
-              }
+              headers: { 'x-user-role': 'admin', 'x-user-email': adminEmail }
             })
-              .then(r => r.ok ? r.json() : null)
+              .then(r => (r.ok ? r.json() : null))
               .then(stats => {
                 if (stats) setAdminStats(stats);
               })
-              .catch(() => null)
-          );
-
-          fetchers.push(
+              .catch(() => null),
             fetch('/api/admin/subscriptions', {
-              headers: {
-                'x-user-role': 'admin',
-                'x-user-email': adminEmail
-              }
+              headers: { 'x-user-role': 'admin', 'x-user-email': adminEmail }
             })
-              .then(r => r.ok ? r.json() : null)
+              .then(r => (r.ok ? r.json() : null))
               .then(subs => {
                 if (subs && Array.isArray(subs.userSubscriptions)) {
                   setUserSubscriptions(subs.userSubscriptions);
                 }
               })
               .catch(() => null)
-          );
+          ]);
         }
-
-        // Transactions
-        fetchers.push(
-          fetch('/api/payment/transactions')
-            .then(r => r.ok ? r.json() : null)
-            .then(txs => {
-              if (Array.isArray(txs)) setTransactions(txs);
-            })
-            .catch(() => null)
-        );
-
-        // Matches
-        fetchers.push(
-          fetch('/api/matches')
-            .then(r => r.ok ? r.json() : null)
-            .then(matches => {
-              if (Array.isArray(matches)) setMatchOrders(matches);
-            })
-            .catch(() => null)
-        );
-
-        // Run all concurrent background initial requests in parallel
-        await Promise.allSettled(fetchers);
-
-        // Non-blocking social sync
-        fetchSocialData({ silent: true });
       });
     } catch (err) {
       console.warn('Initial data sync note:', err);
     } finally {
       updateLoading({
         isInitialLoading: false,
+        isProfilesLoading: false,
         isBackgroundSyncing: false,
         lastSyncedAt: new Date()
       });
@@ -642,33 +640,10 @@ export default function App() {
     }
   };
 
-  // Initial fetch on mount
+  // Initial fetch on mount (loads bootstrap data including profiles in 1 fast call)
   useEffect(() => {
     fetchInitialData();
   }, []);
-
-  // Debounced profile fetching to prevent unnecessary requests on rapid typing/filter changes
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchProfiles();
-    }, 200);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [
-    searchTerm,
-    selectedProvince,
-    selectedCity,
-    selectedSubLocation,
-    minAge,
-    maxAge,
-    selectedGender,
-    selectedChildren,
-    selectedIntent,
-    selectedHivStatus,
-    selectedBouncerStatus
-  ]);
 
   // Lazy background sync when switching to social / chat tabs
   useEffect(() => {
@@ -1002,20 +977,73 @@ export default function App() {
   // Active signed-in user's gender for strict opposite-gender matching (Men see Ladies, Ladies see Men)
   const activeViewerGender = (currentUser?.gender || '').toLowerCase();
 
-  // Filter and Sort Profiles
+  // Instant 0ms Client-Side Filter and Sort Profiles
   const displayedProfiles = profiles
     .filter((p) => {
       const profGender = (p.gender || 'female').toLowerCase();
       // Strict rule: Men only see Ladies, and Ladies only see Men
       if (activeViewerGender === 'male') {
-        return profGender === 'female';
+        if (profGender !== 'female') return false;
+      } else if (activeViewerGender === 'female') {
+        if (profGender !== 'male') return false;
+      } else if (selectedGender !== 'all') {
+        if (profGender !== selectedGender.toLowerCase()) return false;
       }
-      if (activeViewerGender === 'female') {
-        return profGender === 'male';
+
+      if (p.age < minAge || p.age > maxAge) return false;
+
+      if (selectedProvince !== 'all') {
+        if ((p.province || '').toLowerCase() !== selectedProvince.toLowerCase()) return false;
       }
-      if (selectedGender !== 'all') {
-        return profGender === selectedGender.toLowerCase();
+
+      if (selectedCity !== 'all') {
+        if ((p.city || '').toLowerCase() !== selectedCity.toLowerCase()) return false;
       }
+
+      if (selectedSubLocation !== 'all') {
+        if ((p.subLocation || '').toLowerCase() !== selectedSubLocation.toLowerCase()) return false;
+      }
+
+      if (selectedChildren !== 'all') {
+        const count = p.childrenCount ?? 0;
+        if (selectedChildren === '3+') {
+          if (count < 3) return false;
+        } else if (count !== Number(selectedChildren)) {
+          return false;
+        }
+      }
+
+      if (selectedIntent !== 'all' && p.intent !== selectedIntent) {
+        return false;
+      }
+
+      if (selectedHivStatus !== 'all') {
+        const target = selectedHivStatus.toLowerCase();
+        const val = (p.hivStatus || 'HIV-').toLowerCase();
+        if (target.includes('+')) {
+          if (!val.includes('+')) return false;
+        } else if (val.includes('+')) {
+          return false;
+        }
+      }
+
+      if (selectedBouncerStatus !== 'all' && p.bouncerStatus !== selectedBouncerStatus) {
+        return false;
+      }
+
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim();
+        const matchesSearch =
+          p.name.toLowerCase().includes(q) ||
+          (p.location && p.location.toLowerCase().includes(q)) ||
+          (p.province && p.province.toLowerCase().includes(q)) ||
+          (p.city && p.city.toLowerCase().includes(q)) ||
+          (p.subLocation && p.subLocation.toLowerCase().includes(q)) ||
+          (p.bio && p.bio.toLowerCase().includes(q)) ||
+          (p.intent && p.intent.toLowerCase().includes(q));
+        if (!matchesSearch) return false;
+      }
+
       return true;
     })
     .sort((a, b) => {
@@ -1120,6 +1148,102 @@ export default function App() {
         {/* DISCOVER & HOME TAB: DIRECT SINGLES DIRECTORY */}
         {(activeTab === 'discover' || activeTab === 'home') && (
           <div className="space-y-6">
+            {/* ADMIN PROFILE LINK PREVIEW & SUMMARY OF DATING WITH BOUNCER */}
+            <section className="bg-gradient-to-br from-slate-900/95 via-[#180714] to-slate-950 border border-amber-500/30 rounded-3xl p-4 sm:p-5 shadow-xl relative overflow-hidden">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                {/* Left: Official Admin Profile Link Preview Card */}
+                <div className="lg:col-span-5 bg-slate-950/90 border border-amber-500/40 rounded-2xl p-3.5 sm:p-4 flex items-center gap-3.5 shadow-md">
+                  <div className="relative shrink-0">
+                    <img
+                      src={adminPreview.avatar}
+                      alt={adminPreview.name}
+                      decoding="async"
+                      referrerPolicy="no-referrer"
+                      className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-2 ring-amber-400 shadow-lg"
+                    />
+                    <span className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 p-1 rounded-full ring-2 ring-slate-950 shadow">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        Official Link Preview • Admin Profile
+                      </span>
+                    </div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-white font-serif truncate mt-1 flex items-center gap-1.5">
+                      <span>{adminPreview.name}</span>
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    </h3>
+                    <p className="text-[11px] text-amber-200/90 font-semibold truncate">
+                      {adminPreview.role} • 📍 {adminPreview.location}
+                    </p>
+                    <p className="text-[11px] text-slate-300 line-clamp-2 mt-1">
+                      {adminPreview.bio}
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const shareUrl = window.location.origin;
+                          if (navigator.clipboard) {
+                            navigator.clipboard.writeText(shareUrl).catch(() => {});
+                          }
+                          addToast(
+                            'Admin Link Preview Copied! 🔗',
+                            `Share ${shareUrl} on WhatsApp or social media — the link preview displays ${adminPreview.name}'s profile & platform summary.`,
+                            'bouncer'
+                          );
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+                      >
+                        Copy Link Preview
+                      </button>
+                      <span className="text-[10px] text-slate-400 truncate">
+                        Verified Bouncer HQ
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Summary of DATING WITH BOUNCER */}
+                <div className="lg:col-span-7 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <h2 className="text-sm sm:text-base font-black text-white font-serif uppercase tracking-wide flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Summary of DATING WITH BOUNCER</span>
+                    </h2>
+                    <span className="text-[10px] font-bold text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2.5 py-0.5 rounded-full">
+                      🇿🇼 All 10 Provinces • 60+ Centres
+                    </span>
+                  </div>
+                  <p className="text-xs text-rose-100/90 leading-relaxed">
+                    <strong>DATING WITH BOUNCER</strong> is Zimbabwe&apos;s #1 Bouncer-vetted singles &amp; matchmaking platform. Every profile is verified for identity, honest HIV disclosure (<strong>HIV-</strong> / <strong>HIV+</strong>), and dating intent (<strong>💍 Seeking Marriage</strong> or <strong>😂 Funny &amp; Good Vibe</strong>).
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5 text-[11px]">
+                    <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
+                      <div className="font-extrabold text-amber-300">1. Opposite-Gender Match</div>
+                      <div className="text-slate-300 text-[10px] mt-0.5">
+                        Men exclusively see Single Ladies, and Ladies exclusively see Single Gentlemen.
+                      </div>
+                    </div>
+                    <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
+                      <div className="font-extrabold text-rose-300">2. Choose Singles to Cart</div>
+                      <div className="text-slate-300 text-[10px] mt-0.5">
+                        $3 for 1 Single • $6 for 2–3 Singles • $10 for 4–10 Singles • $15 VIP (30+ Singles).
+                      </div>
+                    </div>
+                    <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
+                      <div className="font-extrabold text-emerald-300">3. Unlock WhatsApp Direct</div>
+                      <div className="text-slate-300 text-[10px] mt-0.5">
+                        Pay securely via Paynow &amp; get direct private WhatsApp numbers upon Admin approval.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             {/* FEATURED SINGLES SPOTLIGHT: Horizontal Scroll Section at the Top */}
             <FeaturedSingles
               profiles={profiles}

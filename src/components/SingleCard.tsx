@@ -27,7 +27,7 @@ interface SingleCardProps {
   currentUser?: User | null;
 }
 
-export const SingleCard: React.FC<SingleCardProps> = ({
+export const SingleCard: React.FC<SingleCardProps> = React.memo(({
   profile,
   isInCart,
   onAddToCart,
@@ -75,14 +75,26 @@ export const SingleCard: React.FC<SingleCardProps> = ({
   };
 
   const starRating = profile.averageRating || 5.0;
+  const isVipOrFeatured = Boolean(
+    profile.bouncerStatus === 'vip_approved' ||
+    profile.role === 'featured' ||
+    profile.isFeatured ||
+    (profile as any).featured ||
+    profile.role === 'admin'
+  );
+  const isVerifiedBouncer = Boolean(
+    profile.bouncerStatus === 'verified' ||
+    profile.bouncerStatus === 'vip_approved' ||
+    isVipOrFeatured
+  );
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.25 }}
-      className="bg-white border border-rose-200/90 hover:border-rose-400 rounded-xl sm:rounded-2xl md:rounded-3xl overflow-hidden shadow-sm hover:shadow-lg hover:shadow-rose-950/10 flex flex-col group transition-all"
+    <div
+      className={`bg-white hover:-translate-y-1 rounded-xl sm:rounded-2xl md:rounded-3xl overflow-hidden flex flex-col group transition-all duration-200 ${
+        isVipOrFeatured
+          ? 'border-2 border-amber-400/90 hover:border-amber-500 shadow-md shadow-amber-950/15 ring-1 ring-amber-300/50'
+          : 'border border-rose-200/90 hover:border-rose-400 shadow-sm hover:shadow-lg hover:shadow-rose-950/10'
+      }`}
     >
       {/* Top Image Container with Photo Navigation & Quick Preview */}
       <div 
@@ -93,20 +105,31 @@ export const SingleCard: React.FC<SingleCardProps> = ({
         <img
           src={photos[currentPhotoIdx] || photos[0]}
           alt={capitalizeName(profile.name)}
+          loading="lazy"
+          decoding="async"
           referrerPolicy="no-referrer"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
 
         {/* Subtle Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/30 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-black/35 pointer-events-none" />
 
-        {/* Top Left Featured / Spotlight Badge */}
-        {profile.isFeatured && (
-          <div className="absolute top-1.5 sm:top-2.5 left-1.5 sm:left-2.5 bg-amber-500 text-slate-950 font-black text-[8px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full shadow-md flex items-center gap-0.5 sm:gap-1 border border-amber-300 z-10">
-            <Crown className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-slate-950 text-slate-950" />
-            <span className="hidden xs:inline">FEATURED</span>
-          </div>
-        )}
+        {/* Top Left Overlay Badges: VIP & Verified Bouncer */}
+        <div className="absolute top-1.5 sm:top-2.5 left-1.5 sm:left-2.5 flex flex-col items-start gap-1 z-10 pointer-events-none">
+          {isVipOrFeatured && (
+            <div className="bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 font-black text-[8px] sm:text-[10px] px-2 sm:px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 border border-amber-200 uppercase tracking-wider">
+              <Crown className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-slate-950 text-slate-950 shrink-0" />
+              <span>VIP{profile.isFeatured || profile.role === 'featured' ? ' • FEATURED' : ''}</span>
+            </div>
+          )}
+
+          {isVerifiedBouncer && (
+            <div className="bg-emerald-950/90 backdrop-blur-md text-emerald-300 font-extrabold text-[8px] sm:text-[9px] px-1.5 sm:px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-emerald-400/50 uppercase tracking-wide">
+              <ShieldCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-400 shrink-0" />
+              <span>Verified Bouncer</span>
+            </div>
+          )}
+        </div>
 
         {/* Top Right Quick Like Button */}
         <button
@@ -282,6 +305,6 @@ export const SingleCard: React.FC<SingleCardProps> = ({
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
-};
+});
