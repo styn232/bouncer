@@ -707,7 +707,7 @@ async function startServer() {
           : `New Single, ${regAge} and ${regCity} has signed up`);
 
     const newNotif: NotificationItem = {
-      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `notif_single_${newProfile.id}`,
       userId: 'all',
       title: notifTitle,
       message: notifMessage,
@@ -719,7 +719,9 @@ async function startServer() {
       profileId: newProfile.id,
       photo: newProfile.photos?.[0] || currentUser.avatar
     };
-    notifications.unshift(newNotif);
+    if (!notifications.some(n => n.id === newNotif.id || (n.profileId && n.profileId === newNotif.profileId && n.title === newNotif.title))) {
+      notifications.unshift(newNotif);
+    }
 
     res.json({ success: true, user: currentUser, profile: newProfile });
     setImmediate(() => saveAppData());
@@ -1044,7 +1046,7 @@ async function startServer() {
           : `New Single, ${singleAge} and ${singleCity} has signed up`);
 
     const newNotif: NotificationItem = {
-      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `notif_single_${newProfile.id}`,
       userId: 'all',
       title: notifTitle,
       message: notifMessage,
@@ -1056,7 +1058,9 @@ async function startServer() {
       profileId: newProfile.id,
       photo: newProfile.photos?.[0]
     };
-    notifications.unshift(newNotif);
+    if (!notifications.some(n => n.id === newNotif.id || (n.profileId && n.profileId === newNotif.profileId && n.title === newNotif.title))) {
+      notifications.unshift(newNotif);
+    }
     saveAppData();
 
     res.json({ success: true, profile: newProfile });
@@ -1072,9 +1076,9 @@ async function startServer() {
     const viewerName = req.body?.viewerName || (currentUser ? currentUser.name : 'A single member');
     const targetProfile = profiles[idx];
 
-    // Create notification for target profile owner
+    // Create notification for target profile owner (deduplicated so same viewer does not spam repeats)
     const newNotif: NotificationItem = {
-      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `notif_view_${targetProfile.id}_${viewerName.toLowerCase().replace(/\s+/g, '_')}`,
       userId: targetProfile.id,
       title: '👀 New Profile View',
       message: `${viewerName} has viewed your profile!`,
@@ -1083,7 +1087,9 @@ async function startServer() {
       createdAt: new Date().toISOString()
     };
 
-    notifications.unshift(newNotif);
+    if (!notifications.some(n => n.id === newNotif.id || (n.userId === newNotif.userId && n.message === newNotif.message))) {
+      notifications.unshift(newNotif);
+    }
     saveAppData();
 
     res.json({
@@ -2402,9 +2408,20 @@ async function startServer() {
     const userId = req.query.userId as string;
     const role = req.query.role as string;
 
-    // Admins see all notifications
+    const seenKeys = new Set<string>();
+    const dedupeList = (list: NotificationItem[]) => {
+      return list.filter(n => {
+        const key = n.profileId ? `prof:${n.profileId}:${n.title}` : `msg:${n.userId || 'all'}:${n.title}:${n.message}`;
+        if (seenKeys.has(n.id) || seenKeys.has(key)) return false;
+        seenKeys.add(n.id);
+        seenKeys.add(key);
+        return true;
+      });
+    };
+
+    // Admins see all notifications (deduplicated)
     if (role === 'admin') {
-      return res.json(notifications);
+      return res.json(dedupeList(notifications));
     }
 
     // Filter notifications based on targetGender:
@@ -2428,7 +2445,7 @@ async function startServer() {
       return true;
     });
 
-    res.json(filtered);
+    res.json(dedupeList(filtered));
   });
 
   app.post('/api/notifications/:id/read', (req, res) => {

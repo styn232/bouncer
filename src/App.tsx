@@ -15,7 +15,7 @@ import { AuthModal, AuthModalMode } from './components/AuthModal';
 import { ToastNotification, Toast } from './components/ToastNotification';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { PushNotificationBanner } from './components/PushNotificationBanner';
-import { playRomanticChime, triggerBrowserPushNotification, formatGenderTargetedNotification } from './utils/pushNotification';
+import { playRomanticChime, triggerBrowserPushNotification, formatGenderTargetedNotification, hasReceivedNotification, markNotificationReceived, getNotificationDedupeKeys } from './utils/pushNotification';
 import { dataCache, INITIAL_LOADING_STATE } from './utils/dataCache';
 
 // Dating with Bouncer Components
@@ -197,6 +197,20 @@ export default function App() {
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   const seenNotifIdsRef = useRef<Set<string>>(new Set());
 
+  // Deduplicate notifications list so a user never sees repeated notifications
+  const dedupeNotificationsList = (list: NotificationItem[]): NotificationItem[] => {
+    const seen = new Set<string>();
+    const result: NotificationItem[] = [];
+    for (const item of list) {
+      if (!item) continue;
+      const keys = getNotificationDedupeKeys(item);
+      if (keys.some((k) => seen.has(k))) continue;
+      keys.forEach((k) => seen.add(k));
+      result.push(item);
+    }
+    return result;
+  };
+
   const addToast = (
     title: string,
     message: string,
@@ -204,7 +218,13 @@ export default function App() {
     extra?: { photo?: string; profileId?: string; actionLabel?: string; onAction?: () => void }
   ) => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-    setToasts((prev) => [...prev, { id, title, message, type, ...extra }]);
+    setToasts((prev) => {
+      // Do not repeat an identical active toast
+      if (prev.some((t) => t.title === title && t.message === message)) {
+        return prev;
+      }
+      return [...prev, { id, title, message, type, ...extra }];
+    });
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 6000);
@@ -214,7 +234,7 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Push Notification & New Single Alert trigger
+  // Push Notification & New Single Alert trigger (strictly deduplicated so it never repeats once received)
   const notifyNewSingleSignedUp = (single: {
     age?: number;
     city?: string;
@@ -223,6 +243,7 @@ export default function App() {
     photos?: string[];
     id?: string;
     gender?: 'male' | 'female' | string;
+    forceSimulate?: boolean;
   }) => {
     const age = single.age || 24;
     const location = single.city || single.location || 'Harare';
@@ -238,6 +259,19 @@ export default function App() {
       gender: singleGender
     });
 
+    const dedupeKeys = getNotificationDedupeKeys({
+      id: single.id ? `notif_single_${single.id}` : undefined,
+      profileId: single.id,
+      title: notifInfo.title,
+      message: notifInfo.message
+    });
+
+    // Do not repeat notification if user has already received it
+    if (!single.forceSimulate && hasReceivedNotification(dedupeKeys)) {
+      return;
+    }
+    markNotificationReceived(dedupeKeys);
+
     const userGender = currentUser?.gender?.toLowerCase();
     const isAdmin = currentUser?.role === 'admin';
     // Deliver if admin, visitor, or gender matches target
@@ -250,6 +284,7 @@ export default function App() {
       // 2. Trigger native browser push notification
       triggerBrowserPushNotification(notifInfo.title, notifInfo.message, {
         icon: single.photos?.[0],
+        tag: single.id ? `single_${single.id}` : undefined,
         onClick: () => {
           if (single.id) {
             const found = profiles.find((p) => p.id === single.id);
@@ -276,9 +311,9 @@ export default function App() {
       });
     }
 
-    // 4. Also store in notifications list
+    // 4. Also store in notifications list (deduplicated)
     const newNotif: NotificationItem = {
-      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      id: single.id ? `notif_single_${single.id}` : `notif_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       userId: 'all',
       title: notifInfo.title,
       message: notifInfo.message,
@@ -290,7 +325,8 @@ export default function App() {
       profileId: single.id,
       photo: single.photos?.[0]
     };
-    setNotifications((prev) => [newNotif, ...prev]);
+    seenNotifIdsRef.current.add(newNotif.id);
+    setNotifications((prev) => dedupeNotificationsList([newNotif, ...prev]));
   };
 
   // Optimized Fetch Profiles with In-Memory Caching, Deduplication & Non-Blocking Background Sync
@@ -431,13 +467,17 @@ export default function App() {
         }
         if (likersRes.status === 'fulfilled' && Array.isArray(likersRes.value)) setLikers(likersRes.value);
         if (notifsRes.status === 'fulfilled' && Array.isArray(notifsRes.value)) {
-          const freshNotifs = notifsRes.value;
+          const freshNotifs = dedupeNotificationsList(notifsRes.value);
           setNotifications(freshNotifs);
 
-          // Alert for unread New Single sign-ups (with gender routing)
+          // Alert for unread New Single sign-ups (with gender routing & strict deduplication so it never repeats)
           freshNotifs.forEach((n: NotificationItem) => {
-            if (!n.read && !seenNotifIdsRef.current.has(n.id)) {
+            const dedupeKeys = getNotificationDedupeKeys(n);
+            const alreadyReceived = seenNotifIdsRef.current.has(n.id) || hasReceivedNotification(dedupeKeys);
+
+            if (!n.read && !alreadyReceived) {
               seenNotifIdsRef.current.add(n.id);
+              markNotificationReceived(dedupeKeys);
 
               const userGender = currentUser?.gender?.toLowerCase();
               const isAdmin = currentUser?.role === 'admin';
@@ -453,6 +493,7 @@ export default function App() {
                 playRomanticChime();
                 triggerBrowserPushNotification(n.title, n.message, {
                   icon: n.photo,
+                  tag: n.id,
                   onClick: () => {
                     if (n.profileId) {
                       const found = profiles.find((p) => p.id === n.profileId);
@@ -476,8 +517,9 @@ export default function App() {
                   }
                 });
               }
-            } else if (n.id) {
-              seenNotifIdsRef.current.add(n.id);
+            } else {
+              if (n.id) seenNotifIdsRef.current.add(n.id);
+              markNotificationReceived(dedupeKeys);
             }
           });
         }
@@ -560,7 +602,13 @@ export default function App() {
               setMatchOrders(boot.matchOrders);
             }
             if (Array.isArray(boot.notifications)) {
-              setNotifications(boot.notifications);
+              const dedupedBootNotifs = dedupeNotificationsList(boot.notifications);
+              setNotifications(dedupedBootNotifs);
+              // Mark initial bootstrap notifications as seen so they never repeat popups on background sync
+              dedupedBootNotifs.forEach((n: NotificationItem) => {
+                if (n.id) seenNotifIdsRef.current.add(n.id);
+                markNotificationReceived(getNotificationDedupeKeys(n));
+              });
             }
           }
         }
@@ -655,7 +703,7 @@ export default function App() {
   // Handle Tab Selection with Admin Auth Gate
   const handleSelectTab = (tab: MainTabType) => {
     if (tab === 'admin' && currentUser?.role !== 'admin') {
-      setAuthModalInitialMode('admin_login');
+      setAuthModalInitialMode('user_login');
       setIsAuthModalOpen(true);
       return;
     }
@@ -1181,7 +1229,7 @@ export default function App() {
                     <p className="text-[11px] text-slate-300 line-clamp-2 mt-1">
                       {adminPreview.bio}
                     </p>
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <button
                         type="button"
                         onClick={() => {
@@ -1199,9 +1247,16 @@ export default function App() {
                       >
                         Copy Link Preview
                       </button>
-                      <span className="text-[10px] text-slate-400 truncate">
-                        Verified Bouncer HQ
-                      </span>
+                      <a
+                        href="https://wa.me/263715786859?text=Hi%20Admin%20I%20need%20Help"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] transition-all shadow-xs flex items-center gap-1"
+                        title="WhatsApp Support"
+                      >
+                        <MessageSquare className="w-2.5 h-2.5" />
+                        <span>Support</span>
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -1866,10 +1921,24 @@ export default function App() {
             location: sample.location || sample.city || 'Harare',
             photos: sample.photos,
             id: sample.id,
-            gender: chosenGender
+            gender: chosenGender,
+            forceSimulate: true
           });
         }}
       />
+
+      {/* Compact Floating WhatsApp Support Button */}
+      <a
+        href="https://wa.me/263715786859?text=Hi%20Admin%20I%20need%20Help"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="WhatsApp Support"
+        className="fixed bottom-20 md:bottom-5 left-3 sm:left-5 z-40 bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1.5 rounded-full shadow-lg border border-emerald-400/50 flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 text-[11px] font-bold"
+        title="WhatsApp Support"
+      >
+        <MessageSquare className="w-3.5 h-3.5 text-white fill-white/20 shrink-0" />
+        <span>Support</span>
+      </a>
 
       {/* Global Footer */}
       <footer className="bg-[#0a0309] border-t border-rose-900/30 py-8 text-xs text-rose-300/60 mt-12">
@@ -1881,6 +1950,16 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-4 text-[11px]">
+            <a
+              href="https://wa.me/263715786859?text=Hi%20Admin%20I%20need%20Help"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition-colors"
+            >
+              <MessageSquare className="w-3 h-3 text-emerald-400" />
+              <span>Support</span>
+            </a>
+            <span>•</span>
             <button onClick={() => setActiveTab('safety')} className="hover:text-white transition-colors">
               Safety Center
             </button>
@@ -1906,13 +1985,13 @@ export default function App() {
                 if (currentUser?.role === 'admin') {
                   setActiveTab('admin');
                 } else {
-                  setAuthModalInitialMode('admin_login');
+                  setAuthModalInitialMode('user_login');
                   setIsAuthModalOpen(true);
                 }
               }}
               className="text-pink-400 font-bold hover:underline"
             >
-              {currentUser?.role === 'admin' ? 'Open Admin Panel' : 'Staff Admin Portal'}
+              {currentUser?.role === 'admin' ? 'Open Admin Panel' : 'Sign In'}
             </button>
           </div>
         </div>

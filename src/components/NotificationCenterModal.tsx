@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bell, Heart, Check, Trash2, X, Sparkles, AlertCircle, ShieldCheck, ShoppingBag, UserCheck, Users } from 'lucide-react';
 import { NotificationItem, SingleProfile, User } from '../types';
-import { isPushNotificationSupported, requestPushPermission, getPushPermission, isPushAlertsEnabled, setPushAlertsEnabled, playRomanticChime, triggerBrowserPushNotification, formatGenderTargetedNotification } from '../utils/pushNotification';
+import { isPushNotificationSupported, requestPushPermission, getPushPermission, isPushAlertsEnabled, setPushAlertsEnabled, playRomanticChime, triggerBrowserPushNotification, formatGenderTargetedNotification, getNotificationDedupeKeys } from '../utils/pushNotification';
 
 interface NotificationCenterModalProps {
   isOpen: boolean;
@@ -89,18 +89,23 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   const userGender = currentUser?.gender?.toLowerCase();
   const isAdmin = currentUser?.role === 'admin';
 
+  const seenModalKeys = new Set<string>();
   const visibleNotifs = notifications.filter(n => {
-    if (isAdmin) return true;
-    if (n.userId && n.userId !== 'all' && currentUser?.id) {
-      return n.userId === currentUser.id;
+    if (!isAdmin) {
+      if (n.userId && n.userId !== 'all' && currentUser?.id) {
+        if (n.userId !== currentUser.id) return false;
+      }
+      if (userGender === 'male') {
+        if (n.gender && n.gender.toLowerCase() === 'male') return false;
+        if (n.targetGender && n.targetGender !== 'all' && n.targetGender !== 'male') return false;
+      } else if (userGender === 'female') {
+        if (n.gender && n.gender.toLowerCase() === 'female') return false;
+        if (n.targetGender && n.targetGender !== 'all' && n.targetGender !== 'female') return false;
+      }
     }
-    if (userGender === 'male') {
-      if (n.gender && n.gender.toLowerCase() === 'male') return false;
-      if (n.targetGender && n.targetGender !== 'all' && n.targetGender !== 'male') return false;
-    } else if (userGender === 'female') {
-      if (n.gender && n.gender.toLowerCase() === 'female') return false;
-      if (n.targetGender && n.targetGender !== 'all' && n.targetGender !== 'female') return false;
-    }
+    const keys = getNotificationDedupeKeys(n);
+    if (keys.some(k => seenModalKeys.has(k))) return false;
+    keys.forEach(k => seenModalKeys.add(k));
     return true;
   });
 

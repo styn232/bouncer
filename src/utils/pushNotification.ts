@@ -171,9 +171,85 @@ export function flashBrowserTabTitle(alertText: string, durationMs = 8000) {
   }, durationMs);
 }
 
+const RECEIVED_NOTIFS_STORAGE_KEY = 'bouncer_received_notifs_v1';
+const receivedNotifSet = new Set<string>();
+
+function loadReceivedNotifsFromStorage() {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(RECEIVED_NOTIFS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((k) => {
+          if (typeof k === 'string') receivedNotifSet.add(k);
+        });
+      }
+    }
+  } catch {
+    // Ignore storage read errors
+  }
+}
+
+loadReceivedNotifsFromStorage();
+
+function persistReceivedNotifsToStorage() {
+  if (typeof window === 'undefined') return;
+  try {
+    const arr = Array.from(receivedNotifSet).slice(-500);
+    localStorage.setItem(RECEIVED_NOTIFS_STORAGE_KEY, JSON.stringify(arr));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+/**
+ * Check if a notification (by ID, profileId, or title+message signature) has already been received
+ */
+export function hasReceivedNotification(keys: string | string[]): boolean {
+  loadReceivedNotifsFromStorage();
+  const list = Array.isArray(keys) ? keys : [keys];
+  return list.some((k) => Boolean(k && receivedNotifSet.has(k)));
+}
+
+/**
+ * Mark a notification (by ID, profileId, and/or title+message signature) as received so it never repeats
+ */
+export function markNotificationReceived(keys: string | string[]): void {
+  const list = Array.isArray(keys) ? keys : [keys];
+  let changed = false;
+  list.forEach((k) => {
+    if (k && !receivedNotifSet.has(k)) {
+      receivedNotifSet.add(k);
+      changed = true;
+    }
+  });
+  if (changed) {
+    persistReceivedNotifsToStorage();
+  }
+}
+
+/**
+ * Build deduplication keys for a notification item
+ */
+export function getNotificationDedupeKeys(notif: {
+  id?: string;
+  profileId?: string;
+  title?: string;
+  message?: string;
+}): string[] {
+  const keys: string[] = [];
+  if (notif.id) keys.push(`id:${notif.id}`);
+  if (notif.profileId) keys.push(`profile:${notif.profileId}`);
+  if (notif.title || notif.message) {
+    keys.push(`msg:${(notif.title || '').trim()}::${(notif.message || '').trim()}`);
+  }
+  return keys;
+}
+
 /**
  * Send a native browser push notification directly to the operating system / browser
- * If permission is not yet asked (default), it asks permission and sends upon grant!
+ * Deduplicates by tag / content so a user never receives the same notification twice.
  */
 export async function triggerBrowserPushNotification(
   title: string,
@@ -184,6 +260,12 @@ export async function triggerBrowserPushNotification(
     onClick?: () => void;
   }
 ): Promise<boolean> {
+  const dedupeTag = options?.tag || `msg:${title.trim()}::${body.trim()}`;
+  if (hasReceivedNotification(dedupeTag)) {
+    return false;
+  }
+  markNotificationReceived(dedupeTag);
+
   // Flash browser tab title for guaranteed visibility
   flashBrowserTabTitle(`(1) ${title}`);
 
@@ -203,7 +285,7 @@ export async function triggerBrowserPushNotification(
       body,
       icon: iconUrl,
       badge: iconUrl,
-      tag: options?.tag || `bouncer-${Date.now()}`
+      tag: dedupeTag
     });
 
     if (options?.onClick) {
@@ -223,7 +305,7 @@ export async function triggerBrowserPushNotification(
         await reg.showNotification(title, {
           body,
           icon: options?.icon,
-          tag: options?.tag || `bouncer-${Date.now()}`
+          tag: dedupeTag
         });
         return true;
       } catch (swErr) {
