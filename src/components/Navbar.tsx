@@ -22,9 +22,12 @@ import {
   CreditCard,
   CheckCircle2,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  ImageOff,
+  Gift
 } from 'lucide-react';
 import { User, SiteSettings, CentralizedLoadingState } from '../types';
+import { hasValidProfilePhoto } from '../utils/format';
 
 export type MainTabType = 'home' | 'discover' | 'reels' | 'feed' | 'wholikedme' | 'profile' | 'admin' | 'safety' | 'pricing';
 
@@ -305,12 +308,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   title="Account Menu & Profile"
                 >
                   <div className="relative">
-                    <img
-                      src={currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80'}
-                      alt={currentUser.name}
-                      referrerPolicy="no-referrer"
-                      className="w-8 h-8 rounded-xl object-cover ring-2 ring-rose-500/60"
-                    />
+                    {hasValidProfilePhoto(currentUser.avatar) ? (
+                      <img
+                        src={currentUser.avatar}
+                        alt={currentUser.name}
+                        referrerPolicy="no-referrer"
+                        className="w-8 h-8 rounded-xl object-cover ring-2 ring-rose-500/60"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-xl bg-slate-950 border border-slate-700 flex items-center justify-center text-slate-400 ring-2 ring-amber-500/50" title="No Picture Uploaded">
+                        <ImageOff className="w-4 h-4 text-amber-400" />
+                      </div>
+                    )}
                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-slate-950 flex items-center justify-center">
                       <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-1 ring-slate-950" />
                     </div>
@@ -347,12 +356,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                         className="p-3 rounded-2xl hover:bg-slate-800/80 cursor-pointer transition-all flex items-center gap-3.5 group mb-2 border border-slate-800/60 bg-slate-950/60 shadow-sm"
                       >
                         <div className="relative shrink-0">
-                          <img
-                            src={currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80'}
-                            alt={currentUser.name}
-                            referrerPolicy="no-referrer"
-                            className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl object-cover ring-2 ring-rose-500 shadow-md group-hover:scale-105 transition-transform"
-                          />
+                          {hasValidProfilePhoto(currentUser.avatar) ? (
+                            <img
+                              src={currentUser.avatar}
+                              alt={currentUser.name}
+                              referrerPolicy="no-referrer"
+                              className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl object-cover ring-2 ring-rose-500 shadow-md group-hover:scale-105 transition-transform"
+                            />
+                          ) : (
+                            <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-slate-900 border border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-400">
+                              <ImageOff className="w-5 h-5 text-amber-400" />
+                              <span className="text-[8px] font-bold uppercase mt-0.5">No Pic</span>
+                            </div>
+                          )}
                           {currentUser.bouncerVerified && (
                             <div className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 p-0.5 rounded-full ring-2 ring-slate-900 shadow-xs">
                               <ShieldCheck className="w-3.5 h-3.5" />
@@ -379,7 +395,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                       {/* Dropdown Action Items */}
                       <div className="py-2 space-y-1">
-                        {/* Edit Profile & Photos Option */}
+                        {/* Settings, Affiliate Link & Profile Option */}
                         {onOpenEditProfile && (
                           <button
                             onClick={() => {
@@ -389,12 +405,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                             className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800/80 text-left transition-colors group"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 group-hover:bg-rose-500 group-hover:text-white transition-colors">
-                                <Camera className="w-4 h-4" />
+                              <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+                                <Settings className="w-4 h-4" />
                               </div>
                               <div>
-                                <div className="text-xs font-bold text-slate-100 group-hover:text-white">Edit Profile & Photos</div>
-                                <div className="text-[10px] text-slate-400">Update bio, WhatsApp, location & pictures</div>
+                                <div className="text-xs font-bold text-slate-100 group-hover:text-white flex items-center gap-1.5">
+                                  <span>Settings & Affiliate Link</span>
+                                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-black px-1.5 py-0.2 rounded-full">
+                                    Earn $
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-400">Affiliate link, withdrawals, photos & profile settings</div>
                               </div>
                             </div>
                             <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />

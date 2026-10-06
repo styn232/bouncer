@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye, RefreshCw, Bell } from 'lucide-react';
+import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye, RefreshCw, Bell, ImageOff, ShieldAlert, Gift, Upload } from 'lucide-react';
 import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, NotificationItem, CentralizedLoadingState } from './types';
+import { hasValidProfilePhoto, getValidProfilePhotos } from './utils/format';
 import { Navbar, MainTabType } from './components/Navbar';
 import { SinglesFilterBar } from './components/SinglesFilterBar';
 import { SingleCard } from './components/SingleCard';
@@ -690,6 +691,15 @@ export default function App() {
 
   // Initial fetch on mount (loads bootstrap data including profiles in 1 fast call)
   useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const refParam = params.get('ref');
+      if (refParam) {
+        localStorage.setItem('bouncer_ref_code', refParam.trim().toUpperCase());
+      }
+    } catch {
+      // ignore
+    }
     fetchInitialData();
   }, []);
 
@@ -716,6 +726,22 @@ export default function App() {
     if (exists) {
       setCartItems((prev) => prev.filter((item) => item.profileId !== profile.id));
     } else {
+      // Encourage user to upload their profile picture so that they can choose other singles
+      if (
+        currentUser &&
+        currentUser.role !== 'admin' &&
+        !hasValidProfilePhoto(currentUser.avatar) &&
+        getValidProfilePhotos(currentUser.photos).length === 0
+      ) {
+        addToast(
+          '📸 Upload Your Picture First!',
+          'Please upload your profile picture in Settings so that you can choose other singles and connect on WhatsApp.',
+          'bouncer'
+        );
+        setIsUserModalOpen(true);
+        return;
+      }
+
       const newItem: CartItem = {
         profileId: profile.id,
         profile,
@@ -1154,6 +1180,34 @@ export default function App() {
       {/* Main Body View Switching */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 md:pb-8 space-y-4 sm:space-y-6">
         
+        {/* ENCOURAGE USER TO UPLOAD PICTURE SO THEY CAN CHOOSE OTHER SINGLES */}
+        {currentUser && !hasValidProfilePhoto(currentUser.avatar) && getValidProfilePhotos(currentUser.photos).length === 0 && (
+          <div className="bg-gradient-to-r from-amber-500/20 via-rose-500/15 to-slate-900 border border-amber-400/60 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-slate-950 border border-dashed border-amber-400/60 flex flex-col items-center justify-center shrink-0 text-amber-300">
+                <ImageOff className="w-5 h-5" />
+                <span className="text-[7px] font-black uppercase">No Pic</span>
+              </div>
+              <div>
+                <h3 className="text-xs sm:text-sm font-extrabold text-amber-300 uppercase tracking-wide">
+                  Upload Your Picture to Choose Other Singles
+                </h3>
+                <p className="text-[11px] text-rose-100/90 mt-0.5">
+                  You don&apos;t have a profile picture yet. Upload your real photo in Settings so that you can choose other singles and connect on WhatsApp!
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsUserModalOpen(true)}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-md flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Upload Picture Now</span>
+            </button>
+          </div>
+        )}
+
         {/* Visitor Sign Up / Sign In Prompt Banner */}
         {!currentUser && (
           <div className="bg-gradient-to-r from-rose-950/90 via-slate-900/95 to-amber-950/80 border border-rose-500/30 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
@@ -1163,10 +1217,10 @@ export default function App() {
               </div>
               <div>
                 <h3 className="text-xs sm:text-sm font-extrabold text-white">
-                  Welcome to Dating With Bouncer
+                  Welcome to DATING WITH BOUNCER
                 </h3>
                 <p className="text-[11px] text-rose-200/80">
-                  Sign up to create your single profile or sign in to your account to connect with vetted singles.
+                  Sign up &amp; upload your picture so you can choose other singles and connect on WhatsApp.
                 </p>
               </div>
             </div>
@@ -1196,109 +1250,6 @@ export default function App() {
         {/* DISCOVER & HOME TAB: DIRECT SINGLES DIRECTORY */}
         {(activeTab === 'discover' || activeTab === 'home') && (
           <div className="space-y-6">
-            {/* ADMIN PROFILE LINK PREVIEW & SUMMARY OF DATING WITH BOUNCER */}
-            <section className="bg-gradient-to-br from-slate-900/95 via-[#180714] to-slate-950 border border-amber-500/30 rounded-3xl p-4 sm:p-5 shadow-xl relative overflow-hidden">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-                {/* Left: Official Admin Profile Link Preview Card */}
-                <div className="lg:col-span-5 bg-slate-950/90 border border-amber-500/40 rounded-2xl p-3.5 sm:p-4 flex items-center gap-3.5 shadow-md">
-                  <div className="relative shrink-0">
-                    <img
-                      src={adminPreview.avatar}
-                      alt={adminPreview.name}
-                      decoding="async"
-                      referrerPolicy="no-referrer"
-                      className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-2 ring-amber-400 shadow-lg"
-                    />
-                    <span className="absolute -bottom-1 -right-1 bg-amber-500 text-slate-950 p-1 rounded-full ring-2 ring-slate-950 shadow">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                        Official Link Preview • Admin Profile
-                      </span>
-                    </div>
-                    <h3 className="text-sm sm:text-base font-extrabold text-white font-serif truncate mt-1 flex items-center gap-1.5">
-                      <span>{adminPreview.name}</span>
-                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                    </h3>
-                    <p className="text-[11px] text-amber-200/90 font-semibold truncate">
-                      {adminPreview.role} • 📍 {adminPreview.location}
-                    </p>
-                    <p className="text-[11px] text-slate-300 line-clamp-2 mt-1">
-                      {adminPreview.bio}
-                    </p>
-                    <div className="mt-2 flex items-center gap-2 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const shareUrl = window.location.origin;
-                          if (navigator.clipboard) {
-                            navigator.clipboard.writeText(shareUrl).catch(() => {});
-                          }
-                          addToast(
-                            'Admin Link Preview Copied! 🔗',
-                            `Share ${shareUrl} on WhatsApp or social media — the link preview displays ${adminPreview.name}'s profile & platform summary.`,
-                            'bouncer'
-                          );
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer shadow-xs"
-                      >
-                        Copy Link Preview
-                      </button>
-                      <a
-                        href="https://wa.me/263715786859?text=Hi%20Admin%20I%20need%20Help"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] transition-all shadow-xs flex items-center gap-1"
-                        title="WhatsApp Support"
-                      >
-                        <MessageSquare className="w-2.5 h-2.5" />
-                        <span>Support</span>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Summary of DATING WITH BOUNCER */}
-                <div className="lg:col-span-7 space-y-2.5">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <h2 className="text-sm sm:text-base font-black text-white font-serif uppercase tracking-wide flex items-center gap-2">
-                      <Crown className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>Summary of DATING WITH BOUNCER</span>
-                    </h2>
-                    <span className="text-[10px] font-bold text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2.5 py-0.5 rounded-full">
-                      🇿🇼 All 10 Provinces • 60+ Centres
-                    </span>
-                  </div>
-                  <p className="text-xs text-rose-100/90 leading-relaxed">
-                    <strong>DATING WITH BOUNCER</strong> is Zimbabwe&apos;s #1 Bouncer-vetted singles &amp; matchmaking platform. Every profile is verified for identity, honest HIV disclosure (<strong>HIV-</strong> / <strong>HIV+</strong>), and dating intent (<strong>💍 Seeking Marriage</strong> or <strong>😂 Funny &amp; Good Vibe</strong>).
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5 text-[11px]">
-                    <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
-                      <div className="font-extrabold text-amber-300">1. Opposite-Gender Match</div>
-                      <div className="text-slate-300 text-[10px] mt-0.5">
-                        Men exclusively see Single Ladies, and Ladies exclusively see Single Gentlemen.
-                      </div>
-                    </div>
-                    <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
-                      <div className="font-extrabold text-rose-300">2. Choose Singles to Cart</div>
-                      <div className="text-slate-300 text-[10px] mt-0.5">
-                        $3 for 1 Single • $6 for 2–3 Singles • $10 for 4–10 Singles • $15 VIP (30+ Singles).
-                      </div>
-                    </div>
-                    <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
-                      <div className="font-extrabold text-emerald-300">3. Unlock WhatsApp Direct</div>
-                      <div className="text-slate-300 text-[10px] mt-0.5">
-                        Pay securely via Paynow &amp; get direct private WhatsApp numbers upon Admin approval.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
             {/* FEATURED SINGLES SPOTLIGHT: Horizontal Scroll Section at the Top */}
             <FeaturedSingles
               profiles={profiles}
@@ -1560,14 +1511,21 @@ export default function App() {
         {activeTab === 'profile' && currentUser && (
           <div className="max-w-2xl mx-auto py-8">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
-              <div className="flex items-center justify-between pb-6 border-b border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
                 <div className="flex items-center gap-4">
-                  <img
-                    src={currentUser.avatar}
-                    alt={currentUser.name}
-                    referrerPolicy="no-referrer"
-                    className="w-16 h-16 rounded-2xl object-cover ring-2 ring-rose-500"
-                  />
+                  {hasValidProfilePhoto(currentUser.avatar) ? (
+                    <img
+                      src={currentUser.avatar}
+                      alt={currentUser.name}
+                      referrerPolicy="no-referrer"
+                      className="w-16 h-16 rounded-2xl object-cover ring-2 ring-rose-500 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-2xl bg-slate-950 border border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-400 shrink-0">
+                      <ImageOff className="w-6 h-6 text-amber-400" />
+                      <span className="text-[8px] font-bold uppercase mt-0.5">No Picture</span>
+                    </div>
+                  )}
                   <div>
                     <h2 className="text-2xl font-bold text-white font-serif flex items-center gap-2">
                       <span>{currentUser.name}, {currentUser.age}</span>
@@ -1580,13 +1538,13 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-col items-start sm:items-end gap-2">
                   <button
                     onClick={() => setIsUserModalOpen(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white text-xs font-bold rounded-xl shadow-lg transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Edit Profile & Photos</span>
+                    <Gift className="w-3.5 h-3.5" />
+                    <span>Settings, Photos & Affiliate Link</span>
                   </button>
                   {currentUser?.role === 'admin' && (
                     <button

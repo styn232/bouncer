@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck, Eye, Crown, Zap, HeartPulse, ChevronLeft, ChevronRight, Camera } from 'lucide-react';
+import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck, Eye, Crown, Zap, HeartPulse, ChevronLeft, ChevronRight, Camera, ImageOff } from 'lucide-react';
 import { SingleProfile, User } from '../types';
-import { capitalizeName, formatDisplayName, maskPhoneNumber, formatHivStatus } from '../utils/format';
+import { capitalizeName, formatDisplayName, maskPhoneNumber, formatHivStatus, getValidProfilePhotos } from '../utils/format';
 
 interface ProfileDetailModalProps {
   profile: SingleProfile | null;
@@ -133,25 +133,35 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
           {/* Left Side: Photo Gallery */}
           <div className="w-full md:w-1/2 bg-slate-950 flex flex-col justify-between p-3 sm:p-4 border-r border-slate-800 shrink-0">
             <div className="relative aspect-[4/5] rounded-2xl overflow-hidden bg-slate-900 mb-3 shadow-inner group select-none">
-              <img
-                src={profile.photos?.[selectedPhotoIdx] || profile.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'}
-                alt={profile.name}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover transition-transform duration-300"
-              />
+              {getValidProfilePhotos(profile.photos).length > 0 ? (
+                <img
+                  src={getValidProfilePhotos(profile.photos)[selectedPhotoIdx] || getValidProfilePhotos(profile.photos)[0]}
+                  alt={profile.name}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover transition-transform duration-300"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-rose-950/60 p-6 text-center">
+                  <div className="w-20 h-20 rounded-3xl bg-slate-800/90 border border-slate-700 flex items-center justify-center text-rose-400 mb-3 shadow-inner">
+                    <ImageOff className="w-10 h-10" />
+                  </div>
+                  <span className="text-base font-extrabold text-slate-200 uppercase tracking-wider">No Picture</span>
+                  <span className="text-xs text-slate-400 mt-1">This single has not uploaded a profile photo yet.</span>
+                </div>
+              )}
 
               {/* Photo Cycling Arrows */}
-              {(profile.photos?.length || 0) > 1 && (
+              {getValidProfilePhotos(profile.photos).length > 1 && (
                 <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex justify-between items-center pointer-events-auto z-20">
                   <button
-                    onClick={() => setSelectedPhotoIdx((prev) => (prev - 1 + (profile.photos?.length || 1)) % (profile.photos?.length || 1))}
+                    onClick={() => setSelectedPhotoIdx((prev) => (prev - 1 + getValidProfilePhotos(profile.photos).length) % getValidProfilePhotos(profile.photos).length)}
                     className="p-1.5 sm:p-2 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md transition-all active:scale-95 shadow-md"
                     aria-label="Previous photo"
                   >
                     <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                   <button
-                    onClick={() => setSelectedPhotoIdx((prev) => (prev + 1) % (profile.photos?.length || 1))}
+                    onClick={() => setSelectedPhotoIdx((prev) => (prev + 1) % getValidProfilePhotos(profile.photos).length)}
                     className="p-1.5 sm:p-2 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md transition-all active:scale-95 shadow-md"
                     aria-label="Next photo"
                   >

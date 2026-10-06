@@ -13,10 +13,11 @@ import {
   Crown, 
   Lock, 
   HeartPulse,
-  Camera
+  Camera,
+  ImageOff
 } from 'lucide-react';
 import { SingleProfile, User } from '../types';
-import { formatDisplayName, capitalizeName, formatHivStatus } from '../utils/format';
+import { formatDisplayName, capitalizeName, formatHivStatus, getValidProfilePhotos } from '../utils/format';
 
 interface SingleCardProps {
   profile: SingleProfile;
@@ -38,12 +39,11 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
 
-  const isOwner = currentUser && (currentUser.id === profile.id || currentUser.email === profile.email);
+  const isOwner = currentUser && (currentUser.id === profile.id || currentUser.email === (profile as any).email);
   const formattedDisplayName = formatDisplayName(profile.name, 15);
-  const photos = profile.photos && profile.photos.length > 0
-    ? profile.photos
-    : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'];
+  const photos = getValidProfilePhotos(profile.photos);
   const totalPhotos = photos.length;
+  const hasPhoto = totalPhotos > 0;
 
   const isUnlocked =
     currentUser?.role === 'admin' ||
@@ -99,17 +99,31 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
       {/* Top Image Container with Photo Navigation & Quick Preview */}
       <div 
         onClick={handlePhotoClick}
-        className="relative aspect-[4/5] overflow-hidden bg-slate-100 cursor-pointer select-none"
+        className="relative aspect-[4/5] overflow-hidden bg-slate-900 cursor-pointer select-none"
         title="Tap to view full photos"
       >
-        <img
-          src={photos[currentPhotoIdx] || photos[0]}
-          alt={capitalizeName(profile.name)}
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
+        {hasPhoto ? (
+          <img
+            src={photos[currentPhotoIdx] || photos[0]}
+            alt={capitalizeName(profile.name)}
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-rose-950/60 p-4 text-center">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-800/90 border border-slate-700 flex items-center justify-center text-slate-400 mb-2 shadow-inner">
+              <ImageOff className="w-7 h-7 sm:w-8 sm:h-8 text-rose-400/80" />
+            </div>
+            <span className="text-xs sm:text-sm font-extrabold text-slate-200 uppercase tracking-wider">
+              No Picture
+            </span>
+            <span className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">
+              Photo not uploaded yet
+            </span>
+          </div>
+        )}
 
         {/* Subtle Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-black/35 pointer-events-none" />
@@ -178,7 +192,7 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
             title="Click to view all photos"
           >
             <Camera className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400" />
-            <span>{currentPhotoIdx + 1}/{totalPhotos}</span>
+            <span>{hasPhoto ? `${currentPhotoIdx + 1}/${totalPhotos}` : 'No Picture'}</span>
           </button>
 
           {isOwner && (

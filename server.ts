@@ -16,7 +16,7 @@ import {
   INITIAL_ADS,
   INITIAL_VERIFICATIONS
 } from './src/data/mockData';
-import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, VerificationSubmission, ReportItem, AdCampaign, NotificationItem, SiteSettings } from './src/types';
+import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, VerificationSubmission, ReportItem, AdCampaign, NotificationItem, SiteSettings, OpenGraphSettings, AffiliateWithdrawalRequest, AffiliateReferral } from './src/types';
 import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getProvinceForCity, ZIMBABWE_LOCATIONS_CSV } from './src/data/zimbabweLocations';
 import { Paynow } from 'paynow';
 
@@ -78,7 +78,32 @@ async function startServer() {
     }
   }
 
-  app.use('/uploads', express.static(uploadsDir));
+  // Ensure the default 1200x630 promotional Open Graph image is always available in /uploads/og-default-1200x630.jpg
+  const DEFAULT_OG_FILENAME = 'og-default-1200x630.jpg';
+  const defaultOgSourceAsset = path.join(process.cwd(), 'src', 'assets', 'images', 'og_default_banner_1791266962030.jpg');
+  const defaultOgDestPath = path.join(uploadsDir, DEFAULT_OG_FILENAME);
+  try {
+    if (fs.existsSync(defaultOgSourceAsset) && !fs.existsSync(defaultOgDestPath)) {
+      fs.copyFileSync(defaultOgSourceAsset, defaultOgDestPath);
+    }
+  } catch (e) {
+    console.warn('Could not copy default OG promotional image:', e);
+  }
+
+  // Serve /og-default-1200x630.jpg directly at root as well as /uploads/og-default-1200x630.jpg
+  app.get('/og-default-1200x630.jpg', (_req, res) => {
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    if (fs.existsSync(defaultOgDestPath)) {
+      return res.sendFile(defaultOgDestPath);
+    }
+    if (fs.existsSync(defaultOgSourceAsset)) {
+      return res.sendFile(defaultOgSourceAsset);
+    }
+    return res.status(404).send('Default OG image not found');
+  });
+
+  app.use('/uploads', express.static(uploadsDir, { maxAge: '7d' }));
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -115,13 +140,167 @@ async function startServer() {
     return PAYNOW_MERCHANT_EMAIL;
   }
 
+  const DEFAULT_CANONICAL_URL = 'https://datingwithbouncer.com/';
+  const DEFAULT_OG_IMAGE_URL = 'https://datingwithbouncer.com/og-default-1200x630.jpg';
+
+  const DEFAULT_OPEN_GRAPH: OpenGraphSettings = {
+    ogTitle: 'Dating With Bouncer | Choose Singles & Connect',
+    ogDescription: 'See photos. Choose your match. Get their WhatsApp and start connecting today.',
+    ogImage: DEFAULT_OG_IMAGE_URL,
+    siteName: 'DATING WITH BOUNCER',
+    canonicalUrl: DEFAULT_CANONICAL_URL,
+    ogType: 'website',
+    ogImageWidth: 1200,
+    ogImageHeight: 630,
+    twitterCard: 'summary_large_image',
+    twitterTitle: 'Dating With Bouncer | Find Your Match',
+    twitterDescription: 'Browse singles, view photos and connect directly on WhatsApp. Sign up today.',
+    twitterImage: DEFAULT_OG_IMAGE_URL,
+    defaultOgImage: DEFAULT_OG_IMAGE_URL,
+    isCustomImage: false,
+    version: 1,
+    updatedAt: new Date().toISOString()
+  };
+
+  // Helper to ensure an image URL is always an absolute HTTPS URL (never localhost, 127.0.0.1, or relative path)
+  function resolvePublicHttpsImageUrl(rawImage: string | undefined, canonicalUrl?: string, version?: number): string {
+    let baseOrigin = 'https://datingwithbouncer.com';
+    if (canonicalUrl && typeof canonicalUrl === 'string') {
+      try {
+        const parsed = new URL(canonicalUrl.startsWith('http') ? canonicalUrl : `https://${canonicalUrl}`);
+        if (parsed.hostname && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+          baseOrigin = `https://${parsed.host}`;
+        }
+      } catch {
+        // Fallback to https://datingwithbouncer.com
+      }
+    }
+
+    let target = (rawImage || '').trim();
+    if (!target) {
+      target = `${baseOrigin}/og-default-1200x630.jpg`;
+    } else if (target.startsWith('data:image/')) {
+      // Persist data URL to /uploads so social crawlers get a clean HTTPS image URL
+      const matches = target.match(/^data:image\/([a-zA-Z0-9.+]+);base64,(.+)$/);
+      if (matches) {
+        const rawExt = matches[1].toLowerCase();
+        const ext = rawExt === 'jpeg' ? 'jpg' : rawExt;
+        const fname = `og_custom_${version || Date.now()}.${ext}`;
+        const fpath = path.join(uploadsDir, fname);
+        try {
+          if (!fs.existsSync(fpath)) {
+            fs.writeFileSync(fpath, Buffer.from(matches[2], 'base64'));
+          }
+          target = `${baseOrigin}/uploads/${fname}`;
+        } catch {
+          target = `${baseOrigin}/og-default-1200x630.jpg`;
+        }
+      } else {
+        target = `${baseOrigin}/og-default-1200x630.jpg`;
+      }
+    } else if (target.startsWith('/')) {
+      target = `${baseOrigin}${target}`;
+    } else if (target.startsWith('http://') || target.startsWith('https://')) {
+      try {
+        const parsedImg = new URL(target);
+        if (parsedImg.hostname === 'localhost' || parsedImg.hostname === '127.0.0.1') {
+          target = `${baseOrigin}${parsedImg.pathname}${parsedImg.search}`;
+        } else {
+          parsedImg.protocol = 'https:';
+          target = parsedImg.toString();
+        }
+      } catch {
+        target = `${baseOrigin}/og-default-1200x630.jpg`;
+      }
+    } else {
+      target = `${baseOrigin}/${target.replace(/^\/+/, '')}`;
+    }
+
+    // Append version query param for social crawler cache busting when custom or updated
+    if (version && version > 1) {
+      try {
+        const u = new URL(target);
+        u.searchParams.set('v', String(version));
+        return u.toString();
+      } catch {
+        return target;
+      }
+    }
+    return target;
+  }
+
+  // Convert an absolute https://datingwithbouncer.com/uploads/... URL to a browser-previewable URL in dev/preview
+  function resolvePreviewableImageUrl(imgUrl: string | undefined): string {
+    if (!imgUrl) return '/og-default-1200x630.jpg';
+    try {
+      if (imgUrl.startsWith('http://') || imgUrl.startsWith('https://')) {
+        const parsed = new URL(imgUrl);
+        if (parsed.pathname === '/og-default-1200x630.jpg' || parsed.pathname.startsWith('/uploads/') || parsed.pathname.startsWith('/api/')) {
+          return `${parsed.pathname}${parsed.search}`;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return imgUrl;
+  }
+
   // In-memory persistent database states
   let siteSettings: SiteSettings = {
     siteName: 'DATING WITH BOUNCER',
     tagline: 'Real People. Real Connections. Real Possibilities.',
     logoUrl: '',
-    iconUrl: ''
+    iconUrl: '',
+    affiliateRewardPerInvite: 0.25,
+    minWithdrawalAmount: 5,
+    enforceOneAccountPerIp: true,
+    blockVpnConnections: true,
+    ogTitle: DEFAULT_OPEN_GRAPH.ogTitle,
+    ogDescription: DEFAULT_OPEN_GRAPH.ogDescription,
+    ogImage: DEFAULT_OPEN_GRAPH.ogImage,
+    canonicalUrl: DEFAULT_OPEN_GRAPH.canonicalUrl,
+    ogType: DEFAULT_OPEN_GRAPH.ogType,
+    ogImageWidth: 1200,
+    ogImageHeight: 630,
+    twitterCard: DEFAULT_OPEN_GRAPH.twitterCard,
+    twitterTitle: DEFAULT_OPEN_GRAPH.twitterTitle,
+    twitterDescription: DEFAULT_OPEN_GRAPH.twitterDescription,
+    twitterImage: DEFAULT_OPEN_GRAPH.twitterImage,
+    isCustomOgImage: false,
+    ogVersion: 1,
+    openGraph: { ...DEFAULT_OPEN_GRAPH }
   };
+
+  function getActiveOpenGraphSettings(): OpenGraphSettings {
+    const og = siteSettings.openGraph || DEFAULT_OPEN_GRAPH;
+    const version = Number(siteSettings.ogVersion || og.version || 1);
+    const canonical = (siteSettings.canonicalUrl || og.canonicalUrl || DEFAULT_CANONICAL_URL).trim() || DEFAULT_CANONICAL_URL;
+    const rawOgImg = siteSettings.ogImage || og.ogImage || DEFAULT_OG_IMAGE_URL;
+    const rawTwImg = siteSettings.twitterImage || og.twitterImage || rawOgImg || DEFAULT_OG_IMAGE_URL;
+    const upperSiteName = (siteSettings.siteName || og.siteName || 'DATING WITH BOUNCER').toUpperCase();
+
+    const resolvedOgImage = resolvePublicHttpsImageUrl(rawOgImg, canonical, version);
+    const resolvedTwitterImage = resolvePublicHttpsImageUrl(rawTwImg, canonical, version);
+
+    return {
+      ogTitle: siteSettings.ogTitle || og.ogTitle || DEFAULT_OPEN_GRAPH.ogTitle,
+      ogDescription: siteSettings.ogDescription || og.ogDescription || DEFAULT_OPEN_GRAPH.ogDescription,
+      ogImage: resolvedOgImage,
+      siteName: upperSiteName,
+      canonicalUrl: canonical.startsWith('http') ? canonical.replace(/^http:\/\//i, 'https://') : `https://${canonical}`,
+      ogType: siteSettings.ogType || og.ogType || 'website',
+      ogImageWidth: Number(siteSettings.ogImageWidth || og.ogImageWidth || 1200),
+      ogImageHeight: Number(siteSettings.ogImageHeight || og.ogImageHeight || 630),
+      twitterCard: siteSettings.twitterCard || og.twitterCard || 'summary_large_image',
+      twitterTitle: siteSettings.twitterTitle || og.twitterTitle || DEFAULT_OPEN_GRAPH.twitterTitle,
+      twitterDescription: siteSettings.twitterDescription || og.twitterDescription || DEFAULT_OPEN_GRAPH.twitterDescription,
+      twitterImage: resolvedTwitterImage,
+      defaultOgImage: DEFAULT_OG_IMAGE_URL,
+      isCustomImage: Boolean(siteSettings.isCustomOgImage ?? og.isCustomImage ?? (rawOgImg !== DEFAULT_OG_IMAGE_URL && !rawOgImg.endsWith('/og-default-1200x630.jpg'))),
+      version,
+      updatedAt: og.updatedAt || new Date().toISOString()
+    };
+  }
   let profiles: SingleProfile[] = [...DEFAULT_STARTER_PROFILES];
   let users: User[] = [MOCK_ADMIN_USER, MOCK_DEMO_USER];
   let currentUser: User | null = null;
@@ -139,6 +318,67 @@ async function startServer() {
   let reports: ReportItem[] = [];
   let userLikes: Record<string, string[]> = {};
   let userMatches: Record<string, string[]> = {};
+  let affiliateWithdrawals: AffiliateWithdrawalRequest[] = [];
+
+  function isRealUploadedPhoto(url?: string | null): boolean {
+    if (!url || typeof url !== 'string') return false;
+    const t = url.trim();
+    if (!t || t === 'no-picture' || t === 'none') return false;
+    if (
+      t.includes('photo-1534528741775-53994a69daeb') ||
+      t.includes('photo-1507003211169-0a1dd7228f2d')
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function generateUserReferralCode(userId: string, name?: string): string {
+    const cleanName = (name || 'USER').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4) || 'USER';
+    const suffix = (userId || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(-4) || Math.floor(1000 + Math.random() * 9000).toString();
+    return `DWB-${cleanName}${suffix}`;
+  }
+
+  function getClientIp(req: express.Request): string {
+    const cfIp = req.headers['cf-connecting-ip'];
+    if (typeof cfIp === 'string' && cfIp.trim()) return cfIp.trim();
+    const realIp = req.headers['x-real-ip'];
+    if (typeof realIp === 'string' && realIp.trim()) return realIp.trim();
+    const forwardedFor = req.headers['x-forwarded-for'];
+    if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+      return forwardedFor.split(',')[0].trim();
+    }
+    const remote = req.socket?.remoteAddress || req.ip || '127.0.0.1';
+    return remote.replace(/^::ffff:/, '');
+  }
+
+  function detectVpnOrProxy(req: express.Request): { isVpn: boolean; reason?: string } {
+    if (req.body?.vpnDetected === true) {
+      return { isVpn: true, reason: 'Client network VPN/Proxy tunnel detected.' };
+    }
+    const vpnHeaderKeys = [
+      'x-vpn',
+      'x-tor',
+      'x-proxy-id',
+      'proxy-connection',
+      'x-anonymous-proxy',
+      'x-forwarded-server'
+    ];
+    for (const h of vpnHeaderKeys) {
+      if (req.headers[h]) {
+        return { isVpn: true, reason: `Anonymous proxy/VPN header (${h}) detected.` };
+      }
+    }
+    const viaHeader = String(req.headers['via'] || '').toLowerCase();
+    if (viaHeader && (viaHeader.includes('vpn') || viaHeader.includes('tor') || viaHeader.includes('squid') || viaHeader.includes('privoxy'))) {
+      return { isVpn: true, reason: 'VPN/Proxy relay detected in connection headers.' };
+    }
+    const ua = String(req.headers['user-agent'] || '').toLowerCase();
+    if (ua.includes('torbrowser') || ua.includes('openvpn') || ua.includes('wireguard')) {
+      return { isVpn: true, reason: 'VPN/Tor client signature detected.' };
+    }
+    return { isVpn: false };
+  }
 
   function loadPersistentData() {
     try {
@@ -149,7 +389,12 @@ async function startServer() {
           profiles = data.profiles;
         }
         if (data.siteSettings && data.siteSettings.siteName) {
-          siteSettings = { ...siteSettings, ...data.siteSettings };
+          siteSettings = {
+            ...siteSettings,
+            ...data.siteSettings,
+            siteName: String(data.siteSettings.siteName || 'DATING WITH BOUNCER').toUpperCase()
+          };
+          siteSettings.openGraph = getActiveOpenGraphSettings();
         }
         if (Array.isArray(data.users) && data.users.length > 0) {
           users = data.users;
@@ -178,8 +423,29 @@ async function startServer() {
         if (Array.isArray(data.verifications)) verifications = data.verifications;
         if (Array.isArray(data.ads)) ads = data.ads;
         if (Array.isArray(data.reports)) reports = data.reports;
+        if (Array.isArray(data.affiliateWithdrawals)) affiliateWithdrawals = data.affiliateWithdrawals;
         if (data.userLikes) userLikes = data.userLikes;
         if (data.userMatches) userMatches = data.userMatches;
+
+        // Ensure all loaded users have a referralCode and strip legacy default placeholder avatars
+        users = users.map(u => {
+          const refCode = u.referralCode || generateUserReferralCode(u.id, u.name);
+          const cleanAvatar = isRealUploadedPhoto(u.avatar) ? u.avatar : '';
+          return {
+            ...u,
+            referralCode: refCode,
+            avatar: cleanAvatar,
+            affiliateBalance: Number(u.affiliateBalance || 0),
+            affiliateTotalEarned: Number(u.affiliateTotalEarned || 0),
+            affiliateInvitedMen: Number(u.affiliateInvitedMen || 0),
+            affiliateInvitedLadies: Number(u.affiliateInvitedLadies || 0),
+            affiliateReferrals: Array.isArray(u.affiliateReferrals) ? u.affiliateReferrals : []
+          };
+        });
+        profiles = profiles.map(p => ({
+          ...p,
+          photos: Array.isArray(p.photos) ? p.photos.filter(ph => isRealUploadedPhoto(ph)) : []
+        }));
         console.log(`[Storage] Loaded persistent state from disk. ${profiles.length} profiles, ${users.length} users.`);
       } else {
         saveAppData();
@@ -211,6 +477,7 @@ async function startServer() {
           verifications,
           ads,
           reports,
+          affiliateWithdrawals,
           userLikes,
           userMatches,
           lastUpdated: new Date().toISOString()
@@ -327,7 +594,54 @@ async function startServer() {
   });
 
   app.get('/api/settings', (_req, res) => {
+    siteSettings.siteName = (siteSettings.siteName || 'DATING WITH BOUNCER').toUpperCase();
+    siteSettings.openGraph = getActiveOpenGraphSettings();
     res.json(siteSettings);
+  });
+
+  // Public Open Graph Configuration Endpoint
+  app.get('/api/opengraph', (_req, res) => {
+    const og = getActiveOpenGraphSettings();
+    res.setHeader('Cache-Control', 'no-cache');
+    res.json({
+      ...og,
+      previewOgImage: resolvePreviewableImageUrl(og.ogImage),
+      previewTwitterImage: resolvePreviewableImageUrl(og.twitterImage),
+      previewDefaultOgImage: '/og-default-1200x630.jpg'
+    });
+  });
+
+  // Public Active Open Graph Image Endpoint (serves active 1200x630 OG image or default fallback)
+  app.get('/api/og-image', (_req, res) => {
+    try {
+      const og = getActiveOpenGraphSettings();
+      const previewPath = resolvePreviewableImageUrl(og.ogImage).split('?')[0];
+
+      if (previewPath.startsWith('/uploads/')) {
+        const localFile = path.join(uploadsDir, path.basename(previewPath));
+        if (fs.existsSync(localFile)) {
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          return res.sendFile(localFile);
+        }
+      }
+
+      if (fs.existsSync(defaultOgDestPath)) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        return res.sendFile(defaultOgDestPath);
+      }
+      if (fs.existsSync(defaultOgSourceAsset)) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        return res.sendFile(defaultOgSourceAsset);
+      }
+      return res.redirect(302, DEFAULT_OG_IMAGE_URL);
+    } catch {
+      if (fs.existsSync(defaultOgDestPath)) {
+        return res.sendFile(defaultOgDestPath);
+      }
+      return res.redirect(302, DEFAULT_OG_IMAGE_URL);
+    }
   });
 
   // Admin Profile Link Preview & Summary Endpoint
@@ -381,28 +695,275 @@ async function startServer() {
       return { ...rest, whatsappNumber: undefined };
     });
 
+    siteSettings.siteName = (siteSettings.siteName || 'DATING WITH BOUNCER').toUpperCase();
+    if (siteSettings.affiliateRewardPerInvite === undefined) siteSettings.affiliateRewardPerInvite = 0.25;
+    if (siteSettings.minWithdrawalAmount === undefined) siteSettings.minWithdrawalAmount = 5;
+    siteSettings.openGraph = getActiveOpenGraphSettings();
+
+    const platformMenCount = profiles.filter(p => (p.gender || '').toLowerCase() === 'male').length;
+    const platformLadiesCount = profiles.filter(p => (p.gender || 'female').toLowerCase() === 'female').length;
+
     res.json({
       siteSettings,
+      openGraph: siteSettings.openGraph,
       profiles: sanitizedProfiles,
       plans: SUBSCRIPTION_PLANS,
       adminPreview: getAdminProfileSummary(),
       transactions: transactions.slice(0, 50),
       matchOrders: matchOrders.slice(0, 50),
-      notifications: notifications.slice(0, 40)
+      notifications: notifications.slice(0, 40),
+      affiliateWithdrawals: isAdminReq ? affiliateWithdrawals : [],
+      platformGenderBalance: {
+        menCount: platformMenCount,
+        ladiesCount: platformLadiesCount,
+        isMenEqualOrMore: platformMenCount >= platformLadiesCount
+      }
     });
   });
 
   app.put('/api/settings', (req, res) => {
-    const { siteName, logoUrl, iconUrl, tagline } = req.body;
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Only authenticated administrators can modify site settings.' });
+    }
+    const {
+      siteName,
+      logoUrl,
+      iconUrl,
+      tagline,
+      affiliateRewardPerInvite,
+      minWithdrawalAmount,
+      enforceOneAccountPerIp,
+      blockVpnConnections,
+      ogTitle,
+      ogDescription,
+      ogImage,
+      canonicalUrl,
+      twitterTitle,
+      twitterDescription,
+      twitterImage,
+      isCustomOgImage
+    } = req.body;
+
+    const nextVersion = (siteSettings.ogVersion || 1) + (ogImage !== undefined || twitterImage !== undefined ? 1 : 0);
+    const upperSiteName = siteName ? String(siteName).trim().toUpperCase() : (siteSettings.siteName || 'DATING WITH BOUNCER').toUpperCase();
+
     siteSettings = {
       ...siteSettings,
-      ...(siteName && { siteName }),
+      siteName: upperSiteName,
       ...(logoUrl !== undefined && { logoUrl }),
       ...(iconUrl !== undefined && { iconUrl }),
-      ...(tagline && { tagline })
+      ...(tagline !== undefined && { tagline }),
+      ...(affiliateRewardPerInvite !== undefined && { affiliateRewardPerInvite: Math.max(0.01, Number(affiliateRewardPerInvite) || 0.25) }),
+      ...(minWithdrawalAmount !== undefined && { minWithdrawalAmount: Math.max(1, Number(minWithdrawalAmount) || 5) }),
+      ...(enforceOneAccountPerIp !== undefined && { enforceOneAccountPerIp: Boolean(enforceOneAccountPerIp) }),
+      ...(blockVpnConnections !== undefined && { blockVpnConnections: Boolean(blockVpnConnections) }),
+      ...(ogTitle !== undefined && { ogTitle: String(ogTitle).trim() }),
+      ...(ogDescription !== undefined && { ogDescription: String(ogDescription).trim() }),
+      ...(ogImage !== undefined && { ogImage: String(ogImage).trim() }),
+      ...(canonicalUrl !== undefined && { canonicalUrl: String(canonicalUrl).trim() }),
+      ...(twitterTitle !== undefined && { twitterTitle: String(twitterTitle).trim() }),
+      ...(twitterDescription !== undefined && { twitterDescription: String(twitterDescription).trim() }),
+      ...(twitterImage !== undefined && { twitterImage: String(twitterImage).trim() }),
+      ...(isCustomOgImage !== undefined && { isCustomOgImage: Boolean(isCustomOgImage) }),
+      ogVersion: nextVersion
     };
+    siteSettings.openGraph = getActiveOpenGraphSettings();
     saveAppData();
-    res.json({ success: true, siteSettings });
+    res.json({ success: true, siteSettings, openGraph: siteSettings.openGraph });
+  });
+
+  // Admin-Only: Update Open Graph / Social Sharing Configuration
+  app.put('/api/admin/opengraph', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Only authenticated administrators can modify Open Graph settings.' });
+    }
+
+    const {
+      ogTitle,
+      ogDescription,
+      ogImage,
+      siteName,
+      canonicalUrl,
+      twitterTitle,
+      twitterDescription,
+      twitterImage,
+      isCustomImage
+    } = req.body || {};
+
+    const nextVersion = (siteSettings.ogVersion || 1) + 1;
+    const upperSiteName = (siteName || siteSettings.siteName || 'DATING WITH BOUNCER').toString().trim().toUpperCase();
+    const cleanedCanonical = (canonicalUrl || siteSettings.canonicalUrl || DEFAULT_CANONICAL_URL).toString().trim();
+
+    const rawOgImg = ogImage !== undefined ? String(ogImage).trim() : (siteSettings.ogImage || DEFAULT_OG_IMAGE_URL);
+    const rawTwImg = twitterImage !== undefined ? String(twitterImage).trim() : (rawOgImg || DEFAULT_OG_IMAGE_URL);
+
+    const resolvedOgImg = resolvePublicHttpsImageUrl(rawOgImg, cleanedCanonical, nextVersion);
+    const resolvedTwImg = resolvePublicHttpsImageUrl(rawTwImg, cleanedCanonical, nextVersion);
+
+    const customFlag =
+      isCustomImage !== undefined
+        ? Boolean(isCustomImage)
+        : !rawOgImg.includes('og-default-1200x630.jpg');
+
+    siteSettings = {
+      ...siteSettings,
+      siteName: upperSiteName,
+      ogTitle: (ogTitle ?? siteSettings.ogTitle ?? DEFAULT_OPEN_GRAPH.ogTitle).toString().trim(),
+      ogDescription: (ogDescription ?? siteSettings.ogDescription ?? DEFAULT_OPEN_GRAPH.ogDescription).toString().trim(),
+      ogImage: resolvedOgImg,
+      canonicalUrl: cleanedCanonical.startsWith('http') ? cleanedCanonical.replace(/^http:\/\//i, 'https://') : `https://${cleanedCanonical}`,
+      ogType: 'website',
+      ogImageWidth: 1200,
+      ogImageHeight: 630,
+      twitterCard: 'summary_large_image',
+      twitterTitle: (twitterTitle ?? siteSettings.twitterTitle ?? DEFAULT_OPEN_GRAPH.twitterTitle).toString().trim(),
+      twitterDescription: (twitterDescription ?? siteSettings.twitterDescription ?? DEFAULT_OPEN_GRAPH.twitterDescription).toString().trim(),
+      twitterImage: resolvedTwImg,
+      isCustomOgImage: customFlag,
+      ogVersion: nextVersion
+    };
+
+    siteSettings.openGraph = getActiveOpenGraphSettings();
+    saveAppData();
+
+    return res.json({
+      success: true,
+      message: 'Open Graph & Social Sharing settings saved successfully.',
+      openGraph: {
+        ...siteSettings.openGraph,
+        previewOgImage: resolvePreviewableImageUrl(siteSettings.openGraph.ogImage),
+        previewTwitterImage: resolvePreviewableImageUrl(siteSettings.openGraph.twitterImage),
+        previewDefaultOgImage: '/og-default-1200x630.jpg'
+      },
+      siteSettings
+    });
+  });
+
+  // Admin-Only: Upload & Validate Open Graph Image (JPG, PNG, WebP)
+  app.post('/api/admin/opengraph/upload', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Only authenticated administrators can upload Open Graph images.' });
+    }
+
+    try {
+      const { image, name, mimeType, fileSize } = req.body || {};
+      if (!image || typeof image !== 'string') {
+        return res.status(400).json({ error: 'No image data provided.' });
+      }
+
+      // Prevent executable or dangerous file extensions in original name
+      const lowerName = String(name || '').toLowerCase();
+      const forbiddenExts = ['.exe', '.sh', '.bat', '.cmd', '.php', '.py', '.pl', '.js', '.ts', '.jsp', '.asp', '.aspx', '.cgi', '.jar', '.msi', '.dll', '.html', '.htm', '.svg'];
+      if (forbiddenExts.some(ext => lowerName.endsWith(ext))) {
+        return res.status(400).json({ error: 'Invalid file type. Executable or script files are strictly prohibited. Upload JPG, PNG, or WebP.' });
+      }
+
+      const matches = image.match(/^data:image\/([a-zA-Z0-9.+]+);base64,(.+)$/);
+      if (!matches) {
+        return res.status(400).json({ error: 'Invalid image format. Only JPG/JPEG, PNG, and WebP images are allowed.' });
+      }
+
+      const detectedSubType = matches[1].toLowerCase();
+      const allowedSubTypes = ['jpeg', 'jpg', 'png', 'webp'];
+      if (!allowedSubTypes.includes(detectedSubType)) {
+        return res.status(400).json({
+          error: `Unsupported image type "image/${detectedSubType}". Please upload a JPG, PNG, or WebP image.`
+        });
+      }
+
+      if (mimeType && !['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(String(mimeType).toLowerCase())) {
+        return res.status(400).json({ error: 'Unsupported MIME type. Only JPG, PNG, and WebP are accepted.' });
+      }
+
+      const buffer = Buffer.from(matches[2], 'base64');
+      const maxBytes = 10 * 1024 * 1024; // 10 MB max
+      if (buffer.length > maxBytes || (fileSize && Number(fileSize) > maxBytes)) {
+        return res.status(400).json({ error: 'Image file size exceeds the 10 MB maximum limit.' });
+      }
+      if (buffer.length < 100) {
+        return res.status(400).json({ error: 'Uploaded image file is empty or corrupted.' });
+      }
+
+      // Verify magic bytes for JPEG, PNG, or WebP to block disguised executables
+      const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+      const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47;
+      const isWebp =
+        buffer.length > 12 &&
+        buffer.toString('ascii', 0, 4) === 'RIFF' &&
+        buffer.toString('ascii', 8, 12) === 'WEBP';
+
+      if (!isJpeg && !isPng && !isWebp) {
+        return res.status(400).json({
+          error: 'File content validation failed. Only genuine JPG, PNG, or WebP images are accepted.'
+        });
+      }
+
+      const safeExt = isPng ? 'png' : isWebp ? 'webp' : 'jpg';
+      const nextVersion = (siteSettings.ogVersion || 1) + 1;
+      const safeFilename = `og_social_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${safeExt}`;
+      const filePath = path.join(uploadsDir, safeFilename);
+
+      fs.writeFileSync(filePath, buffer);
+
+      const relativePath = `/uploads/${safeFilename}`;
+      const publicHttpsUrl = resolvePublicHttpsImageUrl(
+        relativePath,
+        siteSettings.canonicalUrl || DEFAULT_CANONICAL_URL,
+        nextVersion
+      );
+
+      return res.json({
+        success: true,
+        filename: safeFilename,
+        relativePath,
+        publicUrl: publicHttpsUrl,
+        previewUrl: `${relativePath}?v=${nextVersion}`,
+        version: nextVersion
+      });
+    } catch (err) {
+      console.error('Error uploading Open Graph image:', err);
+      return res.status(500).json({ error: 'Failed to process Open Graph image upload. Existing image was preserved.' });
+    }
+  });
+
+  // Admin-Only: Reset Open Graph Settings & Restore Default 1200x630 Promotional Image
+  app.post('/api/admin/opengraph/reset', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Only authenticated administrators can reset Open Graph settings.' });
+    }
+
+    const nextVersion = (siteSettings.ogVersion || 1) + 1;
+    siteSettings = {
+      ...siteSettings,
+      siteName: 'DATING WITH BOUNCER',
+      ogTitle: DEFAULT_OPEN_GRAPH.ogTitle,
+      ogDescription: DEFAULT_OPEN_GRAPH.ogDescription,
+      ogImage: DEFAULT_OPEN_GRAPH.ogImage,
+      canonicalUrl: DEFAULT_OPEN_GRAPH.canonicalUrl,
+      ogType: DEFAULT_OPEN_GRAPH.ogType,
+      ogImageWidth: 1200,
+      ogImageHeight: 630,
+      twitterCard: DEFAULT_OPEN_GRAPH.twitterCard,
+      twitterTitle: DEFAULT_OPEN_GRAPH.twitterTitle,
+      twitterDescription: DEFAULT_OPEN_GRAPH.twitterDescription,
+      twitterImage: DEFAULT_OPEN_GRAPH.twitterImage,
+      isCustomOgImage: false,
+      ogVersion: nextVersion
+    };
+    siteSettings.openGraph = getActiveOpenGraphSettings();
+    saveAppData();
+
+    return res.json({
+      success: true,
+      message: 'Open Graph settings restored to default 1200×630 promotional configuration.',
+      openGraph: {
+        ...siteSettings.openGraph,
+        previewOgImage: '/og-default-1200x630.jpg',
+        previewTwitterImage: '/og-default-1200x630.jpg',
+        previewDefaultOgImage: '/og-default-1200x630.jpg'
+      },
+      siteSettings
+    });
   });
 
   // Media / Photo Upload Endpoint
@@ -460,7 +1021,11 @@ async function startServer() {
 
   const isAuthorizedAdmin = (req: express.Request): boolean => {
     const roleHeader = (req.headers['x-user-role'] as string || '').toLowerCase().trim();
-    return roleHeader === 'admin';
+    const emailHeader = (req.headers['x-user-email'] as string || '').toLowerCase().trim();
+    if (roleHeader === 'admin') return true;
+    if (emailHeader === MOCK_ADMIN_USER.email.toLowerCase() || emailHeader === 'admin@bouncer.date') return true;
+    if (currentUser?.role === 'admin') return true;
+    return false;
   };
 
   // Firebase Auth Sync & Backend Opening Endpoint
@@ -577,26 +1142,67 @@ async function startServer() {
   });
 
   app.post('/api/auth/register', (req, res) => {
-    const { id, email, name, age, province, city, subLocation, location, gender, childrenCount, intent, bio, whatsappNumber, hivStatus, avatar } = req.body;
+    const { id, email, name, age, province, city, subLocation, location, gender, childrenCount, intent, bio, whatsappNumber, hivStatus, avatar, referredByCode, deviceFingerprint } = req.body;
     if (!email || !name) {
       return res.status(400).json({ error: 'Name and email are required.' });
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
+    const isSuperAdmin = normalizedEmail === MOCK_ADMIN_USER.email.toLowerCase() || normalizedEmail === 'admin@bouncer.date';
+    const clientIp = getClientIp(req);
+    const vpnCheck = detectVpnOrProxy(req);
+
+    // 1. Security Check: Do NOT allow VPN or Proxy connections
+    if (!isSuperAdmin && siteSettings.blockVpnConnections !== false && vpnCheck.isVpn) {
+      return res.status(403).json({
+        error: '🚫 Security Policy: No VPN allowed! Please disable your VPN or proxy connection to register an account.'
+      });
+    }
+
+    // Check if user with this email already exists
+    const existingIdx = users.findIndex(u => u.email && u.email.toLowerCase() === normalizedEmail);
+
+    // 2. Security Check: Only 1 account per IP address / device
+    if (existingIdx === -1 && !isSuperAdmin && siteSettings.enforceOneAccountPerIp !== false) {
+      const duplicateIpUser = users.find(u => {
+        if (u.role === 'admin' || u.id === 'usr_demo') return false;
+        if (deviceFingerprint && u.deviceFingerprint && u.deviceFingerprint === deviceFingerprint) {
+          return true;
+        }
+        if (
+          clientIp &&
+          clientIp !== '127.0.0.1' &&
+          clientIp !== '::1' &&
+          !clientIp.startsWith('10.') &&
+          !clientIp.startsWith('192.168.') &&
+          u.registeredIp === clientIp
+        ) {
+          return true;
+        }
+        return false;
+      });
+
+      if (duplicateIpUser) {
+        return res.status(403).json({
+          error: '🚫 Security Policy: Only 1 account is allowed per IP address! An account is already registered from your IP address / device. Please sign in to your existing account.'
+        });
+      }
+    }
+
     const formattedName = capitalizeName(name);
     const normalizedHiv = hivStatus && (hivStatus.includes('+') || hivStatus.toLowerCase().includes('pos')) ? 'HIV+' : 'HIV-';
     const selectedCity = city || 'Harare';
     const selectedSubLocation = subLocation || 'Borrowdale';
     const selectedProvince = province || getProvinceForCity(selectedCity);
-    const userAvatar = avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
-    const isSuperAdmin = normalizedEmail === MOCK_ADMIN_USER.email.toLowerCase() || normalizedEmail === 'admin@bouncer.date';
+    // Do NOT use any placeholder picture if user did not upload a real photo
+    const cleanUserAvatar = isRealUploadedPhoto(avatar) ? String(avatar).trim() : '';
 
-    // Check if user with this email already exists
-    const existingIdx = users.findIndex(u => u.email && u.email.toLowerCase() === normalizedEmail);
     let registeredUser: User;
+    const isBrandNewRegistration = existingIdx === -1;
 
     if (existingIdx !== -1) {
       const existingUser = users[existingIdx];
+      const nextAvatar = cleanUserAvatar || (isRealUploadedPhoto(existingUser.avatar) ? existingUser.avatar : '');
       registeredUser = {
         ...existingUser,
         name: formattedName || existingUser.name,
@@ -609,14 +1215,16 @@ async function startServer() {
         intent: intent || existingUser.intent || 'Marriage',
         hivStatus: normalizedHiv,
         role: isSuperAdmin ? 'admin' : (existingUser.role || 'user'),
-        avatar: avatar || existingUser.avatar || userAvatar,
+        avatar: nextAvatar,
         whatsappNumber: whatsappNumber || existingUser.whatsappNumber || '+263 77 123 4567',
-        gender: gender || existingUser.gender || 'female'
+        gender: gender || existingUser.gender || 'female',
+        referralCode: existingUser.referralCode || generateUserReferralCode(existingUser.id, formattedName)
       };
       users[existingIdx] = registeredUser;
     } else {
+      const newUserId = id || `usr_${Date.now()}`;
       registeredUser = {
-        id: id || `usr_${Date.now()}`,
+        id: newUserId,
         email: String(email).trim(),
         name: formattedName,
         age: Number(age) || 25,
@@ -630,21 +1238,77 @@ async function startServer() {
         role: isSuperAdmin ? 'admin' : 'user',
         subscriptionPlan: isSuperAdmin ? 'vip_30_singles' : 'free',
         subscriptionStatus: 'active',
-        avatar: userAvatar,
+        avatar: cleanUserAvatar,
+        photos: cleanUserAvatar ? [cleanUserAvatar] : [],
         bio: bio || 'New single on Dating with Bouncer!',
         whatsappNumber: whatsappNumber || '+263 77 123 4567',
         gender: gender || 'female',
         interests: ['Dating', 'Coffee', 'Music'],
         bouncerVerified: isSuperAdmin,
         walletBalance: 0,
+        referralCode: generateUserReferralCode(newUserId, formattedName),
+        referredByCode: referredByCode ? String(referredByCode).trim().toUpperCase() : undefined,
+        affiliateBalance: 0,
+        affiliateTotalEarned: 0,
+        affiliateInvitedMen: 0,
+        affiliateInvitedLadies: 0,
+        affiliateReferrals: [],
+        registeredIp: clientIp,
+        deviceFingerprint: deviceFingerprint ? String(deviceFingerprint) : undefined,
         createdAt: new Date().toISOString()
       };
       users.push(registeredUser);
     }
 
+    // 3. Process Affiliate Invite Reward if a brand new user signed up via an affiliate link
+    if (isBrandNewRegistration && referredByCode && typeof referredByCode === 'string') {
+      const cleanRef = referredByCode.trim().toUpperCase();
+      const referrerIdx = users.findIndex(
+        u =>
+          u.id !== registeredUser.id &&
+          ((u.referralCode && u.referralCode.toUpperCase() === cleanRef) || u.id.toUpperCase() === cleanRef)
+      );
+      if (referrerIdx !== -1) {
+        const referrer = users[referrerIdx];
+        const rewardRate = Number(siteSettings.affiliateRewardPerInvite ?? 0.25);
+        const invitedGender = (registeredUser.gender || 'female').toLowerCase();
+
+        registeredUser.referredByUserId = referrer.id;
+        referrer.affiliateBalance = Number(((referrer.affiliateBalance || 0) + rewardRate).toFixed(2));
+        referrer.affiliateTotalEarned = Number(((referrer.affiliateTotalEarned || 0) + rewardRate).toFixed(2));
+        if (invitedGender === 'male') {
+          referrer.affiliateInvitedMen = (referrer.affiliateInvitedMen || 0) + 1;
+        } else {
+          referrer.affiliateInvitedLadies = (referrer.affiliateInvitedLadies || 0) + 1;
+        }
+        if (!Array.isArray(referrer.affiliateReferrals)) {
+          referrer.affiliateReferrals = [];
+        }
+        const refRecord: AffiliateReferral = {
+          id: `ref_${Date.now()}`,
+          referredUserId: registeredUser.id,
+          referredUserName: registeredUser.name,
+          referredUserGender: (invitedGender === 'male' ? 'male' : 'female'),
+          rewardAmount: rewardRate,
+          createdAt: new Date().toISOString()
+        };
+        referrer.affiliateReferrals.unshift(refRecord);
+
+        notifications.unshift({
+          id: `notif_aff_${Date.now()}`,
+          userId: referrer.id,
+          title: `🎁 Affiliate Bonus Earned (+$${rewardRate.toFixed(2)})!`,
+          message: `${registeredUser.name} (${invitedGender === 'male' ? 'Man' : 'Lady'}) signed up using your affiliate link! Your affiliate balance is now $${referrer.affiliateBalance.toFixed(2)}.`,
+          type: 'system',
+          read: false,
+          createdAt: new Date().toISOString()
+        });
+      }
+    }
+
     currentUser = registeredUser;
 
-    // Auto-create or update SingleProfile so user displays in directory immediately
+    // Auto-create or update SingleProfile so user displays in directory immediately (with no placeholder photo)
     const existingProfIdx = profiles.findIndex(
       p => p.id === `p_${registeredUser.id}` || (p.name.toLowerCase() === registeredUser.name.toLowerCase() && p.whatsappNumber === registeredUser.whatsappNumber)
     );
@@ -665,7 +1329,7 @@ async function startServer() {
       seeking: registeredUser.gender === 'male' ? 'female' : 'male',
       bio: registeredUser.bio || 'Recently joined single seeking genuine connections.',
       whatsappNumber: registeredUser.whatsappNumber || '+263 77 123 4567',
-      photos: [registeredUser.avatar],
+      photos: registeredUser.avatar ? [registeredUser.avatar] : [],
       interests: registeredUser.interests || ['Dating'],
       gender: registeredUser.gender || 'female',
       bouncerStatus: registeredUser.bouncerVerified ? 'verified' : 'pending_check',
@@ -792,10 +1456,15 @@ async function startServer() {
         gender: currentUser.gender || profiles[pIdx].gender,
         seeking: currentUser.seeking || profiles[pIdx].seeking,
         interests: currentUser.interests || profiles[pIdx].interests,
-        photos: updatedPhotos.length > 0 ? updatedPhotos : [currentUser.avatar],
+        photos: updatedPhotos.filter(ph => isRealUploadedPhoto(ph)).length > 0
+          ? updatedPhotos.filter(ph => isRealUploadedPhoto(ph))
+          : (isRealUploadedPhoto(currentUser.avatar) ? [currentUser.avatar] : []),
         bouncerStatus: currentUser.bouncerVerified ? 'verified' : profiles[pIdx].bouncerStatus
       };
     } else {
+      const cleanedNewPhotos = validPhotos && validPhotos.filter(ph => isRealUploadedPhoto(ph)).length > 0
+        ? validPhotos.filter(ph => isRealUploadedPhoto(ph))
+        : (isRealUploadedPhoto(currentUser.avatar) ? [currentUser.avatar] : []);
       const newProf: SingleProfile = {
         id: `p_${Date.now()}`,
         name: currentUser.name,
@@ -808,7 +1477,7 @@ async function startServer() {
         intent: currentUser.intent || 'Marriage',
         hivStatus: currentUser.hivStatus || 'HIV-',
         bio: currentUser.bio || 'Single looking for love.',
-        photos: validPhotos && validPhotos.length > 0 ? validPhotos : [currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'],
+        photos: cleanedNewPhotos,
         interests: currentUser.interests || ['Coffee', 'Travel'],
         gender: currentUser.gender || 'female',
         seeking: currentUser.seeking || 'male',
@@ -826,6 +1495,270 @@ async function startServer() {
 
     saveAppData();
     res.json({ success: true, user: currentUser });
+  });
+
+  // Security & IP / VPN Verification Endpoint
+  app.get('/api/security/status', (req, res) => {
+    const clientIp = getClientIp(req);
+    const vpnCheck = detectVpnOrProxy(req);
+    const existingAccount = users.find(
+      u =>
+        u.role !== 'admin' &&
+        u.id !== 'usr_demo' &&
+        clientIp &&
+        clientIp !== '127.0.0.1' &&
+        clientIp !== '::1' &&
+        u.registeredIp === clientIp
+    );
+    res.json({
+      ip: clientIp,
+      vpnDetected: vpnCheck.isVpn,
+      vpnReason: vpnCheck.reason || null,
+      hasExistingAccountForIp: Boolean(existingAccount),
+      enforceOneAccountPerIp: siteSettings.enforceOneAccountPerIp !== false,
+      blockVpnConnections: siteSettings.blockVpnConnections !== false
+    });
+  });
+
+  // Affiliate Program: Get User Affiliate Stats & Link
+  app.get('/api/affiliate/me', (req, res) => {
+    const queryUserId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || currentUser?.id;
+    const targetUser = users.find(u => u.id === queryUserId) || currentUser;
+    if (!targetUser) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    if (!targetUser.referralCode) {
+      targetUser.referralCode = generateUserReferralCode(targetUser.id, targetUser.name);
+      saveAppData();
+    }
+
+    const rewardPerInvite = Number(siteSettings.affiliateRewardPerInvite ?? 0.25);
+    const minWithdrawalAmount = Number(siteSettings.minWithdrawalAmount ?? 5);
+    const balance = Number(targetUser.affiliateBalance || 0);
+    const invitedMen = Number(targetUser.affiliateInvitedMen || 0);
+    const invitedLadies = Number(targetUser.affiliateInvitedLadies || 0);
+
+    const platformMenCount = profiles.filter(p => (p.gender || '').toLowerCase() === 'male').length;
+    const platformLadiesCount = profiles.filter(p => (p.gender || 'female').toLowerCase() === 'female').length;
+
+    const hasReachedMinAmount = balance >= minWithdrawalAmount;
+    const isMenEqualOrMore = invitedMen >= invitedLadies;
+    const canWithdraw = hasReachedMinAmount && isMenEqualOrMore;
+
+    let withdrawalStatusReason = 'Withdrawal is active and ready!';
+    if (!hasReachedMinAmount && !isMenEqualOrMore) {
+      withdrawalStatusReason = `Reach $${minWithdrawalAmount.toFixed(2)} minimum (need $${(minWithdrawalAmount - balance).toFixed(2)} more) AND ensure invited Men (${invitedMen}) are equal to or more than invited Ladies (${invitedLadies}).`;
+    } else if (!hasReachedMinAmount) {
+      withdrawalStatusReason = `Minimum withdrawal is $${minWithdrawalAmount.toFixed(2)}. You need $${(minWithdrawalAmount - balance).toFixed(2)} more to unlock withdrawal.`;
+    } else if (!isMenEqualOrMore) {
+      const neededMen = invitedLadies - invitedMen;
+      withdrawalStatusReason = `Withdrawal requires invited Men (${invitedMen}) to be equal to or more than invited Ladies (${invitedLadies}). Invite ${neededMen} more ${neededMen === 1 ? 'man' : 'men'} to activate withdrawal!`;
+    }
+
+    const userWithdrawals = affiliateWithdrawals.filter(w => w.userId === targetUser.id);
+
+    res.json({
+      referralCode: targetUser.referralCode,
+      affiliateBalance: balance,
+      affiliateTotalEarned: Number(targetUser.affiliateTotalEarned || 0),
+      invitedMen,
+      invitedLadies,
+      referrals: targetUser.affiliateReferrals || [],
+      withdrawals: userWithdrawals,
+      rewardPerInvite,
+      minWithdrawalAmount,
+      hasReachedMinAmount,
+      isMenEqualOrMore,
+      canWithdraw,
+      withdrawalStatusReason,
+      platformMenCount,
+      platformLadiesCount
+    });
+  });
+
+  // Affiliate Program: Submit Withdrawal Request (Minimum $5 AND Men >= Ladies, approved by Admin)
+  app.post('/api/affiliate/withdraw', (req, res) => {
+    const { userId, amount, payoutMethod, payoutAccount } = req.body || {};
+    const targetUserId = userId || currentUser?.id;
+    const uIdx = users.findIndex(u => u.id === targetUserId);
+    if (uIdx === -1) {
+      return res.status(401).json({ error: 'Please sign in to request an affiliate withdrawal.' });
+    }
+
+    const user = users[uIdx];
+    const minWithdrawal = Number(siteSettings.minWithdrawalAmount ?? 5);
+    const balance = Number(user.affiliateBalance || 0);
+    const reqAmount = amount !== undefined ? Number(amount) : balance;
+    const invitedMen = Number(user.affiliateInvitedMen || 0);
+    const invitedLadies = Number(user.affiliateInvitedLadies || 0);
+
+    if (balance < minWithdrawal || reqAmount < minWithdrawal) {
+      return res.status(400).json({
+        error: `Minimum withdrawal starts from $${minWithdrawal.toFixed(2)}. Your current affiliate balance is $${balance.toFixed(2)}.`
+      });
+    }
+
+    if (reqAmount > balance) {
+      return res.status(400).json({
+        error: `Requested amount ($${reqAmount.toFixed(2)}) exceeds your available affiliate balance ($${balance.toFixed(2)}).`
+      });
+    }
+
+    if (invitedMen < invitedLadies) {
+      const needed = invitedLadies - invitedMen;
+      return res.status(400).json({
+        error: `Withdrawal is locked: The number of invited Men (${invitedMen}) must be equal to or greater than invited Ladies (${invitedLadies}). Invite ${needed} more ${needed === 1 ? 'man' : 'men'} to activate withdrawal.`
+      });
+    }
+
+    if (!payoutAccount || !String(payoutAccount).trim()) {
+      return res.status(400).json({
+        error: 'Please enter your EcoCash / OneMoney / InnBucks mobile number to receive your payout.'
+      });
+    }
+
+    user.affiliateBalance = Number((balance - reqAmount).toFixed(2));
+    if (currentUser && currentUser.id === user.id) {
+      currentUser = { ...user };
+    }
+
+    const newWithdrawal: AffiliateWithdrawalRequest = {
+      id: `aff_wd_${Date.now()}`,
+      userId: user.id,
+      userName: user.name,
+      userEmail: user.email,
+      whatsappNumber: user.whatsappNumber || String(payoutAccount).trim(),
+      payoutMethod: payoutMethod || 'EcoCash',
+      payoutAccount: String(payoutAccount).trim(),
+      amount: Number(reqAmount.toFixed(2)),
+      invitedMen,
+      invitedLadies,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+
+    affiliateWithdrawals.unshift(newWithdrawal);
+
+    notifications.unshift({
+      id: `notif_wd_${Date.now()}`,
+      userId: user.id,
+      title: '💸 Affiliate Withdrawal Submitted',
+      message: `Your withdrawal request of $${newWithdrawal.amount.toFixed(2)} via ${newWithdrawal.payoutMethod} (${newWithdrawal.payoutAccount}) has been submitted for Admin approval.`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    saveAppData();
+    res.json({
+      success: true,
+      message: `Withdrawal request of $${newWithdrawal.amount.toFixed(2)} submitted! Waiting for Admin approval.`,
+      withdrawal: newWithdrawal,
+      newAffiliateBalance: user.affiliateBalance
+    });
+  });
+
+  // Admin: Update Affiliate Settings ($0.10 or $0.25 per invite, min withdrawal $5)
+  app.put('/api/admin/affiliate/settings', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const { affiliateRewardPerInvite, minWithdrawalAmount, enforceOneAccountPerIp, blockVpnConnections } = req.body || {};
+    if (affiliateRewardPerInvite !== undefined) {
+      siteSettings.affiliateRewardPerInvite = Math.max(0.01, Number(affiliateRewardPerInvite) || 0.25);
+    }
+    if (minWithdrawalAmount !== undefined) {
+      siteSettings.minWithdrawalAmount = Math.max(1, Number(minWithdrawalAmount) || 5);
+    }
+    if (enforceOneAccountPerIp !== undefined) {
+      siteSettings.enforceOneAccountPerIp = Boolean(enforceOneAccountPerIp);
+    }
+    if (blockVpnConnections !== undefined) {
+      siteSettings.blockVpnConnections = Boolean(blockVpnConnections);
+    }
+    saveAppData();
+    res.json({
+      success: true,
+      message: `Affiliate reward updated to $${Number(siteSettings.affiliateRewardPerInvite).toFixed(2)} per invite (Min withdrawal: $${Number(siteSettings.minWithdrawalAmount).toFixed(2)}).`,
+      siteSettings
+    });
+  });
+
+  // Admin: Get All Affiliate Withdrawals & Stats
+  app.get('/api/admin/affiliate/withdrawals', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    res.json({
+      withdrawals: affiliateWithdrawals,
+      affiliateRewardPerInvite: siteSettings.affiliateRewardPerInvite ?? 0.25,
+      minWithdrawalAmount: siteSettings.minWithdrawalAmount ?? 5
+    });
+  });
+
+  // Admin: Approve Affiliate Withdrawal Request
+  app.put('/api/admin/affiliate/withdrawals/:id/approve', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const wIdx = affiliateWithdrawals.findIndex(w => w.id === req.params.id);
+    if (wIdx === -1) {
+      return res.status(404).json({ error: 'Withdrawal request not found.' });
+    }
+    affiliateWithdrawals[wIdx].status = 'approved';
+    affiliateWithdrawals[wIdx].processedAt = new Date().toISOString();
+    affiliateWithdrawals[wIdx].adminNotes = req.body?.adminNotes || 'Approved and paid by Admin.';
+
+    const wd = affiliateWithdrawals[wIdx];
+    notifications.unshift({
+      id: `notif_wd_app_${Date.now()}`,
+      userId: wd.userId,
+      title: '✅ Affiliate Withdrawal Approved!',
+      message: `Your affiliate payout of $${wd.amount.toFixed(2)} to ${wd.payoutMethod} (${wd.payoutAccount}) has been approved by Admin!`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    saveAppData();
+    res.json({ success: true, withdrawal: wd });
+  });
+
+  // Admin: Reject Affiliate Withdrawal Request (Refunds user's affiliate balance)
+  app.put('/api/admin/affiliate/withdrawals/:id/reject', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const wIdx = affiliateWithdrawals.findIndex(w => w.id === req.params.id);
+    if (wIdx === -1) {
+      return res.status(404).json({ error: 'Withdrawal request not found.' });
+    }
+    const wd = affiliateWithdrawals[wIdx];
+    if (wd.status === 'pending') {
+      const uIdx = users.findIndex(u => u.id === wd.userId);
+      if (uIdx !== -1) {
+        users[uIdx].affiliateBalance = Number(((users[uIdx].affiliateBalance || 0) + wd.amount).toFixed(2));
+        if (currentUser && currentUser.id === users[uIdx].id) {
+          currentUser = { ...users[uIdx] };
+        }
+      }
+    }
+    affiliateWithdrawals[wIdx].status = 'rejected';
+    affiliateWithdrawals[wIdx].processedAt = new Date().toISOString();
+    affiliateWithdrawals[wIdx].adminNotes = req.body?.adminNotes || 'Rejected by Admin (balance refunded).';
+
+    notifications.unshift({
+      id: `notif_wd_rej_${Date.now()}`,
+      userId: wd.userId,
+      title: '❌ Affiliate Withdrawal Declined',
+      message: `Your withdrawal request of $${wd.amount.toFixed(2)} was declined by Admin and refunded to your affiliate balance.`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    saveAppData();
+    res.json({ success: true, withdrawal: affiliateWithdrawals[wIdx] });
   });
 
   // API ROUTE 3: Profiles Endpoint (Name, Age, Location, Intent, Children, Bouncer Filters)
@@ -2606,6 +3539,94 @@ async function startServer() {
     res.json({ success: true, message: 'Your profile is now Boosted for 30 minutes! 🔥' });
   });
 
+  // Escape HTML attribute helper for server-rendered Open Graph tags
+  function escapeHtmlAttr(val: string): string {
+    return String(val || '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  // Inject active Open Graph & Twitter metadata into HTML response for social crawlers (Facebook, WhatsApp, X, Telegram, LinkedIn, curl)
+  function injectOpenGraphIntoHtml(rawHtml: string): string {
+    const og = getActiveOpenGraphSettings();
+    const safeOgTitle = escapeHtmlAttr(og.ogTitle);
+    const safeOgDesc = escapeHtmlAttr(og.ogDescription);
+    const safeSiteName = escapeHtmlAttr(og.siteName.toUpperCase());
+    const safeCanonical = escapeHtmlAttr(og.canonicalUrl);
+    const safeOgType = escapeHtmlAttr(og.ogType || 'website');
+    const safeOgImg = escapeHtmlAttr(og.ogImage);
+    const safeTwCard = escapeHtmlAttr(og.twitterCard || 'summary_large_image');
+    const safeTwTitle = escapeHtmlAttr(og.twitterTitle);
+    const safeTwDesc = escapeHtmlAttr(og.twitterDescription);
+    const safeTwImg = escapeHtmlAttr(og.twitterImage);
+
+    let html = rawHtml;
+    html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${safeOgTitle}</title>`);
+    html = html.replace(
+      /<meta[^>]+name="description"[^>]*>/i,
+      `<meta id="meta-description" name="description" content="${safeOgDesc}" />`
+    );
+    html = html.replace(
+      /<link[^>]+rel="canonical"[^>]*>/i,
+      `<link id="canonical-url" rel="canonical" href="${safeCanonical}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+property="og:type"[^>]*>/i,
+      `<meta id="og-type" property="og:type" content="${safeOgType}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+property="og:site_name"[^>]*>/i,
+      `<meta id="og-site-name" property="og:site_name" content="${safeSiteName}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+property="og:url"[^>]*>/i,
+      `<meta id="og-url" property="og:url" content="${safeCanonical}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+property="og:title"[^>]*>/i,
+      `<meta id="og-title" property="og:title" content="${safeOgTitle}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+property="og:description"[^>]*>/i,
+      `<meta id="og-description" property="og:description" content="${safeOgDesc}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+property="og:image"[^>]*>/i,
+      `<meta id="og-image" property="og:image" content="${safeOgImg}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+property="og:image:secure_url"[^>]*>/i,
+      `<meta id="og-image-secure" property="og:image:secure_url" content="${safeOgImg}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+property="og:image:width"[^>]*>/i,
+      `<meta id="og-image-width" property="og:image:width" content="${og.ogImageWidth || 1200}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+property="og:image:height"[^>]*>/i,
+      `<meta id="og-image-height" property="og:image:height" content="${og.ogImageHeight || 630}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+name="twitter:card"[^>]*>/i,
+      `<meta id="twitter-card" name="twitter:card" content="${safeTwCard}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+name="twitter:title"[^>]*>/i,
+      `<meta id="twitter-title" name="twitter:title" content="${safeTwTitle}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+name="twitter:description"[^>]*>/i,
+      `<meta id="twitter-description" name="twitter:description" content="${safeTwDesc}" />`
+    );
+    html = html.replace(
+      /<meta[^>]+name="twitter:image"[^>]*>/i,
+      `<meta id="twitter-image" name="twitter:image" content="${safeTwImg}" />`
+    );
+    return html;
+  }
+
   // Vite middleware for development vs static serve for production
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
@@ -2613,12 +3634,44 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: 'spa'
     });
+
+    // Server-side HTML Open Graph injection for initial HTML / social crawlers
+    app.use(async (req, res, next) => {
+      if (
+        req.method === 'GET' &&
+        (req.path === '/' || req.path === '/index.html' || req.path === '/admin') &&
+        !req.path.startsWith('/api') &&
+        !req.path.startsWith('/uploads') &&
+        !req.path.startsWith('/src') &&
+        !req.path.startsWith('/@')
+      ) {
+        try {
+          const indexHtmlPath = path.join(process.cwd(), 'index.html');
+          const rawTemplate = await fs.promises.readFile(indexHtmlPath, 'utf-8');
+          const transformed = await vite.transformIndexHtml(req.originalUrl, rawTemplate);
+          const withOg = injectOpenGraphIntoHtml(transformed);
+          res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).end(withOg);
+          return;
+        } catch (e) {
+          return next(e);
+        }
+      }
+      next();
+    });
+
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath, { index: 'index.html', dotfiles: 'ignore' }));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    app.use(express.static(distPath, { index: false, dotfiles: 'ignore' }));
+    app.get('*', async (_req, res) => {
+      try {
+        const distIndex = path.join(distPath, 'index.html');
+        const rawHtml = await fs.promises.readFile(distIndex, 'utf-8');
+        const withOg = injectOpenGraphIntoHtml(rawHtml);
+        res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).send(withOg);
+      } catch {
+        res.sendFile(path.join(distPath, 'index.html'));
+      }
     });
   }
 

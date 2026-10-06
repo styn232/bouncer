@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image as ImageIcon, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database, Wallet, ArrowUpRight, ArrowDownLeft, X, UserCheck } from 'lucide-react';
-import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings, DatingIntent } from '../types';
+import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image as ImageIcon, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database, Wallet, ArrowUpRight, ArrowDownLeft, X, UserCheck, Gift, ImageOff } from 'lucide-react';
+import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings, DatingIntent, AffiliateWithdrawalRequest } from '../types';
 import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getCitiesByProvince, getSubLocationsForCity, getProvinceForCity } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
-import { capitalizeName } from '../utils/format';
+import { capitalizeName, hasValidProfilePhoto } from '../utils/format';
 import { auth, db, createUserWithEmailAndPassword, doc, setDoc } from '../lib/firebase';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -41,8 +41,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRejectPayment,
   onRefreshData
 }) => {
-  const [activeTab, setActiveTab] = useState<'profiles' | 'queue' | 'subscriptions' | 'audit' | 'orders' | 'branding' | 'views' | 'admins'>('profiles');
+  const [activeTab, setActiveTab] = useState<'profiles' | 'queue' | 'subscriptions' | 'audit' | 'orders' | 'branding' | 'views' | 'admins' | 'affiliate'>('profiles');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Affiliate & Withdrawals Admin State
+  const [affiliateRewardRate, setAffiliateRewardRate] = useState<number>(siteSettings?.affiliateRewardPerInvite ?? 0.25);
+  const [minWithdrawalAmount, setMinWithdrawalAmount] = useState<number>(siteSettings?.minWithdrawalAmount ?? 5);
+  const [adminWithdrawals, setAdminWithdrawals] = useState<AffiliateWithdrawalRequest[]>([]);
+  const [affiliateUsersSummary, setAffiliateUsersSummary] = useState<any[]>([]);
+  const [affiliateAdminMsg, setAffiliateAdminMsg] = useState<string | null>(null);
+  const [isSavingAffiliateSettings, setIsSavingAffiliateSettings] = useState<boolean>(false);
+
+  const fetchAdminAffiliateData = async () => {
+    try {
+      const res = await fetch('/api/admin/affiliate', {
+        headers: {
+          'x-user-role': 'admin',
+          'x-user-email': 'jobsatespace@gmail.com'
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAffiliateRewardRate(Number(data.rewardPerInvite ?? 0.25));
+        setMinWithdrawalAmount(Number(data.minWithdrawalAmount ?? 5));
+        setAdminWithdrawals(Array.isArray(data.withdrawals) ? data.withdrawals : []);
+        setAffiliateUsersSummary(Array.isArray(data.usersSummary) ? data.usersSummary : []);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminAffiliateData();
+  }, [activeTab]);
   
   // Firebase Admin Creation in Panel
   const [adminCreateName, setAdminCreateName] = useState('');
@@ -73,7 +105,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newIntent, setNewIntent] = useState<DatingIntent>('Marriage');
   const [newHivStatus, setNewHivStatus] = useState('HIV-');
   const [newBio, setNewBio] = useState('');
-  const [newPhoto, setNewPhoto] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
+  const [newPhoto, setNewPhoto] = useState('');
   const [newBouncerStatus, setNewBouncerStatus] = useState<BouncerStatus>('verified');
 
   // Edit Single Profile Modal state
@@ -704,6 +736,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveTab('affiliate')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all flex items-center gap-2 ${
+            activeTab === 'affiliate'
+              ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+              : 'bg-slate-900 text-emerald-300 hover:bg-slate-800 border border-emerald-500/30'
+          }`}
+        >
+          <Gift className="w-4 h-4" />
+          Affiliate & Withdrawals ({adminWithdrawals.filter(w => w.status === 'pending').length})
+        </button>
+
+        <button
           onClick={() => setActiveTab('admins')}
           className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all flex items-center gap-2 ${
             activeTab === 'admins'
@@ -760,12 +804,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   return (
                   <tr key={p.id} className="hover:bg-slate-800/40 transition-colors">
                     <td className="p-3">
-                      <img
-                        src={p.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
-                        alt={p.name}
-                        referrerPolicy="no-referrer"
-                        className="w-12 h-12 rounded-xl object-cover ring-1 ring-slate-700"
-                      />
+                      {hasValidProfilePhoto(p.photos?.[0]) ? (
+                        <img
+                          src={p.photos[0]}
+                          alt={p.name}
+                          referrerPolicy="no-referrer"
+                          className="w-12 h-12 rounded-xl object-cover ring-1 ring-slate-700"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-slate-950 border border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-500">
+                          <ImageOff className="w-4 h-4 text-slate-500" />
+                          <span className="text-[7px] font-bold uppercase">No Pic</span>
+                        </div>
+                      )}
                     </td>
                     <td className="p-3 font-semibold text-white">
                       <div className="text-sm flex items-center gap-1.5 flex-wrap">
@@ -2199,6 +2250,269 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: AFFILIATE & WITHDRAWALS */}
+      {activeTab === 'affiliate' && (
+        <div className="space-y-6">
+          {/* Affiliate Reward Configuration Card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-xl font-extrabold text-white font-serif flex items-center gap-2">
+                  <Gift className="w-5 h-5 text-emerald-400" />
+                  Affiliate Reward & Withdrawal Rules Configuration
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Set how much users earn per invited single ($0.10 or $0.25 or custom) and manage minimum withdrawal ($5.00).
+                </p>
+              </div>
+              <div className="bg-emerald-500/15 border border-emerald-500/40 px-4 py-2 rounded-2xl text-right">
+                <div className="text-[10px] font-bold uppercase text-emerald-300">Active Reward / Invite</div>
+                <div className="text-xl font-black font-mono text-white">${Number(affiliateRewardRate).toFixed(2)} USD</div>
+              </div>
+            </div>
+
+            {affiliateAdminMsg && (
+              <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-between">
+                <span>{affiliateAdminMsg}</span>
+                <button onClick={() => setAffiliateAdminMsg(null)} className="text-slate-400 hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Reward Per Invite Selector ($0.10 or $0.25 or Custom) */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+                <label className="block text-xs font-extrabold text-amber-400 uppercase tracking-wider">
+                  1. Affiliate Reward Per Invited Single ($ USD)
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setAffiliateRewardRate(0.10)}
+                    className={`py-3 px-4 rounded-xl font-black text-sm font-mono border transition-all cursor-pointer ${
+                      Number(affiliateRewardRate) === 0.10
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg'
+                        : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    $0.10 / Invite
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAffiliateRewardRate(0.25)}
+                    className={`py-3 px-4 rounded-xl font-black text-sm font-mono border transition-all cursor-pointer ${
+                      Number(affiliateRewardRate) === 0.25
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg'
+                        : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    $0.25 / Invite
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                    Or Enter Custom Reward Amount ($ USD)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={affiliateRewardRate}
+                    onChange={(e) => setAffiliateRewardRate(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Minimum Withdrawal & Gender Rule Info */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+                <label className="block text-xs font-extrabold text-amber-400 uppercase tracking-wider">
+                  2. Minimum Withdrawal Threshold ($ USD)
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={minWithdrawalAmount}
+                  onChange={(e) => setMinWithdrawalAmount(parseFloat(e.target.value) || 5)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-mono text-sm font-bold focus:outline-none focus:border-amber-500"
+                />
+                <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300 space-y-1">
+                  <div className="font-extrabold text-emerald-400">Active Security & Activation Rules:</div>
+                  <div>• Withdrawal starts from <strong>${Number(minWithdrawalAmount).toFixed(2)} USD</strong> and requires Admin approval.</div>
+                  <div>• Withdrawal is only activated if the user's invited <strong>Men ≥ Ladies</strong>.</div>
+                  <div>• Security enforced: <strong>Only 1 Account per IP address</strong> & <strong>No VPN allowed</strong>.</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                disabled={isSavingAffiliateSettings}
+                onClick={async () => {
+                  try {
+                    setIsSavingAffiliateSettings(true);
+                    const res = await fetch('/api/admin/affiliate/settings', {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-role': 'admin',
+                        'x-user-email': 'jobsatespace@gmail.com'
+                      },
+                      body: JSON.stringify({
+                        affiliateRewardPerInvite: affiliateRewardRate,
+                        minWithdrawalAmount
+                      })
+                    });
+                    if (res.ok) {
+                      setAffiliateAdminMsg(`✅ Saved! Affiliate reward set to $${Number(affiliateRewardRate).toFixed(2)} per invite (Min withdrawal: $${Number(minWithdrawalAmount).toFixed(2)}).`);
+                      if (onUpdateSiteSettings) {
+                        onUpdateSiteSettings({
+                          affiliateRewardPerInvite: affiliateRewardRate,
+                          minWithdrawalAmount
+                        });
+                      }
+                      fetchAdminAffiliateData();
+                    }
+                  } finally {
+                    setIsSavingAffiliateSettings(false);
+                  }
+                }}
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-amber-500 hover:from-emerald-400 hover:to-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg cursor-pointer"
+              >
+                {isSavingAffiliateSettings ? 'Saving Settings...' : 'Save Affiliate Settings'}
+              </button>
+            </div>
+          </div>
+
+          {/* Withdrawal Requests Approval Table */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-extrabold text-white font-serif">
+                  Affiliate Withdrawal Requests ({adminWithdrawals.length})
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Approve or reject member withdrawal requests (starts from ${Number(minWithdrawalAmount).toFixed(2)}).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchAdminAffiliateData}
+                className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-slate-300 hover:text-white flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {adminWithdrawals.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-xs bg-slate-950 rounded-2xl border border-slate-800">
+                No affiliate withdrawal requests submitted yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-800">
+                    <tr>
+                      <th className="p-3">Member</th>
+                      <th className="p-3">Amount</th>
+                      <th className="p-3">Payout Account</th>
+                      <th className="p-3">Invited Ratio (Men : Ladies)</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3 text-right">Admin Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {adminWithdrawals.map((w) => (
+                      <tr key={w.id} className="hover:bg-slate-800/40">
+                        <td className="p-3">
+                          <div className="font-bold text-white">{w.userName}</div>
+                          <div className="text-[10px] text-slate-400">{w.userEmail} • {w.whatsappNumber}</div>
+                        </td>
+                        <td className="p-3 font-mono font-black text-emerald-400 text-sm">
+                          ${Number(w.amount).toFixed(2)}
+                        </td>
+                        <td className="p-3">
+                          <span className="uppercase font-bold text-amber-300">{w.payoutMethod}</span>
+                          <div className="font-mono text-[11px] text-slate-300">{w.payoutAccount}</div>
+                        </td>
+                        <td className="p-3 font-mono">
+                          <span className="text-amber-300 font-bold">👨 {w.invitedMenCount} Men</span>
+                          {' / '}
+                          <span className="text-rose-300 font-bold">👩 {w.invitedLadiesCount} Ladies</span>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                            w.status === 'approved'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : w.status === 'rejected'
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          }`}>
+                            {w.status}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          {w.status === 'pending' ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const res = await fetch(`/api/admin/affiliate/withdrawals/${w.id}/approve`, {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'x-user-role': 'admin',
+                                      'x-user-email': 'jobsatespace@gmail.com'
+                                    }
+                                  });
+                                  if (res.ok) {
+                                    setAffiliateAdminMsg(`✅ Approved $${w.amount.toFixed(2)} withdrawal for ${w.userName}.`);
+                                    fetchAdminAffiliateData();
+                                  }
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] uppercase cursor-pointer"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const res = await fetch(`/api/admin/affiliate/withdrawals/${w.id}/reject`, {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'x-user-role': 'admin',
+                                      'x-user-email': 'jobsatespace@gmail.com'
+                                    }
+                                  });
+                                  if (res.ok) {
+                                    setAffiliateAdminMsg(`❌ Rejected withdrawal for ${w.userName} (funds returned to user's affiliate balance).`);
+                                    fetchAdminAffiliateData();
+                                  }
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-rose-600/30 hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-500/40 font-black text-[10px] uppercase cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-500">Processed</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

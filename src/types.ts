@@ -60,11 +60,74 @@ export type SubscriptionPlanId =
   | 'wallet_adjustment'
   | string;
 
+export interface OpenGraphSettings {
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: string;
+  siteName: string;
+  canonicalUrl: string;
+  ogType: string;
+  ogImageWidth: number;
+  ogImageHeight: number;
+  twitterCard: string;
+  twitterTitle: string;
+  twitterDescription: string;
+  twitterImage: string;
+  defaultOgImage?: string;
+  isCustomImage?: boolean;
+  version?: number;
+  updatedAt?: string;
+}
+
+export interface AffiliateReferral {
+  id: string;
+  referredUserId: string;
+  referredUserName: string;
+  referredUserGender: 'female' | 'male' | 'non-binary';
+  rewardAmount: number;
+  createdAt: string;
+}
+
+export interface AffiliateWithdrawalRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  whatsappNumber: string;
+  payoutMethod: string;
+  payoutAccount: string;
+  amount: number;
+  invitedMen: number;
+  invitedLadies: number;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  processedAt?: string;
+  adminNotes?: string;
+}
+
 export interface SiteSettings {
   siteName: string;
   logoUrl: string;
   iconUrl: string;
   tagline?: string;
+  affiliateRewardPerInvite?: number; // e.g. 0.1 or 0.25 set by Admin
+  minWithdrawalAmount?: number; // Default $5
+  enforceOneAccountPerIp?: boolean;
+  blockVpnConnections?: boolean;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
+  canonicalUrl?: string;
+  ogType?: string;
+  ogImageWidth?: number;
+  ogImageHeight?: number;
+  twitterCard?: string;
+  twitterTitle?: string;
+  twitterDescription?: string;
+  twitterImage?: string;
+  isCustomOgImage?: boolean;
+  ogVersion?: number;
+  openGraph?: OpenGraphSettings;
 }
 
 export interface User {
@@ -82,6 +145,7 @@ export interface User {
   subscriptionStatus: 'active' | 'canceled' | 'none';
   subscriptionExpiresAt?: string;
   avatar: string;
+  photos?: string[];
   bio?: string;
   whatsappNumber?: string;
   gender?: 'female' | 'male' | 'non-binary';
@@ -94,6 +158,16 @@ export interface User {
   unlockedSinglesCount?: number; // Total number of singles unlocked
   bouncerVerified: boolean;
   walletBalance?: number; // Account funds balance in USD
+  referralCode?: string;
+  referredByCode?: string;
+  referredByUserId?: string;
+  affiliateBalance?: number;
+  affiliateTotalEarned?: number;
+  affiliateInvitedMen?: number;
+  affiliateInvitedLadies?: number;
+  affiliateReferrals?: AffiliateReferral[];
+  registeredIp?: string;
+  deviceFingerprint?: string;
   isOnline?: boolean;
   superLikesCount?: number;
   boostsCount?: number;

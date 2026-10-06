@@ -11,10 +11,11 @@ import {
   Sparkles, 
   HeartPulse, 
   Eye,
-  Camera
+  Camera,
+  ImageOff
 } from 'lucide-react';
 import { SingleProfile } from '../types';
-import { capitalizeName, formatDisplayName, formatHivStatus } from '../utils/format';
+import { capitalizeName, formatDisplayName, formatHivStatus, getValidProfilePhotos } from '../utils/format';
 
 interface PhotoGalleryModalProps {
   profile: SingleProfile | null;
@@ -58,15 +59,15 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
 
   if (!isOpen || !profile) return null;
 
-  const photos = profile.photos && profile.photos.length > 0 
-    ? profile.photos 
-    : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'];
+  const photos = getValidProfilePhotos(profile.photos);
 
   const nextPhoto = () => {
+    if (photos.length === 0) return;
     setActiveIdx((prev) => (prev + 1) % photos.length);
   };
 
   const prevPhoto = () => {
+    if (photos.length === 0) return;
     setActiveIdx((prev) => (prev - 1 + photos.length) % photos.length);
   };
 
@@ -174,12 +175,22 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-            <img
-              src={photos[activeIdx]}
-              alt={`${profile.name} photo ${activeIdx + 1}`}
-              referrerPolicy="no-referrer"
-              className="max-w-full max-h-full object-contain select-none transition-all duration-300"
-            />
+            {photos.length > 0 ? (
+              <img
+                src={photos[activeIdx] || photos[0]}
+                alt={`${profile.name} photo ${activeIdx + 1}`}
+                referrerPolicy="no-referrer"
+                className="max-w-full max-h-full object-contain select-none transition-all duration-300"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center p-8 text-center">
+                <div className="w-24 h-24 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center text-rose-400 mb-3">
+                  <ImageOff className="w-12 h-12" />
+                </div>
+                <div className="text-lg font-extrabold text-white uppercase tracking-wider">No Picture Uploaded</div>
+                <p className="text-xs text-slate-400 mt-1">This single has not uploaded a profile photo yet.</p>
+              </div>
+            )}
 
             {/* Navigation Arrows */}
             {photos.length > 1 && (

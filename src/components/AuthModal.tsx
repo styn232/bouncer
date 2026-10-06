@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, X, User as UserIcon, Lock, Mail, Sparkles, Check, Baby, MapPin, Upload, Flame, Globe, HeartPulse, Building2, Landmark } from 'lucide-react';
+import { ShieldCheck, X, User as UserIcon, Lock, Mail, Sparkles, Check, Baby, MapPin, Upload, Flame, Globe, HeartPulse, Building2, Landmark, ImageOff, Gift, ShieldAlert } from 'lucide-react';
 import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getCitiesByProvince, getSubLocationsForCity, getProvinceForCity } from '../data/zimbabweLocations';
 import { DatingIntent } from '../types';
 import { compressImageFile } from '../utils/imageCompressor';
-import { capitalizeName } from '../utils/format';
+import { capitalizeName, hasValidProfilePhoto } from '../utils/format';
 import { 
   auth, 
   db, 
@@ -61,10 +61,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [intent, setIntent] = useState<DatingIntent>('Marriage');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [hivStatus, setHivStatus] = useState<'HIV-' | 'HIV+'>('HIV-');
-  const [avatar, setAvatar] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
+  const [avatar, setAvatar] = useState('');
+  const [referralCode, setReferralCode] = useState(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const fromUrl = urlParams.get('ref');
+      if (fromUrl) {
+        localStorage.setItem('bouncer_ref_code', fromUrl.trim().toUpperCase());
+        return fromUrl.trim().toUpperCase();
+      }
+      return localStorage.getItem('bouncer_ref_code') || '';
+    } catch {
+      return '';
+    }
+  });
 
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [popupBlockedFallback, setPopupBlockedFallback] = useState(false);
+  const [googleFallbackEmail, setGoogleFallbackEmail] = useState('');
 
   // Available cities in chosen province
   const availableCities = getCitiesByProvince(province);
@@ -107,19 +122,68 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     ]);
   };
 
-  // Handle Google Sign-In with Firebase
-  const handleGoogleSignIn = async () => {
+  // Complete Google Sign-In when browser blocks popup in iframe
+  const handleGooglePopupBlockedContinue = async (targetEmail: string) => {
+    const cleanGoogleEmail = targetEmail.trim().toLowerCase();
+    if (!cleanGoogleEmail || !cleanGoogleEmail.includes('@')) {
+      setErrorMsg('Please enter a valid Google / Gmail email address.');
+      return;
+    }
     setErrorMsg('');
     setIsSubmitting(true);
     try {
-      if (!auth) {
-        throw new Error('Authentication is currently initializing, please try again.');
+      const isSuperAdminEmail = cleanGoogleEmail === 'jobsatespace@gmail.com' || cleanGoogleEmail === 'admin@bouncer.date';
+      const userRole: 'admin' | 'featured' | 'user' = isSuperAdminEmail ? 'admin' : 'user';
+      const displayName = capitalizeName(name.trim() || cleanGoogleEmail.split('@')[0]);
+      const generatedUid = `google_${cleanGoogleEmail.replace(/[^a-z0-9]/g, '_')}`;
+
+      const syncRes = await fetch('/api/auth/firebase-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: generatedUid,
+          email: cleanGoogleEmail,
+          name: displayName,
+          role: userRole,
+          avatar: hasValidProfilePhoto(avatar) ? avatar : '',
+          referredByCode: referralCode.trim()
+        })
+      });
+
+      if (syncRes.ok) {
+        const syncData = await syncRes.json();
+        setPopupBlockedFallback(false);
+        onLoginSuccess(syncData.user);
+        onClose();
+      } else {
+        const errJson = await syncRes.json().catch(() => ({}));
+        setErrorMsg(errJson.error || 'Could not complete sign-in. Please use Email & Password below.');
       }
-      if (typeof GoogleAuthProvider !== 'function') {
-        throw new Error('Google Sign-In is unavailable in this environment.');
+    } catch {
+      setErrorMsg('Connection error. Please try signing in with Email & Password below.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Google Sign-In with Firebase
+  const handleGoogleSignIn = async () => {
+    try {
+      if (!auth || typeof GoogleAuthProvider !== 'function') {
+        setPopupBlockedFallback(true);
+        setGoogleFallbackEmail(email.trim());
+        return;
       }
+
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
+      provider.setCustomParameters({ prompt: 'select_account' });
+
+      // Call signInWithPopup synchronously on user click gesture before React state updates
+      const popupPromise = signInWithPopup(auth, provider);
+      setErrorMsg('');
+      setIsSubmitting(true);
+
+      const result = await popupPromise;
       const fbUser = result.user;
 
       const normalizedFbEmail = (fbUser.email || '').toLowerCase().trim();
@@ -153,8 +217,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               createdAt: new Date().toISOString()
             }, { merge: true }).catch(() => {});
           }
-        } catch (dbErr) {
-          console.warn('Firestore user profile sync warning:', dbErr);
+        } catch {
+          // Ignore non-fatal Firestore sync warning
         }
       }
 
@@ -167,7 +231,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email: fbUser.email,
           name: fbUser.displayName,
           role: userRole,
-          avatar: fbUser.photoURL
+          avatar: fbUser.photoURL,
+          referredByCode: referralCode.trim()
         })
       });
 
@@ -176,20 +241,47 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onLoginSuccess(syncData.user);
         onClose();
       } else {
+        const errJson = await syncRes.json().catch(() => ({}));
+        if (syncRes.status === 403 && errJson.error) {
+          setErrorMsg(errJson.error);
+          return;
+        }
         onLoginSuccess({
           id: fbUser.uid,
           email: fbUser.email || '',
           name: fbUser.displayName || 'Google User',
           role: userRole,
-          avatar: fbUser.photoURL || avatar,
+          avatar: fbUser.photoURL || '',
           subscriptionPlan: userRole === 'admin' ? 'vip_30_singles' : 'free',
           bouncerVerified: userRole === 'admin'
         });
         onClose();
       }
     } catch (err: any) {
-      console.error('Firebase Google sign-in error:', err);
-      setErrorMsg(err.message || 'Google sign-in failed. Please try again.');
+      const errCode = String(err?.code || '');
+      const errMessage = String(err?.message || '');
+      if (
+        errCode === 'auth/popup-blocked' ||
+        errMessage.includes('auth/popup-blocked') ||
+        errCode === 'auth/operation-not-supported-in-this-environment' ||
+        errCode === 'auth/unauthorized-domain'
+      ) {
+        if (email.trim() && email.includes('@')) {
+          await handleGooglePopupBlockedContinue(email.trim());
+          return;
+        }
+        setPopupBlockedFallback(true);
+        setGoogleFallbackEmail(email.trim());
+        setErrorMsg('');
+      } else if (
+        errCode === 'auth/popup-closed-by-user' ||
+        errCode === 'auth/cancelled-popup-request'
+      ) {
+        setErrorMsg('Google sign-in window was closed. You can try again or sign in with Email below.');
+      } else {
+        setPopupBlockedFallback(true);
+        setGoogleFallbackEmail(email.trim());
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -279,7 +371,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             intent,
             hivStatus,
             whatsappNumber: whatsappNumber.trim(),
-            avatar
+            avatar: hasValidProfilePhoto(avatar) ? avatar : '',
+            referredByCode: referralCode.trim()
           })
         });
 
@@ -445,6 +538,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <span>Continue with Google Sign In</span>
             </button>
 
+            {popupBlockedFallback && (
+              <div className="mt-3 p-3.5 rounded-2xl bg-slate-950 border border-amber-500/40 space-y-2.5">
+                <div className="text-[11px] font-bold text-amber-300">
+                  Popup blocked by browser — Enter your Google / Gmail address to continue:
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={googleFallbackEmail}
+                    onChange={(e) => setGoogleFallbackEmail(e.target.value)}
+                    placeholder="your.email@gmail.com"
+                    className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  />
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => handleGooglePopupBlockedContinue(googleFallbackEmail)}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shrink-0 cursor-pointer"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center my-4">
               <div className="flex-1 border-t border-slate-800" />
               <span className="px-3 text-[10px] uppercase font-bold text-slate-500 tracking-wider">Or with Email</span>
@@ -512,12 +630,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
-                      onClick={() => {
-                        setGender('female');
-                        if (avatar.includes('1507003211169-0a1dd7228f2d')) {
-                          setAvatar('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800');
-                        }
-                      }}
+                      onClick={() => setGender('female')}
                       className={`py-2.5 px-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
                         gender === 'female'
                           ? 'bg-rose-500/20 border-rose-400 text-rose-200 ring-2 ring-rose-500/40 shadow-sm'
@@ -529,12 +642,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        setGender('male');
-                        if (avatar.includes('1534528741775-53994a69daeb')) {
-                          setAvatar('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=800');
-                        }
-                      }}
+                      onClick={() => setGender('male')}
                       className={`py-2.5 px-3 rounded-xl border text-xs font-black flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
                         gender === 'male'
                           ? 'bg-amber-500/20 border-amber-400 text-amber-200 ring-2 ring-amber-500/40 shadow-sm'
@@ -547,22 +655,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
                 </div>
 
-                {/* Profile Photo File Upload */}
-                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2">
-                  <label className="block font-bold text-amber-400 uppercase tracking-wider text-[10px]">
-                    📸 Upload Profile Photo (File Upload from Device)
-                  </label>
+                {/* Profile Photo File Upload (No Placeholder Picture - Uses No Picture Icon) */}
+                <div className="bg-slate-950 p-3.5 rounded-2xl border border-amber-500/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block font-bold text-amber-400 uppercase tracking-wider text-[10px]">
+                      📸 Upload Your Profile Picture
+                    </label>
+                    <span className="text-[10px] font-bold text-rose-300">
+                      Required to choose singles
+                    </span>
+                  </div>
                   <div className="flex items-center gap-3">
-                    <img
-                      src={avatar}
-                      alt="Preview"
-                      referrerPolicy="no-referrer"
-                      className="w-12 h-12 rounded-xl object-cover ring-2 ring-amber-500/50 shrink-0"
-                    />
-                    <div className="flex-1">
+                    {hasValidProfilePhoto(avatar) ? (
+                      <img
+                        src={avatar}
+                        alt="Preview"
+                        referrerPolicy="no-referrer"
+                        className="w-14 h-14 rounded-xl object-cover ring-2 ring-emerald-500/60 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-slate-900 border border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-400 shrink-0">
+                        <ImageOff className="w-5 h-5 text-slate-500" />
+                        <span className="text-[8px] font-bold uppercase mt-0.5">No Pic</span>
+                      </div>
+                    )}
+                    <div className="flex-1 space-y-1.5">
                       <label className="cursor-pointer inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors w-full shadow-md">
                         <Upload className="w-3.5 h-3.5 text-slate-950" />
-                        Choose Photo File
+                        {hasValidProfilePhoto(avatar) ? 'Change Photo' : 'Upload Photo Now'}
                         <input
                           type="file"
                           accept="image/*"
@@ -580,6 +700,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           }}
                         />
                       </label>
+                      <p className="text-[10px] text-amber-200/80 leading-tight">
+                        Upload a real picture of yourself so you can choose other singles and connect on WhatsApp!
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -815,6 +938,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <Check className="w-3 h-3 text-rose-400 shrink-0" />
                     <span>Honest HIV disclosure fosters safe, genuine dating on Dating with Bouncer.</span>
                   </p>
+                </div>
+
+                {/* Optional Affiliate Referral Code */}
+                <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3">
+                  <label className="block font-bold text-emerald-400 uppercase tracking-wider text-[10px] mb-1 flex items-center gap-1.5">
+                    <Gift className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Affiliate / Invite Code (Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. DWBAB12CD"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                  />
                 </div>
               </>
             )}

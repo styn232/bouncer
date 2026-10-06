@@ -76,3 +76,39 @@ export function maskPhoneNumber(phone?: string): string {
   return `${prefix} ••• ••${suffix}`;
 }
 
+/**
+ * Checks whether a photo URL is a real uploaded photo and NOT a generic placeholder or empty string.
+ */
+export function hasValidProfilePhoto(photoUrl?: string | null): boolean {
+  if (!photoUrl || typeof photoUrl !== 'string') return false;
+  const trimmed = photoUrl.trim();
+  if (!trimmed || trimmed === 'no-picture' || trimmed === 'none') return false;
+  // Filter out the legacy default placeholder stock URLs
+  if (
+    trimmed.includes('photo-1534528741775-53994a69daeb') ||
+    trimmed.includes('photo-1507003211169-0a1dd7228f2d')
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Filters a list of photos down to only valid uploaded photos (no placeholders).
+ */
+export function getValidProfilePhotos(photos?: (string | null | undefined)[] | null, fallbackAvatar?: string | null): string[] {
+  const list: string[] = [];
+  if (Array.isArray(photos)) {
+    for (const p of photos) {
+      if (hasValidProfilePhoto(p) && p && !list.includes(p.trim())) {
+        list.push(p.trim());
+      }
+    }
+  }
+  if (list.length === 0 && hasValidProfilePhoto(fallbackAvatar) && fallbackAvatar) {
+    list.push(fallbackAvatar.trim());
+  }
+  return list;
+}
+
+

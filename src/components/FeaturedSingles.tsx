@@ -1,8 +1,8 @@
 import React, { useRef } from 'react';
 import { motion } from 'motion/react';
-import { Crown, Sparkles, ChevronLeft, ChevronRight, MapPin, Star, Eye, UserCheck, Check, Lock, ShieldCheck, Camera } from 'lucide-react';
+import { Crown, Sparkles, ChevronLeft, ChevronRight, MapPin, Star, Eye, UserCheck, Check, Lock, ShieldCheck, Camera, ImageOff } from 'lucide-react';
 import { SingleProfile, User } from '../types';
-import { formatDisplayName, capitalizeName } from '../utils/format';
+import { formatDisplayName, capitalizeName, getValidProfilePhotos } from '../utils/format';
 
 interface FeaturedSinglesProps {
   profiles: SingleProfile[];
@@ -144,12 +144,21 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
                 className="relative aspect-[4/3] bg-slate-900 cursor-pointer overflow-hidden"
                 title="Tap to view photos"
               >
-                <img
-                  src={profile.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
-                  alt={capitalizeName(profile.name)}
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+                {getValidProfilePhotos(profile.photos).length > 0 ? (
+                  <img
+                    src={getValidProfilePhotos(profile.photos)[0]}
+                    alt={capitalizeName(profile.name)}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-rose-950/60 p-3 text-center">
+                    <div className="w-11 h-11 rounded-2xl bg-slate-800/90 border border-slate-700 flex items-center justify-center text-rose-400 mb-1.5">
+                      <ImageOff className="w-6 h-6" />
+                    </div>
+                    <span className="text-[11px] font-extrabold text-slate-200 uppercase tracking-wider">No Picture</span>
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-black/30" />
 
                 {/* Badges */}
