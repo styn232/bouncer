@@ -723,40 +723,59 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
             )}
           </div>
 
-          {/* Bouncer Verification Status Banner */}
-          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between mb-6">
+          {/* Bouncer & Email Verification Status Banner */}
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30">
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <div>
                 <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <span>Bouncer Verification Badge</span>
-                  {bouncerVerified && (
-                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase">
-                      Gold Badge Active
+                  <span>Profile Verification</span>
+                  {(bouncerVerified || currentUser?.emailVerified) && (
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white shadow-xs" title="Verified">
+                      <ShieldCheck className="w-3 h-3" />
+                    </span>
+                  )}
+                  {currentUser?.emailVerified && (
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white shadow-xs" title="Email Verified">
+                      <Mail className="w-3 h-3" />
                     </span>
                   )}
                 </div>
                 <div className="text-[11px] text-slate-400">
-                  {bouncerVerified
-                    ? '✅ Your profile is Bouncer Verified! Gold Badge is active.'
-                    : '⏳ Unverified single. Toggle on or apply for Bouncer Gold Badge clearance.'}
+                  {currentUser?.emailVerified
+                    ? '✅ Verified by Email! Clean verified icons are active on your profile.'
+                    : bouncerVerified
+                    ? '✅ Your profile is Verified! Clean verified icon is active.'
+                    : '📧 Verify your account by email to add the Verified Icon to your profile.'}
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onApplyBouncerBadge();
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white border border-emerald-400/50 flex items-center gap-1.5 shadow-md cursor-pointer"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>{currentUser?.emailVerified ? 'Email Verified ✓' : 'Verify by Email'}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setBouncerVerified(!bouncerVerified)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold shrink-0 transition-all border ${
+                title={bouncerVerified ? 'Verified Icon Active' : 'Enable Verified Icon'}
+                className={`p-2 rounded-xl text-xs font-bold shrink-0 transition-all border cursor-pointer ${
                   bouncerVerified
                     ? 'bg-emerald-600 border-emerald-500 text-white'
-                    : 'bg-amber-500 hover:bg-amber-400 border-amber-400 text-slate-950'
+                    : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-400'
                 }`}
               >
-                {bouncerVerified ? '✅ Verified Badge Active' : '⚡ Enable Verified Badge'}
+                <ShieldCheck className="w-4 h-4" />
               </button>
             </div>
           </div>

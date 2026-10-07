@@ -198,10 +198,12 @@ export const DiscoverDeck: React.FC<DiscoverDeckProps> = ({
               <span>{currentProfile.compatibilityScore}% Match</span>
             </div>
 
-            {currentProfile.bouncerVerified && (
-              <div className="bg-emerald-950/90 backdrop-blur-md px-3 py-1 rounded-full border border-emerald-500/50 text-[10px] font-extrabold text-emerald-400 flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Bouncer Vetted</span>
+            {(currentProfile.bouncerVerified || currentProfile.bouncerStatus === 'verified' || currentProfile.emailVerified) && (
+              <div
+                className="w-8 h-8 rounded-full bg-emerald-600/95 backdrop-blur-md border border-emerald-300 text-white flex items-center justify-center shadow-lg"
+                title="Verified"
+              >
+                <ShieldCheck className="w-4 h-4" />
               </div>
             )}
           </div>

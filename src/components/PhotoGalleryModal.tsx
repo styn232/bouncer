@@ -123,13 +123,13 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                     {displayName}, <span className="text-rose-400 font-sans">{profile.age}</span>
                   </h3>
                   {profile.bouncerStatus === 'vip_approved' && (
-                    <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                      <Sparkles className="w-2.5 h-2.5 fill-current" /> VIP
+                    <span className="w-5 h-5 bg-amber-400 text-slate-950 rounded-full flex items-center justify-center" title="VIP">
+                      <Sparkles className="w-3 h-3 fill-current" />
                     </span>
                   )}
-                  {profile.bouncerStatus === 'verified' && (
-                    <span className="bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                      <ShieldCheck className="w-2.5 h-2.5 text-rose-400" /> Vetted
+                  {(profile.bouncerStatus === 'verified' || profile.bouncerVerified || profile.emailVerified) && (
+                    <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center" title="Verified">
+                      <ShieldCheck className="w-3 h-3 text-white" />
                     </span>
                   )}
                   {profile.hivStatus && (

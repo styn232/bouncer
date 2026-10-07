@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye, RefreshCw, Bell, ImageOff, ShieldAlert, Gift, Upload } from 'lucide-react';
+import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye, RefreshCw, Bell, ImageOff, ShieldAlert, Gift, Upload, MailCheck } from 'lucide-react';
 import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, NotificationItem, CentralizedLoadingState } from './types';
 import { hasValidProfilePhoto, getValidProfilePhotos } from './utils/format';
 import { Navbar, MainTabType } from './components/Navbar';
@@ -1475,7 +1475,16 @@ export default function App() {
                   <div>
                     <h2 className="text-2xl font-bold text-white font-serif flex items-center gap-2">
                       <span>{currentUser.name}, {currentUser.age}</span>
-                      {currentUser.bouncerVerified && <ShieldCheck className="w-5 h-5 text-emerald-400" />}
+                      {(currentUser.bouncerVerified || currentUser.emailVerified) && (
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white shadow-sm" title="Verified">
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                        </span>
+                      )}
+                      {currentUser.emailVerified && (
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white shadow-sm" title="Email Verified">
+                          <MailCheck className="w-3.5 h-3.5" />
+                        </span>
+                      )}
                     </h2>
                     <p className="text-xs text-slate-400">📍 {currentUser.location} • {currentUser.email}</p>
                     <span className="inline-block mt-1 bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full">
@@ -1574,10 +1583,10 @@ export default function App() {
 
                 <button
                   onClick={() => setIsVerificationModalOpen(true)}
-                  className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg"
+                  className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer"
                 >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Request Verification Badge Shield</span>
+                  <MailCheck className="w-4 h-4" />
+                  <span>{currentUser.emailVerified ? 'Verified by Email ✓ (Manage Verification)' : 'Verify by Email or Selfie Shield'}</span>
                 </button>
               </div>
             </div>
@@ -1761,6 +1770,18 @@ export default function App() {
         isOpen={isVerificationModalOpen}
         onClose={() => setIsVerificationModalOpen(false)}
         onSubmitVerification={handleSubmitVerification}
+        currentUser={currentUser}
+        onEmailVerified={(updatedUser) => {
+          if (updatedUser) {
+            setCurrentUser(updatedUser);
+          } else if (currentUser) {
+            setCurrentUser({ ...currentUser, bouncerVerified: true, emailVerified: true });
+          }
+          addToast('Email Verified! ✅', 'Your profile now displays the verified icon!', 'bouncer');
+          dataCache.invalidateAll();
+          fetchInitialData({ force: true, silent: true });
+          fetchProfiles({ force: true, silent: true });
+        }}
       />
 
       {/* Safety Center Modal */}

@@ -14,7 +14,8 @@ import {
   Lock, 
   HeartPulse,
   Camera,
-  ImageOff
+  ImageOff,
+  MailCheck
 } from 'lucide-react';
 import { SingleProfile, User } from '../types';
 import { formatDisplayName, capitalizeName, formatHivStatus, getValidProfilePhotos } from '../utils/format';
@@ -85,6 +86,8 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
   const isVerifiedBouncer = Boolean(
     profile.bouncerStatus === 'verified' ||
     profile.bouncerStatus === 'vip_approved' ||
+    profile.bouncerVerified ||
+    profile.emailVerified ||
     isVipOrFeatured
   );
 
@@ -125,22 +128,38 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
           </div>
         )}
 
-        {/* Subtle Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-black/35 pointer-events-none" />
+        {/* Subtle Bottom Gradient Only (gives way for the picture) */}
+        <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-slate-950/70 to-transparent pointer-events-none" />
 
-        {/* Top Left Overlay Badges: VIP & Verified Bouncer */}
-        <div className="absolute top-1.5 sm:top-2.5 left-1.5 sm:left-2.5 flex flex-col items-start gap-1 z-10 pointer-events-none">
+        {/* Top Left Overlay Icons Only (No Words — Gives Way for Picture) */}
+        <div className="absolute top-1.5 sm:top-2.5 left-1.5 sm:left-2.5 flex items-center gap-1 z-10 pointer-events-none">
           {isVipOrFeatured && (
-            <div className="bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 font-black text-[8px] sm:text-[10px] px-2 sm:px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 border border-amber-200 uppercase tracking-wider">
-              <Crown className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-slate-950 text-slate-950 shrink-0" />
-              <span>VIP{profile.isFeatured || profile.role === 'featured' ? ' • FEATURED' : ''}</span>
+            <div
+              className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 shadow-lg flex items-center justify-center border border-amber-200"
+              title="VIP / Featured"
+              aria-label="VIP / Featured"
+            >
+              <Crown className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-slate-950 text-slate-950 shrink-0" />
             </div>
           )}
 
           {isVerifiedBouncer && (
-            <div className="bg-emerald-950/90 backdrop-blur-md text-emerald-300 font-extrabold text-[8px] sm:text-[9px] px-1.5 sm:px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 border border-emerald-400/50 uppercase tracking-wide">
-              <ShieldCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-emerald-400 shrink-0" />
-              <span>Verified Bouncer</span>
+            <div
+              className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-emerald-600/95 backdrop-blur-md text-white shadow-md flex items-center justify-center border border-emerald-300"
+              title="Verified"
+              aria-label="Verified"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
+            </div>
+          )}
+
+          {profile.emailVerified && (
+            <div
+              className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-sky-600/95 backdrop-blur-md text-white shadow-md flex items-center justify-center border border-sky-300"
+              title="Email Verified"
+              aria-label="Email Verified"
+            >
+              <MailCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
             </div>
           )}
         </div>
@@ -241,9 +260,14 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
                   <Sparkles className="w-2 h-2 fill-slate-950" />
                 </span>
               )}
-              {profile.bouncerStatus === 'verified' && (
-                <span className="inline-flex items-center gap-0.5 bg-rose-50 text-rose-800 font-extrabold text-[7px] sm:text-[9px] px-1 py-0.5 rounded-full border border-rose-300 shrink-0" title="Bouncer Vetted">
-                  <ShieldCheck className="w-2 h-2 text-rose-600" />
+              {isVerifiedBouncer && (
+                <span className="inline-flex items-center justify-center w-4 h-4 sm:w-4.5 sm:h-4.5 bg-emerald-500 text-white rounded-full shrink-0 shadow-xs" title="Verified">
+                  <ShieldCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
+                </span>
+              )}
+              {profile.emailVerified && (
+                <span className="inline-flex items-center justify-center w-4 h-4 sm:w-4.5 sm:h-4.5 bg-sky-500 text-white rounded-full shrink-0 shadow-xs" title="Email Verified">
+                  <MailCheck className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
                 </span>
               )}
             </h3>

@@ -5,6 +5,7 @@ import {
   createUserWithEmailAndPassword, 
   signInWithPopup, 
   GoogleAuthProvider,
+  sendEmailVerification,
   signOut, 
   onAuthStateChanged,
   User as FirebaseUser
@@ -57,6 +58,7 @@ export {
   createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  sendEmailVerification,
   signOut,
   onAuthStateChanged,
   doc,

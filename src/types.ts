@@ -29,6 +29,8 @@ export interface SingleProfile {
   reviews: ProfileReview[];
   averageRating: number; // calculated rating e.g. 4.8
   bouncerStatus: BouncerStatus;
+  bouncerVerified?: boolean;
+  emailVerified?: boolean;
   bouncerNotes: string;
   compatibilityScore: number; // e.g. 98
   height: string;
@@ -170,6 +172,7 @@ export interface User {
   purchasedProfileIds?: string[]; // IDs of profile WhatsApp numbers unlocked after payment
   unlockedSinglesCount?: number; // Total number of singles unlocked
   bouncerVerified: boolean;
+  emailVerified?: boolean;
   walletBalance?: number; // Account funds balance in USD
   referralCode?: string;
   referredByCode?: string;

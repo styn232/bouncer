@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { motion } from 'motion/react';
-import { Crown, Sparkles, ChevronLeft, ChevronRight, MapPin, Star, Eye, UserCheck, Check, Lock, ShieldCheck, Camera, ImageOff } from 'lucide-react';
+import { Crown, Sparkles, ChevronLeft, ChevronRight, MapPin, Star, Eye, UserCheck, Check, Lock, ShieldCheck, Camera, ImageOff, MailCheck } from 'lucide-react';
 import { SingleProfile, User } from '../types';
 import { formatDisplayName, capitalizeName, getValidProfilePhotos } from '../utils/format';
 
@@ -161,12 +161,30 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-black/30" />
 
-                {/* Badges */}
+                {/* Icons Only on Picture (No Words — Gives Way for Picture) */}
                 <div className="absolute top-2 left-2 flex items-center gap-1">
-                  <span className="bg-amber-500 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-md">
-                    <Crown className="w-2.5 h-2.5 fill-slate-950" />
-                    FEATURED
+                  <span
+                    className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-md border border-amber-200"
+                    title="Featured"
+                  >
+                    <Crown className="w-3.5 h-3.5 fill-slate-950" />
                   </span>
+                  {(profile.bouncerStatus === 'verified' || profile.bouncerStatus === 'vip_approved' || profile.bouncerVerified || profile.emailVerified) && (
+                    <span
+                      className="w-6 h-6 rounded-full bg-emerald-600/95 text-white flex items-center justify-center shadow-md border border-emerald-300"
+                      title="Verified"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-white" />
+                    </span>
+                  )}
+                  {profile.emailVerified && (
+                    <span
+                      className="w-6 h-6 rounded-full bg-sky-600/95 text-white flex items-center justify-center shadow-md border border-sky-300"
+                      title="Email Verified"
+                    >
+                      <MailCheck className="w-3.5 h-3.5 text-white" />
+                    </span>
+                  )}
                 </div>
 
                 <div className="absolute top-2 right-2 flex items-center gap-1">
@@ -182,15 +200,21 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
                   </span>
                 </div>
 
-                {/* WhatsApp Status Pill */}
+                {/* WhatsApp Status Icon Only */}
                 <div className="absolute bottom-2 left-2">
                   {unlocked ? (
-                    <span className="bg-emerald-600/90 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                      <ShieldCheck className="w-2.5 h-2.5" /> Direct Chat
+                    <span
+                      className="w-6 h-6 rounded-full bg-emerald-600/90 text-white flex items-center justify-center shadow-md border border-emerald-300"
+                      title="Direct WhatsApp Unlocked"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
                     </span>
                   ) : (
-                    <span className="bg-slate-950/90 border border-amber-500/40 text-amber-300 text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5 text-amber-400" /> Private WhatsApp
+                    <span
+                      className="w-6 h-6 rounded-full bg-slate-950/90 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-md"
+                      title="Private WhatsApp"
+                    >
+                      <Lock className="w-3 h-3 text-amber-400" />
                     </span>
                   )}
                 </div>
@@ -202,9 +226,13 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
                   <div className="flex items-center justify-between gap-1 mb-0.5">
                     <h4
                       onClick={() => onViewDetails(profile)}
-                      className="text-sm font-extrabold text-white hover:text-amber-400 cursor-pointer truncate font-serif"
+                      className="text-sm font-extrabold text-white hover:text-amber-400 cursor-pointer truncate font-serif flex items-center gap-1"
                     >
-                      {formattedName}, <span className="text-amber-400 font-sans">{profile.age}</span>
+                      <span className="truncate">{formattedName}, <span className="text-amber-400 font-sans">{profile.age}</span></span>
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" title="Verified" />
+                      {profile.emailVerified && (
+                        <MailCheck className="w-3.5 h-3.5 text-sky-400 shrink-0" title="Email Verified" />
+                      )}
                     </h4>
                   </div>
 

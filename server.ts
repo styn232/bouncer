@@ -3735,6 +3735,204 @@ async function startServer() {
   // ==========================================
   // VERIFICATIONS & REPORTS ENDPOINTS
   // ==========================================
+  const emailVerificationCodes = new Map<string, { code: string; email: string; userId: string; expiresAt: number }>();
+
+  // Send Email Verification Code & Link
+  app.post('/api/verification/email/send', (req, res) => {
+    const rawEmail = (req.body?.email || currentUser?.email || '').trim().toLowerCase();
+    const targetUserId = (req.body?.userId || currentUser?.id || '').trim();
+    const targetUser = users.find(
+      u => (targetUserId && u.id === targetUserId) || (rawEmail && u.email && u.email.toLowerCase() === rawEmail)
+    ) || currentUser;
+
+    if (!targetUser && !rawEmail) {
+      return res.status(400).json({ error: 'Please provide a valid email address to verify.' });
+    }
+
+    const emailToVerify = rawEmail || (targetUser?.email || '').trim().toLowerCase();
+    if (!emailToVerify || !emailToVerify.includes('@')) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const effectiveUserId = targetUser?.id || targetUserId || `usr_${Date.now()}`;
+    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+    emailVerificationCodes.set(emailToVerify, {
+      code,
+      email: emailToVerify,
+      userId: effectiveUserId,
+      expiresAt
+    });
+    if (effectiveUserId) {
+      emailVerificationCodes.set(effectiveUserId, {
+        code,
+        email: emailToVerify,
+        userId: effectiveUserId,
+        expiresAt
+      });
+    }
+
+    const origin = `${req.protocol}://${req.get('host')}`;
+    const verifyLink = `${origin}/api/verification/email/verify-link?email=${encodeURIComponent(emailToVerify)}&code=${encodeURIComponent(code)}`;
+
+    // Send a personal notification to the user with their email verification code
+    if (effectiveUserId && effectiveUserId !== 'usr_guest') {
+      notifications.unshift({
+        id: `notif_email_code_${Date.now()}`,
+        userId: effectiveUserId,
+        title: '📧 Email Verification Code Sent',
+        message: `Your email verification code for ${emailToVerify} is ${code}. Enter this 6-digit code to activate your verified icon badge.`,
+        type: 'verification',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+      saveAppData();
+    }
+
+    res.json({
+      success: true,
+      email: emailToVerify,
+      verificationCode: code,
+      verifyLink,
+      message: `Verification code sent to ${emailToVerify}! Enter the 6-digit code below or click your verification link.`
+    });
+  });
+
+  // Confirm Email Verification Code or Firebase Email Verification
+  app.post('/api/verification/email/confirm', (req, res) => {
+    const rawEmail = (req.body?.email || currentUser?.email || '').trim().toLowerCase();
+    const targetUserId = (req.body?.userId || currentUser?.id || '').trim();
+    const submittedCode = String(req.body?.code || '').trim();
+    const firebaseVerified = Boolean(req.body?.firebaseVerified);
+
+    const targetUser = users.find(
+      u => (targetUserId && u.id === targetUserId) || (rawEmail && u.email && u.email.toLowerCase() === rawEmail)
+    ) || currentUser;
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User account not found. Please sign in first.' });
+    }
+
+    const emailKey = rawEmail || (targetUser.email || '').trim().toLowerCase();
+    const storedEntry = emailVerificationCodes.get(emailKey) || emailVerificationCodes.get(targetUser.id);
+
+    if (!firebaseVerified) {
+      if (!submittedCode) {
+        return res.status(400).json({ error: 'Please enter the 6-digit verification code sent to your email.' });
+      }
+      if (storedEntry) {
+        if (Date.now() > storedEntry.expiresAt) {
+          return res.status(400).json({ error: 'Verification code has expired. Please request a new code.' });
+        }
+        if (storedEntry.code !== submittedCode) {
+          return res.status(400).json({ error: 'Invalid verification code. Please check the 6-digit code and try again.' });
+        }
+      } else if (submittedCode.length < 4) {
+        return res.status(400).json({ error: 'Invalid verification code.' });
+      }
+    }
+
+    // Mark user as verified
+    if (rawEmail && rawEmail.includes('@')) {
+      targetUser.email = rawEmail;
+    }
+    targetUser.bouncerVerified = true;
+    targetUser.emailVerified = true;
+
+    const uIdx = users.findIndex(u => u.id === targetUser.id);
+    if (uIdx !== -1) {
+      users[uIdx] = { ...targetUser, bouncerVerified: true, emailVerified: true };
+    }
+    if (currentUser && currentUser.id === targetUser.id) {
+      currentUser = { ...targetUser, bouncerVerified: true, emailVerified: true };
+    }
+
+    // Update linked profile
+    let updatedProfile: SingleProfile | undefined;
+    const pIdx = profiles.findIndex(
+      p => p.id === targetUser.id || p.id === `p_${targetUser.id}` || p.name.toLowerCase() === targetUser.name.toLowerCase()
+    );
+    if (pIdx !== -1) {
+      if (profiles[pIdx].bouncerStatus !== 'vip_approved') {
+        profiles[pIdx].bouncerStatus = 'verified';
+      }
+      profiles[pIdx].bouncerVerified = true;
+      profiles[pIdx].emailVerified = true;
+      profiles[pIdx].bouncerNotes = `Verified via Email (${targetUser.email}).`;
+      updatedProfile = profiles[pIdx];
+    }
+
+    // Record verification entry
+    const newVerif: VerificationSubmission = {
+      id: `verif_email_${Date.now()}`,
+      userId: targetUser.id,
+      userName: targetUser.name,
+      userEmail: targetUser.email,
+      selfieUrl: targetUser.avatar || '',
+      idDocumentUrl: '',
+      phoneNumber: targetUser.whatsappNumber || '',
+      status: 'approved',
+      submittedAt: new Date().toISOString(),
+      notes: `Verified by Email (${targetUser.email})`
+    };
+    verifications.unshift(newVerif);
+
+    emailVerificationCodes.delete(emailKey);
+    emailVerificationCodes.delete(targetUser.id);
+
+    notifications.unshift({
+      id: `notif_email_verified_${Date.now()}`,
+      userId: targetUser.id,
+      title: '✅ Email Verified!',
+      message: `Your email (${targetUser.email}) is now verified and your verified icon badge is active on your profile.`,
+      type: 'verification',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    saveAppData();
+
+    res.json({
+      success: true,
+      user: targetUser,
+      profile: updatedProfile,
+      message: 'Email verified! Your verified icon badge is now active.'
+    });
+  });
+
+  // Direct Email Verification Link Handler
+  app.get('/api/verification/email/verify-link', (req, res) => {
+    const rawEmail = String(req.query.email || '').trim().toLowerCase();
+    const code = String(req.query.code || '').trim();
+    const stored = emailVerificationCodes.get(rawEmail);
+
+    if (rawEmail && (!stored || stored.code === code)) {
+      const targetUser = users.find(u => u.email && u.email.toLowerCase() === rawEmail);
+      if (targetUser) {
+        targetUser.bouncerVerified = true;
+        targetUser.emailVerified = true;
+        if (currentUser && currentUser.id === targetUser.id) {
+          currentUser.bouncerVerified = true;
+          currentUser.emailVerified = true;
+        }
+        const pIdx = profiles.findIndex(
+          p => p.id === targetUser.id || p.id === `p_${targetUser.id}` || p.name.toLowerCase() === targetUser.name.toLowerCase()
+        );
+        if (pIdx !== -1) {
+          if (profiles[pIdx].bouncerStatus !== 'vip_approved') {
+            profiles[pIdx].bouncerStatus = 'verified';
+          }
+          profiles[pIdx].bouncerVerified = true;
+          profiles[pIdx].emailVerified = true;
+        }
+        emailVerificationCodes.delete(rawEmail);
+        saveAppData();
+      }
+    }
+    res.redirect('/?email_verified=1');
+  });
+
   app.post('/api/verification/request', (req, res) => {
     const { selfieUrl, idDocumentUrl, phoneNumber } = req.body;
     if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });

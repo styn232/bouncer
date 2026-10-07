@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck, Eye, Crown, Zap, HeartPulse, ChevronLeft, ChevronRight, Camera, ImageOff } from 'lucide-react';
+import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck, Eye, Crown, Zap, HeartPulse, ChevronLeft, ChevronRight, Camera, ImageOff, MailCheck } from 'lucide-react';
 import { SingleProfile, User } from '../types';
 import { capitalizeName, formatDisplayName, maskPhoneNumber, formatHivStatus, getValidProfilePhotos } from '../utils/format';
 
@@ -170,30 +170,47 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                 </div>
               )}
 
-              <div className="absolute top-3 left-3 flex flex-col gap-1 items-start z-10">
+              <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10">
                 {(profile.isNew || (profile.createdAt && (new Date().getTime() - new Date(profile.createdAt).getTime()) < 14 * 24 * 60 * 60 * 1000)) && (
-                  <div className="bg-gradient-to-r from-rose-600 to-pink-600 border border-rose-300 text-white text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg animate-pulse">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-                    <span>🔥 NEW SINGLE</span>
+                  <div
+                    className="w-8 h-8 rounded-full bg-gradient-to-r from-rose-600 to-pink-600 border border-rose-300 text-white flex items-center justify-center shadow-lg"
+                    title="New Single"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
                   </div>
                 )}
-                <div className="bg-slate-950/80 backdrop-blur-md border border-amber-500/40 text-amber-300 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-amber-400" />
-                  Bouncer Verified
-                </div>
+                {(profile.bouncerStatus === 'verified' || profile.bouncerStatus === 'vip_approved' || profile.bouncerVerified || profile.emailVerified) && (
+                  <div
+                    className="w-8 h-8 rounded-full bg-emerald-600/95 backdrop-blur-md border border-emerald-300 text-white flex items-center justify-center shadow-lg"
+                    title="Verified"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-white" />
+                  </div>
+                )}
+                {profile.emailVerified && (
+                  <div
+                    className="w-8 h-8 rounded-full bg-sky-600/95 backdrop-blur-md border border-sky-300 text-white flex items-center justify-center shadow-lg"
+                    title="Email Verified"
+                  >
+                    <MailCheck className="w-4 h-4 text-white" />
+                  </div>
+                )}
                 {isOwner && (
-                  <div className="bg-slate-950/80 backdrop-blur-md border border-slate-700/60 text-slate-200 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 shadow-md">
-                    <Eye className="w-4 h-4 text-amber-400" />
-                    <span>{currentViewsCount} Profile Views</span>
+                  <div
+                    className="bg-slate-950/80 backdrop-blur-md border border-slate-700/60 text-slate-200 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-md"
+                    title="Profile Views"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{currentViewsCount}</span>
                   </div>
                 )}
               </div>
 
               {/* Photo indicator badge */}
               {(profile.photos?.length || 0) > 1 && (
-                <div className="absolute bottom-2.5 right-2.5 bg-black/75 backdrop-blur-md border border-white/10 text-white text-[10px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 z-10">
+                <div className="absolute bottom-2.5 right-2.5 bg-black/75 backdrop-blur-md border border-white/10 text-white text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1 z-10">
                   <Camera className="w-3 h-3 text-rose-400" />
-                  <span>Photo {selectedPhotoIdx + 1} of {profile.photos?.length}</span>
+                  <span>{selectedPhotoIdx + 1}/{profile.photos?.length}</span>
                 </div>
               )}
             </div>
@@ -227,9 +244,6 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
               {/* Header: Name, Age, Location */}
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-bold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30">
-                    {profile.bouncerStatus === 'vip_approved' ? '✨ VIP Single' : '🛡️ Verified Single'}
-                  </span>
                   <span className="text-xs text-slate-400 font-medium">
                     {profile.compatibilityScore}% Compatibility
                   </span>
@@ -238,15 +252,27 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-serif tracking-tight flex items-center gap-2 flex-wrap">
                   <span>{formattedName}, <span className="text-amber-400 font-sans">{profile.age}</span></span>
                   {profile.bouncerStatus === 'vip_approved' && (
-                    <span className="inline-flex items-center gap-1 bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-full shadow-md">
-                      <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
-                      <span>VIP</span>
+                    <span
+                      className="inline-flex items-center justify-center w-7 h-7 bg-amber-500 text-slate-950 rounded-full shadow-md"
+                      title="VIP"
+                    >
+                      <Crown className="w-4 h-4 fill-slate-950" />
                     </span>
                   )}
-                  {profile.bouncerStatus === 'verified' && (
-                    <span className="inline-flex items-center gap-1 bg-emerald-600 text-white font-extrabold text-xs px-2.5 py-1 rounded-full shadow-md border border-emerald-400">
-                      <ShieldCheck className="w-3.5 h-3.5 text-white" />
-                      <span>Vetted</span>
+                  {(profile.bouncerStatus === 'verified' || profile.bouncerStatus === 'vip_approved' || profile.bouncerVerified || profile.emailVerified) && (
+                    <span
+                      className="inline-flex items-center justify-center w-7 h-7 bg-emerald-600 text-white rounded-full shadow-md border border-emerald-400"
+                      title="Verified"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-white" />
+                    </span>
+                  )}
+                  {profile.emailVerified && (
+                    <span
+                      className="inline-flex items-center justify-center w-7 h-7 bg-sky-600 text-white rounded-full shadow-md border border-sky-400"
+                      title="Email Verified"
+                    >
+                      <MailCheck className="w-4 h-4 text-white" />
                     </span>
                   )}
                 </h2>
