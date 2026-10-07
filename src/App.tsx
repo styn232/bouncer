@@ -46,11 +46,20 @@ export default function App() {
   }, [currentUser]);
 
   // Site Settings state
-  const [siteSettings, setSiteSettings] = useState<{ siteName: string; tagline: string; logoUrl: string; iconUrl: string }>({
+  const [siteSettings, setSiteSettings] = useState<{
+    siteName: string;
+    tagline: string;
+    logoUrl: string;
+    iconUrl: string;
+    whatsappSupportNumber?: string;
+    affiliateRewardPerInvite?: number;
+    minWithdrawalAmount?: number;
+  }>({
     siteName: 'DATING WITH BOUNCER',
     tagline: 'Real People. Real Connections. Real Possibilities.',
     logoUrl: '',
-    iconUrl: ''
+    iconUrl: '',
+    whatsappSupportNumber: '+263 71 578 6859'
   });
 
   // Admin Profile Link Preview & Summary State
@@ -92,7 +101,15 @@ export default function App() {
     setMeta('twitter-image', ogImgUrl);
   }, [adminPreview, siteSettings.siteName]);
 
-  const handleUpdateSiteSettings = async (updated: Partial<{ siteName: string; tagline: string; logoUrl: string; iconUrl: string }>) => {
+  const handleUpdateSiteSettings = async (updated: Partial<{
+    siteName: string;
+    tagline: string;
+    logoUrl: string;
+    iconUrl: string;
+    whatsappSupportNumber: string;
+    affiliateRewardPerInvite: number;
+    minWithdrawalAmount: number;
+  }>) => {
     setSiteSettings(prev => ({ ...prev, ...updated }));
     if (updated.siteName) {
       document.title = updated.siteName;
@@ -100,10 +117,14 @@ export default function App() {
     try {
       await fetch('/api/settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': currentUser?.role || 'admin',
+          'x-user-email': currentUser?.email || 'jobsatespace@gmail.com'
+        },
         body: JSON.stringify(updated)
       });
-      addToast('Branding Saved! 🎨', 'Logo, favicon, and brand settings updated.', 'success');
+      addToast('Settings Saved! ✨', 'Site settings and WhatsApp support number updated.', 'success');
     } catch (err) {
       console.error('Failed to update site settings on server:', err);
     }
@@ -661,16 +682,45 @@ export default function App() {
 
   // Initial fetch on mount (loads bootstrap data including profiles in 1 fast call)
   useEffect(() => {
+    let refCodeFromUrl = '';
     try {
       const params = new URLSearchParams(window.location.search);
       const refParam = params.get('ref');
-      if (refParam) {
-        localStorage.setItem('bouncer_ref_code', refParam.trim().toUpperCase());
+      const pathMatch = window.location.pathname.match(/^\/(?:r|invite)\/([A-Za-z0-9_-]+)/);
+      const rawRef = refParam || (pathMatch ? pathMatch[1] : '');
+      if (rawRef) {
+        refCodeFromUrl = rawRef.trim().toUpperCase();
+        localStorage.setItem('bouncer_ref_code', refCodeFromUrl);
+        sessionStorage.setItem('bouncer_ref_code', refCodeFromUrl);
       }
     } catch {
       // ignore
     }
-    fetchInitialData();
+    fetchInitialData().then(() => {
+      if (refCodeFromUrl) {
+        fetch(`/api/affiliate/resolve/${encodeURIComponent(refCodeFromUrl)}`)
+          .then(r => (r.ok ? r.json() : null))
+          .then(data => {
+            if (data && data.valid) {
+              if (data.referralCode) {
+                localStorage.setItem('bouncer_ref_code', data.referralCode);
+                sessionStorage.setItem('bouncer_ref_code', data.referralCode);
+              }
+              if (data.profile) {
+                setSelectedProfileModal(data.profile);
+              }
+              setAuthModalInitialMode('user_register');
+              setIsAuthModalOpen(true);
+              addToast(
+                '🎁 Invite Link Active!',
+                'Sign up now to join Dating With Bouncer through your invite link!',
+                'bouncer'
+              );
+            }
+          })
+          .catch(() => {});
+      }
+    });
   }, []);
 
   // Lazy background sync when switching to social / chat tabs
@@ -1014,9 +1064,11 @@ export default function App() {
   // Active signed-in user's gender for strict opposite-gender matching (Men see Ladies, Ladies see Men)
   const activeViewerGender = (currentUser?.gender || '').toLowerCase();
 
-  // Instant 0ms Client-Side Filter and Sort Profiles
+  // Instant 0ms Client-Side Filter and Sort Profiles (Users without pictures do NOT appear)
   const displayedProfiles = profiles
     .filter((p) => {
+      if (getValidProfilePhotos(p.photos).length === 0) return false;
+
       const profGender = (p.gender || 'female').toLowerCase();
       // Strict rule: Men only see Ladies, and Ladies only see Men
       if (activeViewerGender === 'male') {
@@ -1136,20 +1188,20 @@ export default function App() {
       {/* Main Body View Switching */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 md:pb-8 space-y-4 sm:space-y-6">
         
-        {/* ENCOURAGE USER TO UPLOAD PICTURE SO THEY CAN CHOOSE OTHER SINGLES */}
+        {/* ENCOURAGE USER TO UPLOAD PICTURE SO THEIR PROFILE APPEARS & THEY CAN CHOOSE OTHER SINGLES */}
         {currentUser && !hasValidProfilePhoto(currentUser.avatar) && getValidProfilePhotos(currentUser.photos).length === 0 && (
           <div className="bg-gradient-to-r from-amber-500/20 via-rose-500/15 to-slate-900 border border-amber-400/60 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl bg-slate-950 border border-dashed border-amber-400/60 flex flex-col items-center justify-center shrink-0 text-amber-300">
                 <ImageOff className="w-5 h-5" />
-                <span className="text-[7px] font-black uppercase">No Pic</span>
+                <span className="text-[7px] font-black uppercase">Hidden</span>
               </div>
               <div>
                 <h3 className="text-xs sm:text-sm font-extrabold text-amber-300 uppercase tracking-wide">
-                  Upload Your Picture to Choose Other Singles
+                  Upload Your Picture to Appear in Singles Directory
                 </h3>
                 <p className="text-[11px] text-rose-100/90 mt-0.5">
-                  You don&apos;t have a profile picture yet. Upload your real photo in Settings so that you can choose other singles and connect on WhatsApp!
+                  Users without pictures do not appear in the directory. Upload your real photo in Settings so your profile appears and you can choose other singles!
                 </p>
               </div>
             </div>
@@ -1846,12 +1898,12 @@ export default function App() {
 
       {/* Compact Floating WhatsApp Support Button */}
       <a
-        href="https://wa.me/263715786859?text=Hi%20Admin%20I%20need%20Help"
+        href={`https://wa.me/${(siteSettings.whatsappSupportNumber || '263715786859').replace(/[^0-9]/g, '') || '263715786859'}?text=Hi%20Admin%20I%20need%20Help`}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="WhatsApp Support"
         className="fixed bottom-20 md:bottom-5 left-3 sm:left-5 z-40 bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1.5 rounded-full shadow-lg border border-emerald-400/50 flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 text-[11px] font-bold"
-        title="WhatsApp Support"
+        title={`WhatsApp Support (${siteSettings.whatsappSupportNumber || '+263 71 578 6859'})`}
       >
         <MessageSquare className="w-3.5 h-3.5 text-white fill-white/20 shrink-0" />
         <span>Support</span>
@@ -1868,13 +1920,13 @@ export default function App() {
 
           <div className="flex flex-wrap items-center justify-center gap-4 text-[11px]">
             <a
-              href="https://wa.me/263715786859?text=Hi%20Admin%20I%20need%20Help"
+              href={`https://wa.me/${(siteSettings.whatsappSupportNumber || '263715786859').replace(/[^0-9]/g, '') || '263715786859'}?text=Hi%20Admin%20I%20need%20Help`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition-colors"
             >
               <MessageSquare className="w-3 h-3 text-emerald-400" />
-              <span>Support</span>
+              <span>Support ({siteSettings.whatsappSupportNumber || '+263 71 578 6859'})</span>
             </a>
             <span>•</span>
             <button onClick={() => setActiveTab('safety')} className="hover:text-white transition-colors">

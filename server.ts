@@ -243,6 +243,7 @@ async function startServer() {
     tagline: 'Real People. Real Connections. Real Possibilities.',
     logoUrl: '',
     iconUrl: '',
+    whatsappSupportNumber: '+263 71 578 6859',
     affiliateRewardPerInvite: 0.25,
     minWithdrawalAmount: 5,
     enforceOneAccountPerIp: true,
@@ -442,10 +443,116 @@ async function startServer() {
     return true;
   }
 
-  function generateUserReferralCode(userId: string, name?: string): string {
-    const cleanName = (name || 'USER').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4) || 'USER';
-    const suffix = (userId || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(-4) || Math.floor(1000 + Math.random() * 9000).toString();
-    return `DWB-${cleanName}${suffix}`;
+  function hasValidProfilePicture(p?: SingleProfile | null): boolean {
+    if (!p || !Array.isArray(p.photos)) return false;
+    return p.photos.some(ph => isRealUploadedPhoto(ph));
+  }
+
+  // Generate an 8-letter uppercase affiliate code that NEVER contains the user's name or digits
+  function generateUserReferralCode(userId: string, _name?: string): string {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // 24 unambiguous uppercase letters
+    const seed = `BOUNCER_LINK_${userId || 'DEFAULT'}_SALT_V2`;
+    let h1 = 2166136261;
+    let h2 = 16777619;
+    for (let i = 0; i < seed.length; i++) {
+      const ch = seed.charCodeAt(i);
+      h1 ^= ch;
+      h1 = Math.imul(h1, 16777619);
+      h2 ^= ch + i * 31;
+      h2 = Math.imul(h2, 2246822519);
+    }
+    let code = '';
+    let v1 = Math.abs(h1);
+    let v2 = Math.abs(h2);
+    for (let i = 0; i < 8; i++) {
+      const idx = ((i % 2 === 0 ? v1 : v2) + i * 17) % alphabet.length;
+      code += alphabet[idx];
+      if (i % 2 === 0) {
+        v1 = Math.floor(v1 / alphabet.length) ^ (v2 & 0xff);
+      } else {
+        v2 = Math.floor(v2 / alphabet.length) ^ (v1 & 0xff);
+      }
+    }
+    return code;
+  }
+
+  function isCleanAnonymousReferralCode(code?: string, userName?: string): boolean {
+    if (!code || typeof code !== 'string') return false;
+    const trimmed = code.trim();
+    if (!/^[A-Z]{6,12}$/.test(trimmed)) return false;
+    const cleanName = (userName || '').replace(/[^a-zA-Z]/g, '').toUpperCase();
+    if (cleanName.length >= 3 && trimmed.includes(cleanName.slice(0, 3))) {
+      return false;
+    }
+    return true;
+  }
+
+  function findUserByReferralCode(rawCode?: string, excludeUserId?: string): User | undefined {
+    if (!rawCode || typeof rawCode !== 'string') return undefined;
+    const cleanRef = rawCode.trim().toUpperCase();
+    if (!cleanRef) return undefined;
+    return users.find(u => {
+      if (excludeUserId && u.id === excludeUserId) return false;
+      if (u.referralCode && u.referralCode.toUpperCase() === cleanRef) return true;
+      if (u.legacyReferralCode && u.legacyReferralCode.toUpperCase() === cleanRef) return true;
+      if (generateUserReferralCode(u.id).toUpperCase() === cleanRef) return true;
+      if (u.id.toUpperCase() === cleanRef) return true;
+      return false;
+    });
+  }
+
+  function creditAffiliateReferrer(newUser: User, rawRefCode?: string): User | null {
+    const codeToUse = (rawRefCode || newUser.referredByCode || '').trim().toUpperCase();
+    if (!codeToUse || newUser.referredByUserId) return null;
+
+    const referrer = findUserByReferralCode(codeToUse, newUser.id);
+    if (!referrer) return null;
+
+    if (!Array.isArray(referrer.affiliateReferrals)) {
+      referrer.affiliateReferrals = [];
+    }
+    // Avoid double-crediting the same referred user
+    if (referrer.affiliateReferrals.some(r => r.referredUserId === newUser.id)) {
+      newUser.referredByUserId = referrer.id;
+      newUser.referredByCode = referrer.referralCode;
+      return referrer;
+    }
+
+    const rewardRate = Number(siteSettings.affiliateRewardPerInvite ?? 0.25);
+    const invitedGender = (newUser.gender || 'female').toLowerCase();
+
+    newUser.referredByUserId = referrer.id;
+    newUser.referredByCode = referrer.referralCode;
+
+    referrer.affiliateBalance = Number(((referrer.affiliateBalance || 0) + rewardRate).toFixed(2));
+    referrer.affiliateTotalEarned = Number(((referrer.affiliateTotalEarned || 0) + rewardRate).toFixed(2));
+    if (invitedGender === 'male') {
+      referrer.affiliateInvitedMen = (referrer.affiliateInvitedMen || 0) + 1;
+    } else {
+      referrer.affiliateInvitedLadies = (referrer.affiliateInvitedLadies || 0) + 1;
+    }
+
+    const refRecord: AffiliateReferral = {
+      id: `ref_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      referredUserId: newUser.id,
+      referredUserName: newUser.name,
+      referredUserGender: invitedGender === 'male' ? 'male' : 'female',
+      rewardAmount: rewardRate,
+      createdAt: new Date().toISOString()
+    };
+    referrer.affiliateReferrals.unshift(refRecord);
+
+    notifications.unshift({
+      id: `notif_aff_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      userId: referrer.id,
+      title: `🎁 Affiliate Bonus Earned (+$${rewardRate.toFixed(2)})!`,
+      message: `${newUser.name} (${invitedGender === 'male' ? 'Man' : 'Lady'}) signed up using your affiliate link! Your affiliate balance is now $${referrer.affiliateBalance.toFixed(2)}.`,
+      type: 'system',
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    return referrer;
   }
 
   function getClientIp(req: express.Request): string {
@@ -559,13 +666,16 @@ async function startServer() {
         if (data.userLikes) userLikes = data.userLikes;
         if (data.userMatches) userMatches = data.userMatches;
 
-        // Ensure all loaded users have a referralCode and strip legacy default placeholder avatars
+        // Ensure all loaded users have a pure-letters referralCode (without user name) and strip legacy default placeholder avatars
         users = users.map(u => {
-          const refCode = u.referralCode || generateUserReferralCode(u.id, u.name);
+          const isClean = isCleanAnonymousReferralCode(u.referralCode, u.name);
+          const cleanCode = isClean ? u.referralCode! : generateUserReferralCode(u.id);
+          const legacyCode = !isClean && u.referralCode ? u.referralCode : u.legacyReferralCode;
           const cleanAvatar = isRealUploadedPhoto(u.avatar) ? u.avatar : '';
           return {
             ...u,
-            referralCode: refCode,
+            referralCode: cleanCode,
+            ...(legacyCode ? { legacyReferralCode: legacyCode } : {}),
             avatar: cleanAvatar,
             affiliateBalance: Number(u.affiliateBalance || 0),
             affiliateTotalEarned: Number(u.affiliateTotalEarned || 0),
@@ -574,10 +684,12 @@ async function startServer() {
             affiliateReferrals: Array.isArray(u.affiliateReferrals) ? u.affiliateReferrals : []
           };
         });
-        profiles = profiles.map(p => ({
-          ...p,
-          photos: Array.isArray(p.photos) ? p.photos.filter(ph => isRealUploadedPhoto(ph)) : []
-        }));
+        profiles = profiles
+          .map(p => ({
+            ...p,
+            photos: Array.isArray(p.photos) ? p.photos.filter(ph => isRealUploadedPhoto(ph)) : []
+          }))
+          .filter(p => hasValidProfilePicture(p));
         console.log(`[Storage] Loaded persistent state from disk. ${profiles.length} profiles, ${users.length} users.`);
       } else {
         saveAppData();
@@ -860,20 +972,22 @@ async function startServer() {
       (req.headers['x-user-id'] as string) ||
       (isAdminReq ? (req.headers['x-user-email'] as string) || 'usr_admin' : '');
 
-    const sanitizedProfiles = profiles.map(p => {
+    const visibleProfiles = profiles.filter(p => hasValidProfilePicture(p));
+    const sanitizedProfiles = visibleProfiles.map(p => {
       if (isAdminReq) return p;
       const { whatsappNumber, ...rest } = p;
       return { ...rest, whatsappNumber: undefined };
     });
 
     siteSettings.siteName = (siteSettings.siteName || 'DATING WITH BOUNCER').toUpperCase();
+    if (!siteSettings.whatsappSupportNumber) siteSettings.whatsappSupportNumber = '+263 71 578 6859';
     if (siteSettings.affiliateRewardPerInvite === undefined) siteSettings.affiliateRewardPerInvite = 0.25;
     if (siteSettings.minWithdrawalAmount === undefined) siteSettings.minWithdrawalAmount = 5;
     siteSettings.openGraph = getActiveOpenGraphSettings();
     siteSettings.paymentGateways = getActivePaymentGateways();
 
-    const platformMenCount = profiles.filter(p => (p.gender || '').toLowerCase() === 'male').length;
-    const platformLadiesCount = profiles.filter(p => (p.gender || 'female').toLowerCase() === 'female').length;
+    const platformMenCount = visibleProfiles.filter(p => (p.gender || '').toLowerCase() === 'male').length;
+    const platformLadiesCount = visibleProfiles.filter(p => (p.gender || 'female').toLowerCase() === 'female').length;
 
     const sanitizedSiteSettings = isAdminReq
       ? siteSettings
@@ -931,6 +1045,7 @@ async function startServer() {
       logoUrl,
       iconUrl,
       tagline,
+      whatsappSupportNumber,
       affiliateRewardPerInvite,
       minWithdrawalAmount,
       enforceOneAccountPerIp,
@@ -954,6 +1069,7 @@ async function startServer() {
       ...(logoUrl !== undefined && { logoUrl }),
       ...(iconUrl !== undefined && { iconUrl }),
       ...(tagline !== undefined && { tagline }),
+      ...(whatsappSupportNumber !== undefined && { whatsappSupportNumber: String(whatsappSupportNumber).trim() || '+263 71 578 6859' }),
       ...(affiliateRewardPerInvite !== undefined && { affiliateRewardPerInvite: Math.max(0.01, Number(affiliateRewardPerInvite) || 0.25) }),
       ...(minWithdrawalAmount !== undefined && { minWithdrawalAmount: Math.max(1, Number(minWithdrawalAmount) || 5) }),
       ...(enforceOneAccountPerIp !== undefined && { enforceOneAccountPerIp: Boolean(enforceOneAccountPerIp) }),
@@ -1279,15 +1395,23 @@ async function startServer() {
   });
 
   app.post('/api/auth/sync', (req, res) => {
-    const { user } = req.body;
+    const { user, referredByCode } = req.body;
     if (!user || !user.id) {
       return res.status(400).json({ error: 'No user data provided' });
     }
     const existing = users.find(u => u.id === user.id || (u.email && user.email && u.email.toLowerCase() === user.email.toLowerCase()));
     if (existing) {
+      if (!isCleanAnonymousReferralCode(existing.referralCode, existing.name)) {
+        existing.legacyReferralCode = existing.referralCode;
+        existing.referralCode = generateUserReferralCode(existing.id);
+      }
+      creditAffiliateReferrer(existing, referredByCode || user.referredByCode);
       currentUser = existing;
     } else {
+      user.referralCode = generateUserReferralCode(user.id);
+      user.avatar = isRealUploadedPhoto(user.avatar) ? user.avatar : '';
       users.push(user);
+      creditAffiliateReferrer(user, referredByCode || user.referredByCode);
       currentUser = user;
     }
     saveAppData();
@@ -1305,7 +1429,7 @@ async function startServer() {
 
   // Firebase Auth Sync & Backend Opening Endpoint
   app.post('/api/auth/firebase-sync', (req, res) => {
-    const { uid, email, name, role, adminKey, avatar, photoURL, gender } = req.body;
+    const { uid, email, name, role, adminKey, avatar, photoURL, gender, referredByCode } = req.body;
     if (!email && !uid) {
       return res.status(400).json({ error: 'Firebase UID or email is required.' });
     }
@@ -1329,6 +1453,8 @@ async function startServer() {
       : (existingByEmailOrUid?.role || 'user');
 
     let existing = existingByEmailOrUid;
+    const rawPhoto = avatar || photoURL || '';
+    const cleanSyncAvatar = isRealUploadedPhoto(rawPhoto) ? rawPhoto : '';
 
     if (existing) {
       if (isAdminAccount) {
@@ -1339,11 +1465,19 @@ async function startServer() {
         }
       }
       if (name && !existing.name) existing.name = name;
-      if (avatar || photoURL) existing.avatar = avatar || photoURL || existing.avatar;
+      if (cleanSyncAvatar) existing.avatar = cleanSyncAvatar;
+      if (!isCleanAnonymousReferralCode(existing.referralCode, existing.name)) {
+        existing.legacyReferralCode = existing.referralCode;
+        existing.referralCode = generateUserReferralCode(existing.id);
+      }
+      if (referredByCode && !existing.referredByUserId) {
+        creditAffiliateReferrer(existing, referredByCode);
+      }
       currentUser = existing;
     } else {
+      const newUserId = uid || `usr_${Date.now()}`;
       const newUser: User = {
-        id: uid || `usr_${Date.now()}`,
+        id: newUserId,
         email: normalizedEmail,
         name: name || (isAdminAccount ? 'Super Admin' : normalizedEmail.split('@')[0] || 'Member'),
         age: 28,
@@ -1351,7 +1485,8 @@ async function startServer() {
         isFeatured: effectiveRole === 'featured',
         subscriptionPlan: isAdminAccount ? 'vip_30_singles' : 'free',
         subscriptionStatus: 'active',
-        avatar: avatar || photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        avatar: cleanSyncAvatar,
+        photos: cleanSyncAvatar ? [cleanSyncAvatar] : [],
         city: 'Harare',
         subLocation: 'Borrowdale',
         location: 'Harare, Zimbabwe',
@@ -1359,9 +1494,17 @@ async function startServer() {
         intent: 'Marriage',
         gender: isAdminAccount ? undefined : (gender || 'female'),
         bouncerVerified: isAdminAccount,
+        referralCode: generateUserReferralCode(newUserId),
+        referredByCode: referredByCode ? String(referredByCode).trim().toUpperCase() : undefined,
+        affiliateBalance: 0,
+        affiliateTotalEarned: 0,
+        affiliateInvitedMen: 0,
+        affiliateInvitedLadies: 0,
+        affiliateReferrals: [],
         createdAt: new Date().toISOString()
       };
       users.push(newUser);
+      creditAffiliateReferrer(newUser, referredByCode);
       currentUser = newUser;
     }
 
@@ -1493,7 +1636,9 @@ async function startServer() {
         avatar: nextAvatar,
         whatsappNumber: whatsappNumber || existingUser.whatsappNumber || '+263 77 123 4567',
         gender: gender || existingUser.gender || 'female',
-        referralCode: existingUser.referralCode || generateUserReferralCode(existingUser.id, formattedName)
+        referralCode: isCleanAnonymousReferralCode(existingUser.referralCode, formattedName || existingUser.name)
+          ? existingUser.referralCode!
+          : generateUserReferralCode(existingUser.id)
       };
       users[existingIdx] = registeredUser;
     } else {
@@ -1521,7 +1666,7 @@ async function startServer() {
         interests: ['Dating', 'Coffee', 'Music'],
         bouncerVerified: isSuperAdmin,
         walletBalance: 0,
-        referralCode: generateUserReferralCode(newUserId, formattedName),
+        referralCode: generateUserReferralCode(newUserId),
         referredByCode: referredByCode ? String(referredByCode).trim().toUpperCase() : undefined,
         affiliateBalance: 0,
         affiliateTotalEarned: 0,
@@ -1535,57 +1680,16 @@ async function startServer() {
       users.push(registeredUser);
     }
 
-    // 3. Process Affiliate Invite Reward if a brand new user signed up via an affiliate link
-    if (isBrandNewRegistration && referredByCode && typeof referredByCode === 'string') {
-      const cleanRef = referredByCode.trim().toUpperCase();
-      const referrerIdx = users.findIndex(
-        u =>
-          u.id !== registeredUser.id &&
-          ((u.referralCode && u.referralCode.toUpperCase() === cleanRef) || u.id.toUpperCase() === cleanRef)
-      );
-      if (referrerIdx !== -1) {
-        const referrer = users[referrerIdx];
-        const rewardRate = Number(siteSettings.affiliateRewardPerInvite ?? 0.25);
-        const invitedGender = (registeredUser.gender || 'female').toLowerCase();
-
-        registeredUser.referredByUserId = referrer.id;
-        referrer.affiliateBalance = Number(((referrer.affiliateBalance || 0) + rewardRate).toFixed(2));
-        referrer.affiliateTotalEarned = Number(((referrer.affiliateTotalEarned || 0) + rewardRate).toFixed(2));
-        if (invitedGender === 'male') {
-          referrer.affiliateInvitedMen = (referrer.affiliateInvitedMen || 0) + 1;
-        } else {
-          referrer.affiliateInvitedLadies = (referrer.affiliateInvitedLadies || 0) + 1;
-        }
-        if (!Array.isArray(referrer.affiliateReferrals)) {
-          referrer.affiliateReferrals = [];
-        }
-        const refRecord: AffiliateReferral = {
-          id: `ref_${Date.now()}`,
-          referredUserId: registeredUser.id,
-          referredUserName: registeredUser.name,
-          referredUserGender: (invitedGender === 'male' ? 'male' : 'female'),
-          rewardAmount: rewardRate,
-          createdAt: new Date().toISOString()
-        };
-        referrer.affiliateReferrals.unshift(refRecord);
-
-        notifications.unshift({
-          id: `notif_aff_${Date.now()}`,
-          userId: referrer.id,
-          title: `🎁 Affiliate Bonus Earned (+$${rewardRate.toFixed(2)})!`,
-          message: `${registeredUser.name} (${invitedGender === 'male' ? 'Man' : 'Lady'}) signed up using your affiliate link! Your affiliate balance is now $${referrer.affiliateBalance.toFixed(2)}.`,
-          type: 'system',
-          read: false,
-          createdAt: new Date().toISOString()
-        });
-      }
+    // 3. Process Affiliate Invite Reward if user signed up via an affiliate link
+    if (referredByCode && typeof referredByCode === 'string') {
+      creditAffiliateReferrer(registeredUser, referredByCode);
     }
 
     currentUser = registeredUser;
 
-    // Auto-create or update SingleProfile so user displays in directory immediately (with no placeholder photo)
+    // Auto-create or update SingleProfile ONLY if user has uploaded a valid profile picture (Users without pictures do not appear)
     const existingProfIdx = profiles.findIndex(
-      p => p.id === `p_${registeredUser.id}` || (p.name.toLowerCase() === registeredUser.name.toLowerCase() && p.whatsappNumber === registeredUser.whatsappNumber)
+      p => p.id === `p_${registeredUser.id}` || p.id === registeredUser.id || (p.name.toLowerCase() === registeredUser.name.toLowerCase() && p.whatsappNumber === registeredUser.whatsappNumber)
     );
 
     const newProfile: SingleProfile = {
@@ -1618,10 +1722,14 @@ async function startServer() {
       createdAt: new Date().toISOString()
     };
 
-    if (existingProfIdx !== -1) {
-      profiles[existingProfIdx] = newProfile;
-    } else {
-      profiles.unshift(newProfile);
+    if (hasValidProfilePicture(newProfile)) {
+      if (existingProfIdx !== -1) {
+        profiles[existingProfIdx] = newProfile;
+      } else {
+        profiles.unshift(newProfile);
+      }
+    } else if (existingProfIdx !== -1) {
+      profiles.splice(existingProfIdx, 1);
     }
 
     // Send personal welcome notification strictly to this newly registered user
@@ -1683,65 +1791,72 @@ async function startServer() {
       users[uIdx] = currentUser;
     }
 
-    // Sync user's associated SingleProfile if exists or create if missing
-    let pIdx = profiles.findIndex(p => p.id === currentUser.id || p.name.toLowerCase() === currentUser.name.toLowerCase());
+    // Sync user's associated SingleProfile if exists or create if missing (ONLY if they have a valid picture)
+    let pIdx = profiles.findIndex(p => p.id === currentUser.id || p.id === `p_${currentUser.id}` || p.name.toLowerCase() === currentUser.name.toLowerCase());
     if (pIdx !== -1) {
       const existingPhotos = profiles[pIdx].photos || [];
       const updatedPhotos = validPhotos && validPhotos.length > 0
         ? validPhotos 
         : (avatar ? [avatar, ...existingPhotos.slice(1)] : existingPhotos);
+      const finalPhotos = updatedPhotos.filter(ph => isRealUploadedPhoto(ph)).length > 0
+        ? updatedPhotos.filter(ph => isRealUploadedPhoto(ph))
+        : (isRealUploadedPhoto(currentUser.avatar) ? [currentUser.avatar] : []);
 
-      profiles[pIdx] = {
-        ...profiles[pIdx],
-        name: currentUser.name,
-        age: currentUser.age,
-        province: selectedProvince,
-        city: currentUser.city || profiles[pIdx].city,
-        subLocation: currentUser.subLocation || profiles[pIdx].subLocation,
-        location: currentUser.location,
-        childrenCount: currentUser.childrenCount ?? profiles[pIdx].childrenCount,
-        intent: currentUser.intent || profiles[pIdx].intent,
-        hivStatus: currentUser.hivStatus || profiles[pIdx].hivStatus || 'HIV-',
-        whatsappNumber: currentUser.whatsappNumber || profiles[pIdx].whatsappNumber,
-        bio: currentUser.bio || profiles[pIdx].bio,
-        gender: currentUser.gender || profiles[pIdx].gender,
-        seeking: currentUser.seeking || profiles[pIdx].seeking,
-        interests: currentUser.interests || profiles[pIdx].interests,
-        photos: updatedPhotos.filter(ph => isRealUploadedPhoto(ph)).length > 0
-          ? updatedPhotos.filter(ph => isRealUploadedPhoto(ph))
-          : (isRealUploadedPhoto(currentUser.avatar) ? [currentUser.avatar] : []),
-        bouncerStatus: currentUser.bouncerVerified ? 'verified' : profiles[pIdx].bouncerStatus
-      };
+      if (finalPhotos.length > 0) {
+        profiles[pIdx] = {
+          ...profiles[pIdx],
+          name: currentUser.name,
+          age: currentUser.age,
+          province: selectedProvince,
+          city: currentUser.city || profiles[pIdx].city,
+          subLocation: currentUser.subLocation || profiles[pIdx].subLocation,
+          location: currentUser.location,
+          childrenCount: currentUser.childrenCount ?? profiles[pIdx].childrenCount,
+          intent: currentUser.intent || profiles[pIdx].intent,
+          hivStatus: currentUser.hivStatus || profiles[pIdx].hivStatus || 'HIV-',
+          whatsappNumber: currentUser.whatsappNumber || profiles[pIdx].whatsappNumber,
+          bio: currentUser.bio || profiles[pIdx].bio,
+          gender: currentUser.gender || profiles[pIdx].gender,
+          seeking: currentUser.seeking || profiles[pIdx].seeking,
+          interests: currentUser.interests || profiles[pIdx].interests,
+          photos: finalPhotos,
+          bouncerStatus: currentUser.bouncerVerified ? 'verified' : profiles[pIdx].bouncerStatus
+        };
+      } else {
+        profiles.splice(pIdx, 1);
+      }
     } else {
       const cleanedNewPhotos = validPhotos && validPhotos.filter(ph => isRealUploadedPhoto(ph)).length > 0
         ? validPhotos.filter(ph => isRealUploadedPhoto(ph))
         : (isRealUploadedPhoto(currentUser.avatar) ? [currentUser.avatar] : []);
-      const newProf: SingleProfile = {
-        id: `p_${Date.now()}`,
-        name: currentUser.name,
-        age: currentUser.age,
-        province: selectedProvince,
-        city: currentUser.city || 'Harare',
-        subLocation: currentUser.subLocation || 'Borrowdale',
-        location: currentUser.location,
-        childrenCount: currentUser.childrenCount || 0,
-        intent: currentUser.intent || 'Marriage',
-        hivStatus: currentUser.hivStatus || 'HIV-',
-        bio: currentUser.bio || 'Single looking for love.',
-        photos: cleanedNewPhotos,
-        interests: currentUser.interests || ['Coffee', 'Travel'],
-        gender: currentUser.gender || 'female',
-        seeking: currentUser.seeking || 'male',
-        bouncerStatus: currentUser.bouncerVerified ? 'verified' : 'pending_check',
-        bouncerNotes: currentUser.bouncerVerified ? 'Bouncer verified user.' : 'Pending Bouncer review.',
-        compatibilityScore: 92,
-        height: "5'8\"",
-        relationshipGoal: 'Meaningful connections',
-        reviews: [],
-        averageRating: 5.0,
-        createdAt: new Date().toISOString()
-      };
-      profiles.unshift(newProf);
+      if (cleanedNewPhotos.length > 0) {
+        const newProf: SingleProfile = {
+          id: `p_${Date.now()}`,
+          name: currentUser.name,
+          age: currentUser.age,
+          province: selectedProvince,
+          city: currentUser.city || 'Harare',
+          subLocation: currentUser.subLocation || 'Borrowdale',
+          location: currentUser.location,
+          childrenCount: currentUser.childrenCount || 0,
+          intent: currentUser.intent || 'Marriage',
+          hivStatus: currentUser.hivStatus || 'HIV-',
+          bio: currentUser.bio || 'Single looking for love.',
+          photos: cleanedNewPhotos,
+          interests: currentUser.interests || ['Coffee', 'Travel'],
+          gender: currentUser.gender || 'female',
+          seeking: currentUser.seeking || 'male',
+          bouncerStatus: currentUser.bouncerVerified ? 'verified' : 'pending_check',
+          bouncerNotes: currentUser.bouncerVerified ? 'Bouncer verified user.' : 'Pending Bouncer review.',
+          compatibilityScore: 92,
+          height: "5'8\"",
+          relationshipGoal: 'Meaningful connections',
+          reviews: [],
+          averageRating: 5.0,
+          createdAt: new Date().toISOString()
+        };
+        profiles.unshift(newProf);
+      }
     }
 
     saveAppData();
@@ -1771,15 +1886,54 @@ async function startServer() {
     });
   });
 
+  // Affiliate Short Link Redirect Routes (/r/:code and /invite/:code) - Code contains only letters and no user name
+  app.get('/r/:code', (req, res) => {
+    const cleanCode = String(req.params.code || '').replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase();
+    return res.redirect(302, `/?ref=${encodeURIComponent(cleanCode)}`);
+  });
+
+  app.get('/invite/:code', (req, res) => {
+    const cleanCode = String(req.params.code || '').replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase();
+    return res.redirect(302, `/?ref=${encodeURIComponent(cleanCode)}`);
+  });
+
+  // Resolve an anonymous letter-only affiliate code to its owner user/profile
+  app.get('/api/affiliate/resolve/:code', (req, res) => {
+    const rawCode = String(req.params.code || '').trim().toUpperCase();
+    const owner = findUserByReferralCode(rawCode);
+    if (!owner) {
+      return res.status(404).json({ valid: false, error: 'Affiliate code not found' });
+    }
+    const ownerProfile = profiles.find(
+      p =>
+        hasValidProfilePicture(p) &&
+        (p.id === owner.id ||
+          p.id === `p_${owner.id}` ||
+          (p.name && owner.name && p.name.toLowerCase() === owner.name.toLowerCase()))
+    );
+    const sanitizedProfile = ownerProfile
+      ? { ...ownerProfile, whatsappNumber: undefined }
+      : null;
+
+    res.json({
+      valid: true,
+      referralCode: owner.referralCode,
+      referrerId: owner.id,
+      profileId: ownerProfile?.id || null,
+      profile: sanitizedProfile
+    });
+  });
+
   // Affiliate Program: Get User Affiliate Stats & Link
   app.get('/api/affiliate/me', (req, res) => {
     const queryUserId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || currentUser?.id;
-    const targetUser = users.find(u => u.id === queryUserId) || currentUser;
+    const targetUser = users.find(u => u.id === queryUserId || (u.email && queryUserId && u.email.toLowerCase() === queryUserId.toLowerCase())) || currentUser;
     if (!targetUser) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
-    if (!targetUser.referralCode) {
-      targetUser.referralCode = generateUserReferralCode(targetUser.id, targetUser.name);
+    if (!isCleanAnonymousReferralCode(targetUser.referralCode, targetUser.name)) {
+      targetUser.legacyReferralCode = targetUser.referralCode;
+      targetUser.referralCode = generateUserReferralCode(targetUser.id);
       saveAppData();
     }
 
@@ -1789,8 +1943,9 @@ async function startServer() {
     const invitedMen = Number(targetUser.affiliateInvitedMen || 0);
     const invitedLadies = Number(targetUser.affiliateInvitedLadies || 0);
 
-    const platformMenCount = profiles.filter(p => (p.gender || '').toLowerCase() === 'male').length;
-    const platformLadiesCount = profiles.filter(p => (p.gender || 'female').toLowerCase() === 'female').length;
+    const visibleProfiles = profiles.filter(p => hasValidProfilePicture(p));
+    const platformMenCount = visibleProfiles.filter(p => (p.gender || '').toLowerCase() === 'male').length;
+    const platformLadiesCount = visibleProfiles.filter(p => (p.gender || 'female').toLowerCase() === 'female').length;
 
     const hasReachedMinAmount = balance >= minWithdrawalAmount;
     const isMenEqualOrMore = invitedMen >= invitedLadies;
@@ -1813,14 +1968,18 @@ async function startServer() {
       affiliateBalance: balance,
       affiliateTotalEarned: Number(targetUser.affiliateTotalEarned || 0),
       invitedMen,
+      invitedMenCount: invitedMen,
       invitedLadies,
+      invitedLadiesCount: invitedLadies,
       referrals: targetUser.affiliateReferrals || [],
       withdrawals: userWithdrawals,
       rewardPerInvite,
       minWithdrawalAmount,
+      minWithdrawal: minWithdrawalAmount,
       hasReachedMinAmount,
       isMenEqualOrMore,
       canWithdraw,
+      withdrawalActivated: canWithdraw,
       withdrawalStatusReason,
       platformMenCount,
       platformLadiesCount
@@ -2014,7 +2173,7 @@ async function startServer() {
 
   // API ROUTE 3: Profiles Endpoint (Name, Age, Location, Intent, Children, Bouncer Filters)
   app.get('/api/profiles', (req, res) => {
-    let result = [...profiles];
+    let result = profiles.filter(p => hasValidProfilePicture(p));
     const { search, gender, bouncerStatus, location, province, city, subLocation, minAge, maxAge, childrenCount, intent, hivStatus } = req.query;
 
     if (search) {

@@ -45,6 +45,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (isOpen) {
       setMode(resolveMode(initialMode));
       setErrorMsg('');
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const fromUrl = urlParams.get('ref');
+        if (fromUrl && fromUrl.trim()) {
+          const cleanCode = fromUrl.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+          localStorage.setItem('bouncer_ref_code', cleanCode);
+          setReferralCode(cleanCode);
+        } else {
+          const stored = localStorage.getItem('bouncer_ref_code') || sessionStorage.getItem('bouncer_ref_code') || '';
+          if (stored) setReferralCode(stored.trim().toUpperCase());
+        }
+      } catch {
+        // ignore storage errors
+      }
     }
   }, [isOpen, initialMode]);
 
@@ -328,13 +342,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
 
         if (fbUid) {
+          const activeRefCode = (referralCode || localStorage.getItem('bouncer_ref_code') || '').trim().toUpperCase();
           const syncRes = await fetch('/api/auth/firebase-sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               uid: fbUid,
               email: email.trim(),
-              name: fbDisplayName || email.trim().split('@')[0]
+              name: fbDisplayName || email.trim().split('@')[0],
+              referredByCode: activeRefCode
             })
           });
           if (syncRes.ok) {
@@ -940,17 +956,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </p>
                 </div>
 
-                {/* Optional Affiliate Referral Code */}
-                <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3">
-                  <label className="block font-bold text-emerald-400 uppercase tracking-wider text-[10px] mb-1 flex items-center gap-1.5">
-                    <Gift className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Affiliate / Invite Code (Optional)</span>
-                  </label>
+                {/* Affiliate Referral Code (Auto-filled from Invite Link) */}
+                <div className="bg-slate-950/80 border border-emerald-500/30 rounded-2xl p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-emerald-400 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                      <Gift className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Affiliate Invite Code (Letters Only)</span>
+                    </label>
+                    {referralCode.trim() && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[9px] font-black uppercase">
+                        ✓ Link Owner Will Be Credited
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={referralCode}
-                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                    placeholder="e.g. DWBAB12CD"
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+                      setReferralCode(val);
+                      try {
+                        localStorage.setItem('bouncer_ref_code', val);
+                      } catch {}
+                    }}
+                    placeholder="e.g. DWBMKRTQPL"
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
                   />
                 </div>

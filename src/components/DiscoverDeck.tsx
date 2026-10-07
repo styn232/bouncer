@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Heart, X, Star, ShieldCheck, Sparkles, Sliders, RefreshCw, MessageSquare, MapPin, CheckCircle, Flame, ShoppingBag } from 'lucide-react';
 import { SingleProfile } from '../types';
+import { getValidProfilePhotos } from '../utils/format';
 
 interface DiscoverDeckProps {
   profiles?: SingleProfile[];
@@ -39,6 +40,7 @@ export const DiscoverDeck: React.FC<DiscoverDeckProps> = ({
   const [showFilters, setShowFilters] = useState(false);
 
   const filteredProfiles = safeProfiles.filter(p => {
+    if (getValidProfilePhotos(p.photos).length === 0) return false;
     if (p.age < minAge || p.age > maxAge) return false;
     if (selectedGender !== 'all' && p.gender !== selectedGender) return false;
     return true;

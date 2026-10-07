@@ -160,11 +160,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [adminCreateLoading, setAdminCreateLoading] = useState(false);
   const [backendTestStatus, setBackendTestStatus] = useState<string | null>(null);
   
-  // Branding state
+  // Branding & WhatsApp Support state
   const [siteName, setSiteName] = useState(siteSettings?.siteName || 'DATING WITH BOUNCER');
   const [logoUrl, setLogoUrl] = useState(siteSettings?.logoUrl || '');
   const [iconUrl, setIconUrl] = useState(siteSettings?.iconUrl || '');
+  const [whatsappSupportNumber, setWhatsappSupportNumber] = useState(siteSettings?.whatsappSupportNumber || '+263 71 578 6859');
   const [brandingSaved, setBrandingSaved] = useState(false);
+  const [supportNumberSaved, setSupportNumberSaved] = useState(false);
+
+  useEffect(() => {
+    if (siteSettings?.whatsappSupportNumber) {
+      setWhatsappSupportNumber(siteSettings.whatsappSupportNumber);
+    }
+    if (siteSettings?.siteName) {
+      setSiteName(siteSettings.siteName);
+    }
+  }, [siteSettings?.whatsappSupportNumber, siteSettings?.siteName]);
   
   // New Profile Form Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -711,6 +722,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
 
+        </div>
+
+        {/* Admin Quick WhatsApp Support Number Configuration in Dashboard */}
+        <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-950/90 p-3.5 rounded-2xl border border-emerald-500/30">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+              <Phone className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-extrabold text-white flex items-center gap-2">
+                <span>WhatsApp Support Number</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[9px] font-black uppercase">
+                  Live on Support Button
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Set the official WhatsApp number that opens when users click the floating Support button.
+              </p>
+            </div>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (onUpdateSiteSettings) {
+                onUpdateSiteSettings({ whatsappSupportNumber: whatsappSupportNumber.trim() });
+              }
+              setSupportNumberSaved(true);
+              setTimeout(() => setSupportNumberSaved(false), 2500);
+            }}
+            className="flex items-center gap-2"
+          >
+            <input
+              type="text"
+              value={whatsappSupportNumber}
+              onChange={(e) => setWhatsappSupportNumber(e.target.value)}
+              placeholder="+263 71 578 6859"
+              className="bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 w-full sm:w-48"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider shrink-0 flex items-center gap-1.5 shadow-md cursor-pointer"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>{supportNumberSaved ? 'Saved!' : 'Save Number'}</span>
+            </button>
+          </form>
         </div>
       </div>
 
@@ -2031,7 +2088,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             onSubmit={(e) => {
               e.preventDefault();
               if (onUpdateSiteSettings) {
-                onUpdateSiteSettings({ siteName, logoUrl, iconUrl });
+                onUpdateSiteSettings({ siteName, logoUrl, iconUrl, whatsappSupportNumber: whatsappSupportNumber.trim() });
               }
               setBrandingSaved(true);
               setTimeout(() => setBrandingSaved(false), 2500);
@@ -2050,6 +2107,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 onChange={e => setSiteName(e.target.value)}
                 placeholder="DATING WITH BOUNCER"
                 className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            {/* Official WhatsApp Support Number */}
+            <div className="p-5 rounded-2xl bg-slate-950 border border-emerald-500/40 space-y-2">
+              <label className="block font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                <Phone className="w-4 h-4 text-emerald-400" />
+                <span>WhatsApp Support Number</span>
+              </label>
+              <p className="text-[11px] text-slate-400">
+                Enter the WhatsApp phone number (with country code, e.g. +263 71 578 6859) for customer support across the platform.
+              </p>
+              <input
+                type="text"
+                value={whatsappSupportNumber}
+                onChange={e => setWhatsappSupportNumber(e.target.value)}
+                placeholder="+263 71 578 6859"
+                className="w-full bg-slate-900 border border-emerald-500/40 rounded-2xl px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-emerald-400"
               />
             </div>
 

@@ -23,9 +23,10 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Strictly enforce opposite-gender visibility: Men only see Ladies, Ladies only see Men
+  // Strictly enforce picture requirement and opposite-gender visibility: Men only see Ladies, Ladies only see Men
   const viewerGender = (currentUser?.gender || '').toLowerCase();
   const oppositeGenderProfiles = profiles.filter((p) => {
+    if (getValidProfilePhotos(p.photos).length === 0) return false;
     const profGender = (p.gender || 'female').toLowerCase();
     if (viewerGender === 'male') return profGender === 'female';
     if (viewerGender === 'female') return profGender === 'male';

@@ -62,6 +62,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   const [minWithdrawal, setMinWithdrawal] = useState<number>(5);
   const [withdrawalActivated, setWithdrawalActivated] = useState<boolean>(false);
   const [withdrawals, setWithdrawals] = useState<AffiliateWithdrawalRequest[]>([]);
+  const [creditedReferrals, setCreditedReferrals] = useState<Array<{ id: string; name: string; gender: string; joinedAt?: string }>>([]);
   const [withdrawAmount, setWithdrawAmount] = useState<string>('5');
   const [withdrawMethod, setWithdrawMethod] = useState<'ecocash' | 'onemoney' | 'innbucks' | 'whatsapp_cash'>('ecocash');
   const [withdrawAccount, setWithdrawAccount] = useState<string>(currentUser?.whatsappNumber || '');
@@ -72,8 +73,14 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   const [isSaved, setIsSaved] = useState(false);
 
   const fetchAffiliateStats = async () => {
+    if (!currentUser?.id) return;
     try {
-      const res = await fetch('/api/affiliate/me');
+      const res = await fetch(`/api/affiliate/me?userId=${encodeURIComponent(currentUser.id)}`, {
+        headers: {
+          'x-user-id': currentUser.id,
+          'x-user-email': currentUser.email || ''
+        }
+      });
       if (res.ok) {
         const data = await res.json();
         setReferralCode(data.referralCode || '');
@@ -85,6 +92,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
         setMinWithdrawal(Number(data.minWithdrawal || 5));
         setWithdrawalActivated(Boolean(data.withdrawalActivated));
         setWithdrawals(Array.isArray(data.withdrawals) ? data.withdrawals : []);
+        setCreditedReferrals(Array.isArray(data.referrals) ? data.referrals : []);
         if (Number(data.affiliateBalance || 0) >= Number(data.minWithdrawal || 5)) {
           setWithdrawAmount(Number(data.affiliateBalance || 5).toFixed(2));
         }
@@ -225,8 +233,13 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
       setIsWithdrawing(true);
       const res = await fetch('/api/affiliate/withdraw', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser.id,
+          'x-user-email': currentUser.email || ''
+        },
         body: JSON.stringify({
+          userId: currentUser.id,
           amount: amt,
           payoutMethod: withdrawMethod,
           payoutAccount: withdrawAccount.trim()
@@ -393,7 +406,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
             {/* Affiliate Link Copy & Share */}
             <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 space-y-2">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="font-bold text-slate-300">Your Personal Affiliate Link:</span>
+                <span className="font-bold text-slate-300">Your Personal Affiliate Link (Letters Only • Private):</span>
                 <span className="font-mono text-amber-400 font-bold">Code: {referralCode || 'LOADING'}</span>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
@@ -427,7 +440,28 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                   </a>
                 </div>
               </div>
+              <p className="text-[10px] text-slate-400">
+                🔒 Your link uses a unique letter code (does not show your name), directs visitors to your profile, and automatically credits you when anyone signs up!
+              </p>
             </div>
+
+            {creditedReferrals.length > 0 && (
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-1.5">
+                <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                  Credited Sign-Ups From Your Link ({creditedReferrals.length})
+                </div>
+                <div className="max-h-28 overflow-y-auto space-y-1 pr-1">
+                  {creditedReferrals.slice(0, 10).map((refUser) => (
+                    <div key={refUser.id} className="flex items-center justify-between text-[11px] bg-slate-950/80 px-2.5 py-1.5 rounded-lg border border-slate-800/80">
+                      <span className="font-semibold text-slate-200">{refUser.name}</span>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                        +${rewardPerInvite.toFixed(2)} ({refUser.gender === 'male' ? '👨 Man' : '👩 Lady'})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Stats & Withdrawal Activation Rules */}
             <div className="grid grid-cols-3 gap-2.5 text-center">

@@ -124,6 +124,7 @@ export interface SiteSettings {
   logoUrl: string;
   iconUrl: string;
   tagline?: string;
+  whatsappSupportNumber?: string;
   affiliateRewardPerInvite?: number; // e.g. 0.1 or 0.25 set by Admin
   minWithdrawalAmount?: number; // Default $5
   enforceOneAccountPerIp?: boolean;
@@ -175,6 +176,7 @@ export interface User {
   emailVerified?: boolean;
   walletBalance?: number; // Account funds balance in USD
   referralCode?: string;
+  legacyReferralCode?: string;
   referredByCode?: string;
   referredByUserId?: string;
   affiliateBalance?: number;
