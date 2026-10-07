@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Heart, X, Star, ShieldCheck, Sparkles, Sliders, RefreshCw, MessageSquare, MapPin, CheckCircle, Flame, ShoppingBag } from 'lucide-react';
 import { SingleProfile } from '../types';
-import { getValidProfilePhotos } from '../utils/format';
+import { getValidProfilePhotos, calculateDynamicAge, formatRegistrationDate } from '../utils/format';
 
 interface DiscoverDeckProps {
   profiles?: SingleProfile[];
@@ -41,7 +41,8 @@ export const DiscoverDeck: React.FC<DiscoverDeckProps> = ({
 
   const filteredProfiles = safeProfiles.filter(p => {
     if (getValidProfilePhotos(p.photos).length === 0) return false;
-    if (p.age < minAge || p.age > maxAge) return false;
+    const dynAge = calculateDynamicAge(p);
+    if (dynAge < minAge || dynAge > maxAge) return false;
     if (selectedGender !== 'all' && p.gender !== selectedGender) return false;
     return true;
   });
@@ -220,7 +221,7 @@ export const DiscoverDeck: React.FC<DiscoverDeckProps> = ({
                   onClick={() => handleDetail(currentProfile)}
                   className="text-2xl font-black text-white font-serif flex items-center gap-2 cursor-pointer hover:underline"
                 >
-                  <span>{currentProfile.name}, {currentProfile.age}</span>
+                  <span>{currentProfile.name}, {calculateDynamicAge(currentProfile)}</span>
                 </h2>
 
                 {onAddToCart && (
@@ -237,11 +238,13 @@ export const DiscoverDeck: React.FC<DiscoverDeckProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-slate-300">
+              <div className="flex items-center gap-2 text-xs text-slate-300 flex-wrap">
                 <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                 <span>{currentProfile.location}</span>
                 <span>•</span>
                 <span>💍 Seeking {currentProfile.intent}</span>
+                <span>•</span>
+                <span className="text-amber-300 font-semibold">{formatRegistrationDate(currentProfile.createdAt)}</span>
               </div>
             </div>
 

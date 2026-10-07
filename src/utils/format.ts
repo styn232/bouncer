@@ -111,4 +111,76 @@ export function getValidProfilePhotos(photos?: (string | null | undefined)[] | n
   return list;
 }
 
+/**
+ * Calculates dynamic age so that age automatically updates as time moves forward.
+ * - If `birthYear` is stored on the profile/user, `currentYear - birthYear` is used.
+ * - Otherwise, if `createdAt` and initial `age` are stored, `age + (currentYear - joinedYear)` is used.
+ */
+export function calculateDynamicAge(
+  item?: { birthYear?: number; age?: number; createdAt?: string } | null
+): number {
+  const currentYear = new Date().getFullYear();
+  if (!item) return 25;
+
+  if (item.birthYear && Number(item.birthYear) >= 1920 && Number(item.birthYear) <= currentYear - 18) {
+    return Math.max(18, currentYear - Number(item.birthYear));
+  }
+
+  const baseAge = Number(item.age) || 25;
+  if (item.createdAt) {
+    const joinedDate = new Date(item.createdAt);
+    if (!isNaN(joinedDate.getTime())) {
+      const joinedYear = joinedDate.getFullYear();
+      const yearsElapsed = Math.max(0, currentYear - joinedYear);
+      return Math.max(18, baseAge + yearsElapsed);
+    }
+  }
+
+  return Math.max(18, baseAge);
+}
+
+/**
+ * Resolves a user's birth year from `birthYear` or (`createdAt` year - `age`).
+ */
+export function resolveBirthYear(
+  item?: { birthYear?: number; age?: number; createdAt?: string } | null
+): number {
+  const currentYear = new Date().getFullYear();
+  if (!item) return currentYear - 25;
+  if (item.birthYear && Number(item.birthYear) >= 1920 && Number(item.birthYear) <= currentYear - 18) {
+    return Number(item.birthYear);
+  }
+  const baseAge = Number(item.age) || 25;
+  if (item.createdAt) {
+    const joinedDate = new Date(item.createdAt);
+    if (!isNaN(joinedDate.getTime())) {
+      return joinedDate.getFullYear() - baseAge;
+    }
+  }
+  return currentYear - baseAge;
+}
+
+/**
+ * Formats a registration timestamp into "Joined May 2026" style string.
+ */
+export function formatRegistrationDate(createdAt?: string | null): string {
+  if (!createdAt) return 'Joined May 2026';
+  const date = new Date(createdAt);
+  if (isNaN(date.getTime())) return 'Joined May 2026';
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const shortMonths = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+  const m = date.getMonth();
+  const y = date.getFullYear();
+  // Use "May" or short month name cleanly
+  const monthLabel = monthNames[m].length <= 4 ? monthNames[m] : shortMonths[m];
+  return `Joined ${monthLabel} ${y}`;
+}
+
+
 

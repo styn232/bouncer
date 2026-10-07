@@ -448,6 +448,28 @@ async function startServer() {
     return p.photos.some(ph => isRealUploadedPhoto(ph));
   }
 
+  function computeBirthYear(item?: { birthYear?: number; age?: number; createdAt?: string } | null): number {
+    const currentYear = new Date().getFullYear();
+    if (!item) return currentYear - 25;
+    if (item.birthYear && Number(item.birthYear) >= 1920 && Number(item.birthYear) <= currentYear - 18) {
+      return Number(item.birthYear);
+    }
+    const baseAge = Number(item.age) || 25;
+    if (item.createdAt) {
+      const d = new Date(item.createdAt);
+      if (!isNaN(d.getTime())) {
+        return d.getFullYear() - baseAge;
+      }
+    }
+    return currentYear - baseAge;
+  }
+
+  function computeDynamicAge(item?: { birthYear?: number; age?: number; createdAt?: string } | null): number {
+    const currentYear = new Date().getFullYear();
+    const by = computeBirthYear(item);
+    return Math.max(18, currentYear - by);
+  }
+
   // Generate an 8-letter uppercase affiliate code that NEVER contains the user's name or digits
   function generateUserReferralCode(userId: string, _name?: string): string {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // 24 unambiguous uppercase letters
@@ -666,14 +688,19 @@ async function startServer() {
         if (data.userLikes) userLikes = data.userLikes;
         if (data.userMatches) userMatches = data.userMatches;
 
-        // Ensure all loaded users have a pure-letters referralCode (without user name) and strip legacy default placeholder avatars
+        // Ensure all loaded users have a pure-letters referralCode (without user name), birthYear, dynamic age, and strip legacy default placeholder avatars
         users = users.map(u => {
           const isClean = isCleanAnonymousReferralCode(u.referralCode, u.name);
           const cleanCode = isClean ? u.referralCode! : generateUserReferralCode(u.id);
           const legacyCode = !isClean && u.referralCode ? u.referralCode : u.legacyReferralCode;
           const cleanAvatar = isRealUploadedPhoto(u.avatar) ? u.avatar : '';
+          const userBirthYear = computeBirthYear(u);
+          const userDynamicAge = computeDynamicAge({ ...u, birthYear: userBirthYear });
           return {
             ...u,
+            birthYear: userBirthYear,
+            age: userDynamicAge,
+            createdAt: u.createdAt || '2026-05-01T10:00:00.000Z',
             referralCode: cleanCode,
             ...(legacyCode ? { legacyReferralCode: legacyCode } : {}),
             avatar: cleanAvatar,
@@ -685,10 +712,17 @@ async function startServer() {
           };
         });
         profiles = profiles
-          .map(p => ({
-            ...p,
-            photos: Array.isArray(p.photos) ? p.photos.filter(ph => isRealUploadedPhoto(ph)) : []
-          }))
+          .map(p => {
+            const profBirthYear = computeBirthYear(p);
+            const profDynamicAge = computeDynamicAge({ ...p, birthYear: profBirthYear });
+            return {
+              ...p,
+              birthYear: profBirthYear,
+              age: profDynamicAge,
+              createdAt: p.createdAt || '2026-05-01T10:00:00.000Z',
+              photos: Array.isArray(p.photos) ? p.photos.filter(ph => isRealUploadedPhoto(ph)) : []
+            };
+          })
           .filter(p => hasValidProfilePicture(p));
         console.log(`[Storage] Loaded persistent state from disk. ${profiles.length} profiles, ${users.length} users.`);
       } else {
@@ -776,6 +810,26 @@ async function startServer() {
 
   // Load persistent storage on boot
   loadPersistentData();
+
+  // Ensure all in-memory profiles and users have birthYear, dynamic age, and registration date
+  profiles = profiles.map(p => {
+    const by = computeBirthYear(p);
+    return {
+      ...p,
+      birthYear: by,
+      age: computeDynamicAge({ ...p, birthYear: by }),
+      createdAt: p.createdAt || '2026-05-01T10:00:00.000Z'
+    };
+  });
+  users = users.map(u => {
+    const by = computeBirthYear(u);
+    return {
+      ...u,
+      birthYear: by,
+      age: computeDynamicAge({ ...u, birthYear: by }),
+      createdAt: u.createdAt || '2026-05-01T10:00:00.000Z'
+    };
+  });
 
   function activateUserSubscription(tx: PaymentTransaction) {
     tx.status = 'succeeded';
@@ -974,8 +1028,11 @@ async function startServer() {
 
     const visibleProfiles = profiles.filter(p => hasValidProfilePicture(p));
     const sanitizedProfiles = visibleProfiles.map(p => {
-      if (isAdminReq) return p;
-      const { whatsappNumber, ...rest } = p;
+      const birthYear = computeBirthYear(p);
+      const dynamicAge = computeDynamicAge({ ...p, birthYear });
+      const enriched = { ...p, birthYear, age: dynamicAge };
+      if (isAdminReq) return enriched;
+      const { whatsappNumber, ...rest } = enriched;
       return { ...rest, whatsappNumber: undefined };
     });
 
@@ -1560,7 +1617,7 @@ async function startServer() {
   });
 
   app.post('/api/auth/register', (req, res) => {
-    const { id, email, name, age, province, city, subLocation, location, gender, childrenCount, intent, bio, whatsappNumber, hivStatus, avatar, referredByCode, deviceFingerprint } = req.body;
+    const { id, email, name, age, birthYear, province, city, subLocation, location, gender, childrenCount, intent, bio, whatsappNumber, hivStatus, avatar, referredByCode, deviceFingerprint } = req.body;
     if (!email || !name) {
       return res.status(400).json({ error: 'Name and email are required.' });
     }
@@ -1615,6 +1672,12 @@ async function startServer() {
     // Do NOT use any placeholder picture if user did not upload a real photo
     const cleanUserAvatar = isRealUploadedPhoto(avatar) ? String(avatar).trim() : '';
 
+    const currentYear = new Date().getFullYear();
+    const resolvedBirthYear = birthYear && Number(birthYear) >= 1920 && Number(birthYear) <= currentYear - 18
+      ? Number(birthYear)
+      : (currentYear - (Number(age) || 25));
+    const resolvedAge = Math.max(18, currentYear - resolvedBirthYear);
+
     let registeredUser: User;
     const isBrandNewRegistration = existingIdx === -1;
 
@@ -1624,7 +1687,8 @@ async function startServer() {
       registeredUser = {
         ...existingUser,
         name: formattedName || existingUser.name,
-        age: Number(age) || existingUser.age || 25,
+        birthYear: resolvedBirthYear,
+        age: resolvedAge,
         province: selectedProvince,
         city: selectedCity,
         subLocation: selectedSubLocation,
@@ -1647,7 +1711,8 @@ async function startServer() {
         id: newUserId,
         email: String(email).trim(),
         name: formattedName,
-        age: Number(age) || 25,
+        birthYear: resolvedBirthYear,
+        age: resolvedAge,
         province: selectedProvince,
         city: selectedCity,
         subLocation: selectedSubLocation,
@@ -1695,6 +1760,7 @@ async function startServer() {
     const newProfile: SingleProfile = {
       id: existingProfIdx !== -1 ? profiles[existingProfIdx].id : `p_${Date.now()}`,
       name: registeredUser.name,
+      birthYear: registeredUser.birthYear,
       age: registeredUser.age,
       province: registeredUser.province,
       city: registeredUser.city,
@@ -1719,7 +1785,7 @@ async function startServer() {
       reviews: [],
       averageRating: 5.0,
       isNew: true,
-      createdAt: new Date().toISOString()
+      createdAt: registeredUser.createdAt || new Date().toISOString()
     };
 
     if (hasValidProfilePicture(newProfile)) {
@@ -1751,10 +1817,16 @@ async function startServer() {
   });
 
   app.put('/api/auth/profile', (req, res) => {
-    const { name, email, whatsappNumber, age, province, city, subLocation, childrenCount, intent, location, bio, gender, seeking, interests, avatar, photos, bouncerVerified, hivStatus } = req.body;
+    const { name, email, whatsappNumber, age, birthYear, province, city, subLocation, childrenCount, intent, location, bio, gender, seeking, interests, avatar, photos, bouncerVerified, hivStatus } = req.body;
     if (!currentUser) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
+
+    const currentYear = new Date().getFullYear();
+    const resolvedBirthYear = birthYear && Number(birthYear) >= 1920 && Number(birthYear) <= currentYear - 18
+      ? Number(birthYear)
+      : (age ? currentYear - Number(age) : computeBirthYear(currentUser));
+    const resolvedAge = Math.max(18, currentYear - resolvedBirthYear);
 
     const selectedCity = city || currentUser.city || 'Harare';
     const selectedSubLocation = subLocation || currentUser.subLocation || 'Borrowdale';
@@ -1769,7 +1841,8 @@ async function startServer() {
       ...(formattedName && { name: formattedName }),
       ...(email && { email }),
       ...(whatsappNumber && { whatsappNumber }),
-      ...(age && { age: Number(age) }),
+      birthYear: resolvedBirthYear,
+      age: resolvedAge,
       province: selectedProvince,
       ...(city && { city }),
       ...(subLocation && { subLocation }),
@@ -1806,6 +1879,7 @@ async function startServer() {
         profiles[pIdx] = {
           ...profiles[pIdx],
           name: currentUser.name,
+          birthYear: currentUser.birthYear,
           age: currentUser.age,
           province: selectedProvince,
           city: currentUser.city || profiles[pIdx].city,
@@ -2224,12 +2298,12 @@ async function startServer() {
 
     if (minAge) {
       const min = Number(minAge);
-      if (!isNaN(min)) result = result.filter(p => p.age >= min);
+      if (!isNaN(min)) result = result.filter(p => computeDynamicAge(p) >= min);
     }
 
     if (maxAge) {
       const max = Number(maxAge);
-      if (!isNaN(max)) result = result.filter(p => p.age <= max);
+      if (!isNaN(max)) result = result.filter(p => computeDynamicAge(p) <= max);
     }
 
     if (childrenCount && childrenCount !== 'all') {
@@ -2259,10 +2333,13 @@ async function startServer() {
     // Mask/hide WhatsApp contact numbers from public API response unless caller is Admin
     const isAdminReq = isAuthorizedAdmin(req);
     const sanitizedResult = result.map(p => {
+      const birthYear = computeBirthYear(p);
+      const dynamicAge = computeDynamicAge({ ...p, birthYear });
+      const enriched = { ...p, birthYear, age: dynamicAge };
       if (isAdminReq) {
-        return p;
+        return enriched;
       }
-      const { whatsappNumber, ...rest } = p;
+      const { whatsappNumber, ...rest } = enriched;
       return {
         ...rest,
         whatsappNumber: undefined

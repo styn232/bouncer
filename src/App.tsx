@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye, RefreshCw, Bell, ImageOff, ShieldAlert, Gift, Upload, MailCheck } from 'lucide-react';
 import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, NotificationItem, CentralizedLoadingState } from './types';
-import { hasValidProfilePhoto, getValidProfilePhotos } from './utils/format';
+import { hasValidProfilePhoto, getValidProfilePhotos, calculateDynamicAge, formatRegistrationDate } from './utils/format';
 import { Navbar, MainTabType } from './components/Navbar';
 import { SinglesFilterBar } from './components/SinglesFilterBar';
 import { SingleCard } from './components/SingleCard';
@@ -1061,88 +1061,118 @@ export default function App() {
     setSelectedBouncerStatus('all');
   };
 
+  const [visibleCount, setVisibleCount] = useState(24);
+
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(24);
+  }, [searchTerm, selectedProvince, selectedCity, selectedSubLocation, minAge, maxAge, selectedGender, selectedChildren, selectedIntent, selectedHivStatus, selectedBouncerStatus]);
+
   // Active signed-in user's gender for strict opposite-gender matching (Men see Ladies, Ladies see Men)
   const activeViewerGender = (currentUser?.gender || '').toLowerCase();
 
-  // Instant 0ms Client-Side Filter and Sort Profiles (Users without pictures do NOT appear)
-  const displayedProfiles = profiles
-    .filter((p) => {
-      if (getValidProfilePhotos(p.photos).length === 0) return false;
+  // Instant 0ms Memoized Client-Side Filter and Sort Profiles (Users without pictures do NOT appear)
+  const displayedProfiles = useMemo(() => {
+    return profiles
+      .filter((p) => {
+        if (getValidProfilePhotos(p.photos).length === 0) return false;
 
-      const profGender = (p.gender || 'female').toLowerCase();
-      // Strict rule: Men only see Ladies, and Ladies only see Men
-      if (activeViewerGender === 'male') {
-        if (profGender !== 'female') return false;
-      } else if (activeViewerGender === 'female') {
-        if (profGender !== 'male') return false;
-      } else if (selectedGender !== 'all') {
-        if (profGender !== selectedGender.toLowerCase()) return false;
-      }
+        const profGender = (p.gender || 'female').toLowerCase();
+        // Strict rule: Men only see Ladies, and Ladies only see Men
+        if (activeViewerGender === 'male') {
+          if (profGender !== 'female') return false;
+        } else if (activeViewerGender === 'female') {
+          if (profGender !== 'male') return false;
+        } else if (selectedGender !== 'all') {
+          if (profGender !== selectedGender.toLowerCase()) return false;
+        }
 
-      if (p.age < minAge || p.age > maxAge) return false;
+        const dynAge = calculateDynamicAge(p);
+        if (dynAge < minAge || dynAge > maxAge) return false;
 
-      if (selectedProvince !== 'all') {
-        if ((p.province || '').toLowerCase() !== selectedProvince.toLowerCase()) return false;
-      }
+        if (selectedProvince !== 'all') {
+          if ((p.province || '').toLowerCase() !== selectedProvince.toLowerCase()) return false;
+        }
 
-      if (selectedCity !== 'all') {
-        if ((p.city || '').toLowerCase() !== selectedCity.toLowerCase()) return false;
-      }
+        if (selectedCity !== 'all') {
+          if ((p.city || '').toLowerCase() !== selectedCity.toLowerCase()) return false;
+        }
 
-      if (selectedSubLocation !== 'all') {
-        if ((p.subLocation || '').toLowerCase() !== selectedSubLocation.toLowerCase()) return false;
-      }
+        if (selectedSubLocation !== 'all') {
+          if ((p.subLocation || '').toLowerCase() !== selectedSubLocation.toLowerCase()) return false;
+        }
 
-      if (selectedChildren !== 'all') {
-        const count = p.childrenCount ?? 0;
-        if (selectedChildren === '3+') {
-          if (count < 3) return false;
-        } else if (count !== Number(selectedChildren)) {
+        if (selectedChildren !== 'all') {
+          const count = p.childrenCount ?? 0;
+          if (selectedChildren === '3+') {
+            if (count < 3) return false;
+          } else if (count !== Number(selectedChildren)) {
+            return false;
+          }
+        }
+
+        if (selectedIntent !== 'all' && p.intent !== selectedIntent) {
           return false;
         }
-      }
 
-      if (selectedIntent !== 'all' && p.intent !== selectedIntent) {
-        return false;
-      }
+        if (selectedHivStatus !== 'all') {
+          const target = selectedHivStatus.toLowerCase();
+          const val = (p.hivStatus || 'HIV-').toLowerCase();
+          if (target.includes('+')) {
+            if (!val.includes('+')) return false;
+          } else if (val.includes('+')) {
+            return false;
+          }
+        }
 
-      if (selectedHivStatus !== 'all') {
-        const target = selectedHivStatus.toLowerCase();
-        const val = (p.hivStatus || 'HIV-').toLowerCase();
-        if (target.includes('+')) {
-          if (!val.includes('+')) return false;
-        } else if (val.includes('+')) {
+        if (selectedBouncerStatus !== 'all' && p.bouncerStatus !== selectedBouncerStatus) {
           return false;
         }
-      }
 
-      if (selectedBouncerStatus !== 'all' && p.bouncerStatus !== selectedBouncerStatus) {
-        return false;
-      }
+        if (searchTerm.trim()) {
+          const q = searchTerm.toLowerCase().trim();
+          const matchesSearch =
+            p.name.toLowerCase().includes(q) ||
+            (p.location && p.location.toLowerCase().includes(q)) ||
+            (p.province && p.province.toLowerCase().includes(q)) ||
+            (p.city && p.city.toLowerCase().includes(q)) ||
+            (p.subLocation && p.subLocation.toLowerCase().includes(q)) ||
+            (p.bio && p.bio.toLowerCase().includes(q)) ||
+            (p.intent && p.intent.toLowerCase().includes(q));
+          if (!matchesSearch) return false;
+        }
 
-      if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase().trim();
-        const matchesSearch =
-          p.name.toLowerCase().includes(q) ||
-          (p.location && p.location.toLowerCase().includes(q)) ||
-          (p.province && p.province.toLowerCase().includes(q)) ||
-          (p.city && p.city.toLowerCase().includes(q)) ||
-          (p.subLocation && p.subLocation.toLowerCase().includes(q)) ||
-          (p.bio && p.bio.toLowerCase().includes(q)) ||
-          (p.intent && p.intent.toLowerCase().includes(q));
-        if (!matchesSearch) return false;
-      }
+        return true;
+      })
+      .sort((a, b) => {
+        if (a.isNew && !b.isNew) return -1;
+        if (!a.isNew && b.isNew) return 1;
+        if (sortByStars) {
+          return (b.averageRating || 0) - (a.averageRating || 0);
+        }
+        return 0;
+      });
+  }, [
+    profiles,
+    activeViewerGender,
+    selectedGender,
+    minAge,
+    maxAge,
+    selectedProvince,
+    selectedCity,
+    selectedSubLocation,
+    selectedChildren,
+    selectedIntent,
+    selectedHivStatus,
+    selectedBouncerStatus,
+    searchTerm,
+    sortByStars
+  ]);
 
-      return true;
-    })
-    .sort((a, b) => {
-      if (a.isNew && !b.isNew) return -1;
-      if (!a.isNew && b.isNew) return 1;
-      if (sortByStars) {
-        return (b.averageRating || 0) - (a.averageRating || 0);
-      }
-      return 0;
-    });
+  const paginatedProfiles = useMemo(
+    () => displayedProfiles.slice(0, visibleCount),
+    [displayedProfiles, visibleCount]
+  );
 
   return (
     <div className="min-h-screen bg-[#0e040c] text-rose-50 flex flex-col font-sans selection:bg-rose-500 selection:text-white relative">
@@ -1350,24 +1380,38 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4 md:gap-6">
-                    {displayedProfiles.map((profile) => (
-                      <SingleCard
-                        key={profile.id}
-                        profile={profile}
-                        currentUser={currentUser}
-                        isInCart={cartItems.some((item) => item.profileId === profile.id)}
-                        onAddToCart={handleAddToCart}
-                        onViewDetails={(p) => {
-                          setSelectedProfileModal(p);
-                        }}
-                        onViewPhotos={(p, initialIdx) => {
-                          setPhotoGalleryProfile(p);
-                          setPhotoGalleryInitialIdx(initialIdx || 0);
-                        }}
-                      />
-                    ))}
-                  </div>
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4 md:gap-6">
+                      {paginatedProfiles.map((profile) => (
+                        <SingleCard
+                          key={profile.id}
+                          profile={profile}
+                          currentUser={currentUser}
+                          isInCart={cartItems.some((item) => item.profileId === profile.id)}
+                          onAddToCart={handleAddToCart}
+                          onViewDetails={(p) => {
+                            setSelectedProfileModal(p);
+                          }}
+                          onViewPhotos={(p, initialIdx) => {
+                            setPhotoGalleryProfile(p);
+                            setPhotoGalleryInitialIdx(initialIdx || 0);
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    {displayedProfiles.length > visibleCount && (
+                      <div className="pt-4 flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setVisibleCount((prev) => prev + 24)}
+                          className="px-6 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 font-extrabold text-xs uppercase tracking-wider shadow-lg transition-all cursor-pointer"
+                        >
+                          Show More Singles ({displayedProfiles.length - visibleCount} remaining)
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1526,7 +1570,7 @@ export default function App() {
                   )}
                   <div>
                     <h2 className="text-2xl font-bold text-white font-serif flex items-center gap-2">
-                      <span>{currentUser.name}, {currentUser.age}</span>
+                      <span>{currentUser.name}, {calculateDynamicAge(currentUser)}</span>
                       {(currentUser.bouncerVerified || currentUser.emailVerified) && (
                         <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white shadow-sm" title="Verified">
                           <ShieldCheck className="w-3.5 h-3.5" />
@@ -1539,9 +1583,14 @@ export default function App() {
                       )}
                     </h2>
                     <p className="text-xs text-slate-400">📍 {currentUser.location} • {currentUser.email}</p>
-                    <span className="inline-block mt-1 bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full">
-                      {(currentUser.subscriptionPlan || 'free').replace('_', ' ')} Member
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <span className="inline-block bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full">
+                        {(currentUser.subscriptionPlan || 'free').replace('_', ' ')} Member
+                      </span>
+                      <span className="inline-block bg-slate-950 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                        📅 {formatRegistrationDate(currentUser.createdAt)}
+                      </span>
+                    </div>
                   </div>
                 </div>
 

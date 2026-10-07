@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck, Eye, Crown, Zap, HeartPulse, ChevronLeft, ChevronRight, Camera, ImageOff, MailCheck } from 'lucide-react';
 import { SingleProfile, User } from '../types';
-import { capitalizeName, formatDisplayName, maskPhoneNumber, formatHivStatus, getValidProfilePhotos } from '../utils/format';
+import { capitalizeName, formatDisplayName, maskPhoneNumber, formatHivStatus, getValidProfilePhotos, calculateDynamicAge, formatRegistrationDate } from '../utils/format';
 
 interface ProfileDetailModalProps {
   profile: SingleProfile | null;
@@ -243,14 +243,17 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
             <div>
               {/* Header: Name, Age, Location */}
               <div className="mb-4">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="text-xs text-slate-400 font-medium">
                     {profile.compatibilityScore}% Compatibility
+                  </span>
+                  <span className="text-[11px] font-bold text-amber-300/90 bg-slate-950/90 border border-slate-800 px-2.5 py-0.5 rounded-full">
+                    📅 {formatRegistrationDate(profile.createdAt)}
                   </span>
                 </div>
 
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-serif tracking-tight flex items-center gap-2 flex-wrap">
-                  <span>{formattedName}, <span className="text-amber-400 font-sans">{profile.age}</span></span>
+                  <span>{formattedName}, <span className="text-amber-400 font-sans">{calculateDynamicAge(profile)}</span></span>
                   {profile.bouncerStatus === 'vip_approved' && (
                     <span
                       className="inline-flex items-center justify-center w-7 h-7 bg-amber-500 text-slate-950 rounded-full shadow-md"

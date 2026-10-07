@@ -63,10 +63,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   }, [isOpen, initialMode]);
 
   // User form states
+  const currentYear = new Date().getFullYear();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [age, setAge] = useState(25);
+  const [birthYear, setBirthYear] = useState<number>(currentYear - 25);
+  const age = Math.max(18, currentYear - Number(birthYear));
   const [gender, setGender] = useState('female');
   const [childrenCount, setChildrenCount] = useState(0);
   const [province, setProvince] = useState<string>('Harare Metropolitan');
@@ -377,6 +379,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             id: generatedId,
             email: cleanEmail,
             name: formattedName,
+            birthYear: Number(birthYear),
             age: Number(age),
             gender,
             childrenCount: Number(childrenCount),
@@ -419,6 +422,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     uid: fbUid,
                     email: cleanEmail,
                     name: formattedName,
+                    birthYear: Number(birthYear),
                     age: Number(age),
                     gender,
                     childrenCount: Number(childrenCount),
@@ -739,18 +743,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Age
+                    <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                      <span>Year of Birth</span>
+                      <span className="text-[10px] font-extrabold text-amber-400">
+                        Displays: {age} yrs
+                      </span>
                     </label>
-                    <input
-                      type="number"
-                      min={18}
-                      max={99}
+                    <select
                       required
-                      value={age}
-                      onChange={(e) => setAge(Number(e.target.value))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                    />
+                      value={birthYear}
+                      onChange={(e) => setBirthYear(Number(e.target.value))}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-semibold focus:outline-none focus:border-amber-500"
+                    >
+                      {Array.from({ length: 82 }, (_, idx) => currentYear - 18 - idx).map((yr) => (
+                        <option key={yr} value={yr}>
+                          {yr} ({currentYear - yr} years old)
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

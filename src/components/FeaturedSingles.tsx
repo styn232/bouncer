@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { motion } from 'motion/react';
 import { Crown, Sparkles, ChevronLeft, ChevronRight, MapPin, Star, Eye, UserCheck, Check, Lock, ShieldCheck, Camera, ImageOff, MailCheck } from 'lucide-react';
 import { SingleProfile, User } from '../types';
-import { formatDisplayName, capitalizeName, getValidProfilePhotos } from '../utils/format';
+import { formatDisplayName, capitalizeName, getValidProfilePhotos, calculateDynamicAge, formatRegistrationDate } from '../utils/format';
 
 interface FeaturedSinglesProps {
   profiles: SingleProfile[];
@@ -127,6 +127,8 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
       >
         {displayList.map((profile) => {
           const formattedName = formatDisplayName(profile.name, 15);
+          const dynamicAge = calculateDynamicAge(profile);
+          const joinedLabel = formatRegistrationDate(profile.createdAt);
           const isInCart = cartProfileIds.includes(profile.id);
           const unlocked = isUserUnlocked(profile);
 
@@ -229,7 +231,7 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
                       onClick={() => onViewDetails(profile)}
                       className="text-sm font-extrabold text-white hover:text-amber-400 cursor-pointer truncate font-serif flex items-center gap-1"
                     >
-                      <span className="truncate">{formattedName}, <span className="text-amber-400 font-sans">{profile.age}</span></span>
+                      <span className="truncate">{formattedName}, <span className="text-amber-400 font-sans">{dynamicAge}</span></span>
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" title="Verified" />
                       {profile.emailVerified && (
                         <MailCheck className="w-3.5 h-3.5 text-sky-400 shrink-0" title="Email Verified" />
@@ -237,9 +239,12 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
                     </h4>
                   </div>
 
-                  <div className="flex items-center gap-1 text-[11px] text-slate-400 mb-2 truncate">
-                    <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
-                    <span className="truncate">{profile.city || profile.location}</span>
+                  <div className="flex items-center justify-between gap-1 text-[11px] text-slate-400 mb-2 truncate">
+                    <div className="flex items-center gap-1 truncate">
+                      <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
+                      <span className="truncate">{profile.city || profile.location}</span>
+                    </div>
+                    <span className="text-[9px] text-slate-500 font-semibold shrink-0">{joinedLabel}</span>
                   </div>
                 </div>
 

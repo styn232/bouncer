@@ -1,6 +1,7 @@
 import React from 'react';
 import { Heart, Sparkles, Lock, ShieldCheck } from 'lucide-react';
 import { SingleProfile, User } from '../types';
+import { calculateDynamicAge, formatRegistrationDate } from '../utils/format';
 
 interface WhoLikedMeProps {
   likers?: SingleProfile[];
@@ -74,7 +75,7 @@ export const WhoLikedMe: React.FC<WhoLikedMeProps> = ({
                 <div className="w-10 h-10 rounded-full bg-slate-950/80 border border-amber-400/60 flex items-center justify-center">
                   <Lock className="w-5 h-5 text-amber-400" />
                 </div>
-                <div className="text-xs font-bold">{liker.age} yrs • {liker.location.split(',')[0]}</div>
+                <div className="text-xs font-bold">{calculateDynamicAge(liker)} yrs • {liker.location.split(',')[0]}</div>
                 <span className="text-[10px] text-amber-300 font-extrabold bg-slate-950/90 px-2.5 py-1 rounded-full border border-amber-400/40">
                   Tap to Unlock
                 </span>
@@ -84,10 +85,10 @@ export const WhoLikedMe: React.FC<WhoLikedMeProps> = ({
             {isVip && (
               <div className="absolute bottom-3 left-3 right-3 text-white">
                 <div className="text-sm font-bold font-serif flex items-center gap-1">
-                  <span>{liker.name}, {liker.age}</span>
+                  <span>{liker.name}, {calculateDynamicAge(liker)}</span>
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
-                <div className="text-[10px] text-slate-300">📍 {liker.location}</div>
+                <div className="text-[10px] text-slate-300">📍 {liker.location} • {formatRegistrationDate(liker.createdAt)}</div>
               </div>
             )}
           </div>

@@ -4,7 +4,7 @@ import { User as UserIcon, ShieldCheck, Camera, Sparkles, X, Check, Heart, MapPi
 import { User, DatingIntent, AffiliateWithdrawalRequest } from '../types';
 import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getCitiesByProvince, getSubLocationsForCity, getProvinceForCity } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
-import { capitalizeName, hasValidProfilePhoto } from '../utils/format';
+import { capitalizeName, hasValidProfilePhoto, resolveBirthYear, formatRegistrationDate } from '../utils/format';
 
 interface UserProfileEditorModalProps {
   isOpen: boolean;
@@ -21,9 +21,11 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   onSaveProfile,
   onApplyBouncerBadge
 }) => {
+  const currentYear = new Date().getFullYear();
   const [name, setName] = useState(currentUser?.name || '');
   const [email, setEmail] = useState(currentUser?.email || '');
-  const [age, setAge] = useState(currentUser?.age || 25);
+  const [birthYear, setBirthYear] = useState<number>(resolveBirthYear(currentUser));
+  const age = Math.max(18, currentYear - Number(birthYear));
   const initialCity = currentUser?.city || 'Harare';
   const initialProv = currentUser?.province || getProvinceForCity(initialCity) || 'Harare Metropolitan';
 
@@ -106,7 +108,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
     if (currentUser) {
       setName(currentUser.name || '');
       setEmail(currentUser.email || '');
-      setAge(currentUser.age || 25);
+      setBirthYear(resolveBirthYear(currentUser));
       const curCity = currentUser.city || 'Harare';
       const curProv = currentUser.province || getProvinceForCity(curCity) || 'Harare Metropolitan';
       setProvince(curProv);
@@ -276,6 +278,7 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
     onSaveProfile({
       name: formattedName,
       email,
+      birthYear: Number(birthYear),
       age: Number(age),
       province,
       city,
@@ -987,20 +990,26 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 </span>
               </div>
 
-              {/* Age */}
+              {/* Year of Birth (Dynamic Age) */}
               <div>
-                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Age
+                <label className="block font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Year of Birth</span>
+                  <span className="text-[10px] font-extrabold text-amber-400">
+                    Age: {age} yrs • {formatRegistrationDate(currentUser?.createdAt)}
+                  </span>
                 </label>
-                <input
-                  type="number"
+                <select
                   required
-                  min={18}
-                  max={99}
-                  value={age}
-                  onChange={e => setAge(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
-                />
+                  value={birthYear}
+                  onChange={e => setBirthYear(Number(e.target.value))}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white font-semibold focus:outline-none focus:border-amber-500"
+                >
+                  {Array.from({ length: 82 }, (_, idx) => currentYear - 18 - idx).map((yr) => (
+                    <option key={yr} value={yr}>
+                      {yr} ({currentYear - yr} years old)
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Choose Gender */}

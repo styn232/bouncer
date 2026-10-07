@@ -14,6 +14,7 @@ export interface SingleProfile {
   id: string;
   name: string;
   age: number;
+  birthYear?: number;
   location: string; // full display location string e.g. "Harare (Borrowdale), Zimbabwe"
   province?: string; // e.g. "Harare Metropolitan", "Midlands", etc.
   city?: string; // e.g. "Harare"
@@ -151,6 +152,7 @@ export interface User {
   email: string;
   name: string;
   age: number;
+  birthYear?: number;
   location: string;
   province?: string;
   city?: string;

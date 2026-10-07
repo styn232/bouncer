@@ -18,7 +18,7 @@ import {
   MailCheck
 } from 'lucide-react';
 import { SingleProfile, User } from '../types';
-import { formatDisplayName, capitalizeName, formatHivStatus, getValidProfilePhotos } from '../utils/format';
+import { formatDisplayName, capitalizeName, formatHivStatus, getValidProfilePhotos, calculateDynamicAge, formatRegistrationDate } from '../utils/format';
 
 interface SingleCardProps {
   profile: SingleProfile;
@@ -42,6 +42,8 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
 
   const isOwner = currentUser && (currentUser.id === profile.id || currentUser.email === (profile as any).email);
   const formattedDisplayName = formatDisplayName(profile.name, 15);
+  const dynamicAge = calculateDynamicAge(profile);
+  const joinedLabel = formatRegistrationDate(profile.createdAt);
   const photos = getValidProfilePhotos(profile.photos);
   const totalPhotos = photos.length;
   const hasPhoto = totalPhotos > 0;
@@ -253,7 +255,7 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
             <h3 className="text-xs sm:text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-1 font-serif truncate min-w-0">
               <span className="truncate">{formattedDisplayName}</span>
               <span className="text-rose-600 font-sans text-xs sm:text-sm font-black shrink-0">
-                , {profile.age}
+                , {dynamicAge}
               </span>
               {profile.bouncerStatus === 'vip_approved' && (
                 <span className="inline-flex items-center gap-0.5 bg-amber-400 text-slate-950 font-black text-[7px] sm:text-[9px] px-1 py-0.5 rounded-full shrink-0 shadow-xs" title="VIP Single">
@@ -273,10 +275,15 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
             </h3>
           </div>
 
-          {/* Location */}
-          <div className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-600 font-medium truncate mb-1.5">
-            <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-rose-500 shrink-0" />
-            <span className="truncate">{profile.city || profile.location}</span>
+          {/* Location & Joined Registration Date */}
+          <div className="flex items-center justify-between gap-1 text-[10px] sm:text-xs text-slate-600 font-medium truncate mb-1.5">
+            <div className="flex items-center gap-1 truncate min-w-0">
+              <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-rose-500 shrink-0" />
+              <span className="truncate">{profile.city || profile.location}</span>
+            </div>
+            <span className="text-[8px] sm:text-[10px] text-slate-400 font-semibold shrink-0">
+              {joinedLabel}
+            </span>
           </div>
 
           {/* Badges: Intent, Children, HIV status */}
