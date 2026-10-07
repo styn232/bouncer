@@ -105,6 +105,18 @@ export interface AffiliateWithdrawalRequest {
   adminNotes?: string;
 }
 
+export interface PaymentGatewayConfig {
+  paypalIntegrationId: string;
+  paypalIntegrationKey: string;
+  paypalMode: 'live' | 'sandbox';
+  paypalReceiverEmail?: string;
+  paynowIntegrationId: string;
+  paynowIntegrationKey: string;
+  paynowMerchantEmail: string;
+  paynowTestMode?: boolean;
+  updatedAt?: string;
+}
+
 export interface SiteSettings {
   siteName: string;
   logoUrl: string;
@@ -128,6 +140,7 @@ export interface SiteSettings {
   isCustomOgImage?: boolean;
   ogVersion?: number;
   openGraph?: OpenGraphSettings;
+  paymentGateways?: PaymentGatewayConfig;
 }
 
 export interface User {
@@ -228,6 +241,8 @@ export interface PaymentTransaction {
   reference?: string;
   pollUrl?: string;
   paynowReference?: string;
+  paypalOrderId?: string;
+  gateway?: 'paynow' | 'paypal';
   profileIds?: string[];
 }
 

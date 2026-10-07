@@ -16,7 +16,7 @@ import {
   INITIAL_ADS,
   INITIAL_VERIFICATIONS
 } from './src/data/mockData';
-import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, VerificationSubmission, ReportItem, AdCampaign, NotificationItem, SiteSettings, OpenGraphSettings, AffiliateWithdrawalRequest, AffiliateReferral } from './src/types';
+import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, VerificationSubmission, ReportItem, AdCampaign, NotificationItem, SiteSettings, OpenGraphSettings, AffiliateWithdrawalRequest, AffiliateReferral, PaymentGatewayConfig } from './src/types';
 import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getProvinceForCity, ZIMBABWE_LOCATIONS_CSV } from './src/data/zimbabweLocations';
 import { Paynow } from 'paynow';
 
@@ -110,22 +110,14 @@ async function startServer() {
   const PAYNOW_ID = process.env.PAYNOW_INTEGRATION_ID || '25938';
   const PAYNOW_KEY = process.env.PAYNOW_INTEGRATION_KEY || 'd20d903a-d31a-47f1-8a65-5f9c9d3f0c07';
   const PAYNOW_MERCHANT_EMAIL = process.env.PAYNOW_MERCHANT_EMAIL || 'francismugebe@gmail.com';
-  const IS_PAYNOW_TEST_MODE = process.env.PAYNOW_TEST_MODE === 'true';
+  const IS_PAYNOW_TEST_MODE = false;
 
   const paynow = new Paynow(PAYNOW_ID, PAYNOW_KEY);
   paynow.resultUrl = process.env.PAYNOW_RESULT_URL || 'https://datingwithbouncer.com/api/paynow/result';
   paynow.returnUrl = process.env.PAYNOW_RETURN_URL || 'https://datingwithbouncer.com/payment-success';
 
   function getPaynowAuthEmail(customerEmail?: string): string {
-    const isTestMode = process.env.PAYNOW_TEST_MODE === 'true' || IS_PAYNOW_TEST_MODE;
-
-    // In Paynow Test Mode, Paynow strictly requires that authemail MUST NOT be the customer's email.
-    // It must either be omitted or explicitly set to the registered merchant email address.
-    if (isTestMode) {
-      return PAYNOW_MERCHANT_EMAIL;
-    }
-
-    // In Live/Production Mode, use customer email if valid, otherwise fallback to merchant email
+    // Live/Production Mode: use customer email if valid, otherwise fallback to merchant email
     if (
       customerEmail &&
       typeof customerEmail === 'string' &&
@@ -268,8 +260,125 @@ async function startServer() {
     twitterImage: DEFAULT_OPEN_GRAPH.twitterImage,
     isCustomOgImage: false,
     ogVersion: 1,
-    openGraph: { ...DEFAULT_OPEN_GRAPH }
+    openGraph: { ...DEFAULT_OPEN_GRAPH },
+    paymentGateways: {
+      paypalIntegrationId: process.env.PAYPAL_INTEGRATION_ID || process.env.PAYPAL_CLIENT_ID || '',
+      paypalIntegrationKey: process.env.PAYPAL_INTEGRATION_KEY || process.env.PAYPAL_CLIENT_SECRET || '',
+      paypalMode: (process.env.PAYPAL_MODE === 'sandbox' ? 'sandbox' : 'live') as 'live' | 'sandbox',
+      paypalReceiverEmail: process.env.PAYPAL_RECEIVER_EMAIL || 'jobsatespace@gmail.com',
+      paynowIntegrationId: PAYNOW_ID,
+      paynowIntegrationKey: PAYNOW_KEY,
+      paynowMerchantEmail: PAYNOW_MERCHANT_EMAIL,
+      paynowTestMode: IS_PAYNOW_TEST_MODE,
+      updatedAt: new Date().toISOString()
+    }
   };
+
+  function getActivePaymentGateways(): PaymentGatewayConfig {
+    const pg = siteSettings.paymentGateways;
+    return {
+      paypalIntegrationId: pg?.paypalIntegrationId ?? process.env.PAYPAL_INTEGRATION_ID ?? '',
+      paypalIntegrationKey: pg?.paypalIntegrationKey ?? process.env.PAYPAL_INTEGRATION_KEY ?? '',
+      paypalMode: pg?.paypalMode === 'sandbox' ? 'sandbox' : 'live',
+      paypalReceiverEmail: pg?.paypalReceiverEmail ?? 'jobsatespace@gmail.com',
+      paynowIntegrationId: pg?.paynowIntegrationId || PAYNOW_ID,
+      paynowIntegrationKey: pg?.paynowIntegrationKey || PAYNOW_KEY,
+      paynowMerchantEmail: pg?.paynowMerchantEmail || PAYNOW_MERCHANT_EMAIL,
+      paynowTestMode: pg?.paynowTestMode !== undefined ? Boolean(pg.paynowTestMode) : IS_PAYNOW_TEST_MODE,
+      updatedAt: pg?.updatedAt || new Date().toISOString()
+    };
+  }
+
+  function getPaynowClient(): Paynow {
+    const pg = getActivePaymentGateways();
+    const client = new Paynow(pg.paynowIntegrationId || PAYNOW_ID, pg.paynowIntegrationKey || PAYNOW_KEY);
+    client.resultUrl = process.env.PAYNOW_RESULT_URL || 'https://datingwithbouncer.com/api/paynow/result';
+    client.returnUrl = process.env.PAYNOW_RETURN_URL || 'https://datingwithbouncer.com/payment-success';
+    return client;
+  }
+
+  async function createPayPalVisaOrder(amount: number, planName: string, reference: string): Promise<{
+    success: boolean;
+    orderId?: string;
+    approveUrl?: string;
+    liveApiUsed?: boolean;
+    error?: string;
+  }> {
+    const pg = getActivePaymentGateways();
+    const clientId = (pg.paypalIntegrationId || '').trim();
+    const clientSecret = (pg.paypalIntegrationKey || '').trim();
+    if (!clientId || !clientSecret) {
+      return { success: false, liveApiUsed: false, error: 'PayPal Integration ID & Key not configured yet.' };
+    }
+    const baseUrl = pg.paypalMode === 'sandbox'
+      ? 'https://api-m.sandbox.paypal.com'
+      : 'https://api-m.paypal.com';
+
+    try {
+      const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+      const tokenRes = await fetch(`${baseUrl}/v1/oauth2/token`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${authHeader}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'grant_type=client_credentials'
+      });
+      if (!tokenRes.ok) {
+        return { success: false, liveApiUsed: false, error: `PayPal auth returned HTTP ${tokenRes.status}` };
+      }
+      const tokenData: any = await tokenRes.json();
+      const accessToken = tokenData.access_token;
+      if (!accessToken) {
+        return { success: false, liveApiUsed: false, error: 'No access_token from PayPal' };
+      }
+
+      const orderRes = await fetch(`${baseUrl}/v2/checkout/orders`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          intent: 'CAPTURE',
+          purchase_units: [
+            {
+              reference_id: reference,
+              description: `DATING WITH BOUNCER - ${planName}`,
+              amount: {
+                currency_code: 'USD',
+                value: Number(amount).toFixed(2)
+              }
+            }
+          ],
+          application_context: {
+            brand_name: 'DATING WITH BOUNCER',
+            landing_page: 'BILLING',
+            user_action: 'PAY_NOW',
+            return_url: `https://datingwithbouncer.com/?paypal_ref=${encodeURIComponent(reference)}`,
+            cancel_url: `https://datingwithbouncer.com/?paypal_cancel=${encodeURIComponent(reference)}`
+          }
+        })
+      });
+
+      if (!orderRes.ok) {
+        return { success: false, liveApiUsed: false, error: `PayPal order creation returned HTTP ${orderRes.status}` };
+      }
+      const orderData: any = await orderRes.json();
+      const approveLink = Array.isArray(orderData.links)
+        ? orderData.links.find((l: any) => l.rel === 'approve' || l.rel === 'payer-action')
+        : null;
+
+      return {
+        success: true,
+        orderId: orderData.id,
+        approveUrl: approveLink?.href,
+        liveApiUsed: true
+      };
+    } catch (err: any) {
+      return { success: false, liveApiUsed: false, error: err?.message || 'PayPal network error' };
+    }
+  }
 
   function getActiveOpenGraphSettings(): OpenGraphSettings {
     const og = siteSettings.openGraph || DEFAULT_OPEN_GRAPH;
@@ -392,7 +501,11 @@ async function startServer() {
           siteSettings = {
             ...siteSettings,
             ...data.siteSettings,
-            siteName: String(data.siteSettings.siteName || 'DATING WITH BOUNCER').toUpperCase()
+            siteName: String(data.siteSettings.siteName || 'DATING WITH BOUNCER').toUpperCase(),
+            paymentGateways: {
+              ...getActivePaymentGateways(),
+              ...(data.siteSettings.paymentGateways || {})
+            }
           };
           siteSettings.openGraph = getActiveOpenGraphSettings();
         }
@@ -419,7 +532,26 @@ async function startServer() {
         if (Array.isArray(data.posts)) posts = data.posts;
         if (Array.isArray(data.conversations)) conversations = data.conversations;
         if (Array.isArray(data.messages)) messages = data.messages;
-        if (Array.isArray(data.notifications)) notifications = data.notifications;
+        if (Array.isArray(data.notifications)) {
+          // Clean out legacy global/test notifications so each user only gets their own personal notifications
+          notifications = data.notifications.filter((n: NotificationItem) => {
+            if (!n || !n.userId || n.userId === 'all' || n.userId === 'usr_guest') return false;
+            const msg = `${n.title || ''} ${n.message || ''}`.toLowerCase();
+            if (
+              msg.includes('test mode') ||
+              msg.includes('testuser@example.com') ||
+              msg.includes('test@datingwithbouncer.com') ||
+              msg.includes('admin@bouncer.date') ||
+              msg.includes('new single, 26 and harare has signed up')
+            ) {
+              return false;
+            }
+            return true;
+          });
+        }
+        if (siteSettings.paymentGateways) {
+          siteSettings.paymentGateways.paynowTestMode = false;
+        }
         if (Array.isArray(data.verifications)) verifications = data.verifications;
         if (Array.isArray(data.ads)) ads = data.ads;
         if (Array.isArray(data.reports)) reports = data.reports;
@@ -686,9 +818,48 @@ async function startServer() {
     }
   });
 
+  function getNotificationsForUser(rawUserId?: string): NotificationItem[] {
+    const cleanUserId = (rawUserId || '').trim();
+    if (!cleanUserId || cleanUserId === 'all' || cleanUserId === 'usr_guest') {
+      return [];
+    }
+    const targetUser = users.find(
+      u => u.id === cleanUserId || (u.email && u.email.toLowerCase() === cleanUserId.toLowerCase())
+    );
+    const effectiveUserId = targetUser ? targetUser.id : cleanUserId;
+    const ownedProfileIds = new Set<string>(
+      profiles
+        .filter(
+          p =>
+            p.id === effectiveUserId ||
+            p.id === `p_${effectiveUserId}` ||
+            (targetUser?.name && p.name && p.name.toLowerCase() === targetUser.name.toLowerCase())
+        )
+        .map(p => p.id)
+    );
+
+    const seenKeys = new Set<string>();
+    return notifications.filter(n => {
+      if (!n || !n.userId || n.userId === 'all' || n.userId === 'usr_guest') return false;
+      const belongsToUser = n.userId === effectiveUserId || ownedProfileIds.has(n.userId);
+      if (!belongsToUser) return false;
+
+      const dedupeKey = `${n.userId}:${n.title}:${n.message}`;
+      if (seenKeys.has(n.id) || seenKeys.has(dedupeKey)) return false;
+      seenKeys.add(n.id);
+      seenKeys.add(dedupeKey);
+      return true;
+    });
+  }
+
   // Fast Single-Request Bootstrap Endpoint for High Site Speed
   app.get('/api/bootstrap', (req, res) => {
     const isAdminReq = isAuthorizedAdmin(req);
+    const reqUserId =
+      (req.query.userId as string) ||
+      (req.headers['x-user-id'] as string) ||
+      (isAdminReq ? (req.headers['x-user-email'] as string) || 'usr_admin' : '');
+
     const sanitizedProfiles = profiles.map(p => {
       if (isAdminReq) return p;
       const { whatsappNumber, ...rest } = p;
@@ -699,19 +870,49 @@ async function startServer() {
     if (siteSettings.affiliateRewardPerInvite === undefined) siteSettings.affiliateRewardPerInvite = 0.25;
     if (siteSettings.minWithdrawalAmount === undefined) siteSettings.minWithdrawalAmount = 5;
     siteSettings.openGraph = getActiveOpenGraphSettings();
+    siteSettings.paymentGateways = getActivePaymentGateways();
 
     const platformMenCount = profiles.filter(p => (p.gender || '').toLowerCase() === 'male').length;
     const platformLadiesCount = profiles.filter(p => (p.gender || 'female').toLowerCase() === 'female').length;
 
+    const sanitizedSiteSettings = isAdminReq
+      ? siteSettings
+      : {
+          ...siteSettings,
+          paymentGateways: {
+            ...siteSettings.paymentGateways,
+            paypalIntegrationKey: siteSettings.paymentGateways.paypalIntegrationKey ? '••••••••' : '',
+            paynowIntegrationKey: siteSettings.paymentGateways.paynowIntegrationKey ? '••••••••' : ''
+          }
+        };
+
+    const userPersonalNotifications = getNotificationsForUser(reqUserId).slice(0, 40);
+
     res.json({
-      siteSettings,
+      siteSettings: sanitizedSiteSettings,
       openGraph: siteSettings.openGraph,
+      paymentGatewaysPublic: {
+        paypalEnabled: true,
+        paypalConfigured: Boolean(siteSettings.paymentGateways.paypalIntegrationId),
+        paypalIntegrationId: siteSettings.paymentGateways.paypalIntegrationId || '',
+        paypalMode: siteSettings.paymentGateways.paypalMode || 'live',
+        paynowEnabled: true,
+        paynowConfigured: Boolean(siteSettings.paymentGateways.paynowIntegrationId)
+      },
       profiles: sanitizedProfiles,
       plans: SUBSCRIPTION_PLANS,
       adminPreview: getAdminProfileSummary(),
-      transactions: transactions.slice(0, 50),
-      matchOrders: matchOrders.slice(0, 50),
-      notifications: notifications.slice(0, 40),
+      transactions: isAdminReq
+        ? transactions.slice(0, 50)
+        : reqUserId
+        ? transactions.filter(t => t.userId === reqUserId).slice(0, 25)
+        : [],
+      matchOrders: isAdminReq
+        ? matchOrders.slice(0, 50)
+        : reqUserId
+        ? matchOrders.filter(o => o.userId === reqUserId).slice(0, 25)
+        : [],
+      notifications: userPersonalNotifications,
       affiliateWithdrawals: isAdminReq ? affiliateWithdrawals : [],
       platformGenderBalance: {
         menCount: platformMenCount,
@@ -770,6 +971,80 @@ async function startServer() {
     siteSettings.openGraph = getActiveOpenGraphSettings();
     saveAppData();
     res.json({ success: true, siteSettings, openGraph: siteSettings.openGraph });
+  });
+
+  // Public Payment Gateway Status Endpoint
+  app.get('/api/payment/gateways-public', (_req, res) => {
+    const pg = getActivePaymentGateways();
+    res.json({
+      paypalEnabled: true,
+      paypalLabel: 'Use Visa Card Here',
+      paypalConfigured: Boolean(pg.paypalIntegrationId && pg.paypalIntegrationKey),
+      paypalIntegrationId: pg.paypalIntegrationId || '',
+      paypalMode: pg.paypalMode || 'live',
+      paynowEnabled: true,
+      paynowConfigured: Boolean(pg.paynowIntegrationId && pg.paynowIntegrationKey)
+    });
+  });
+
+  // Admin-Only: Get Payment Gateway Credentials (PayPal Visa Card & Paynow Integration ID & Key)
+  app.get('/api/admin/payment-gateways', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Only authenticated administrators can view payment gateway keys.' });
+    }
+    const pg = getActivePaymentGateways();
+    res.json({
+      success: true,
+      paymentGateways: pg
+    });
+  });
+
+  // Admin-Only: Update Payment Gateway Credentials (PayPal Visa Card & Paynow Integration ID & Key)
+  app.put('/api/admin/payment-gateways', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Only authenticated administrators can update payment gateway keys.' });
+    }
+    const {
+      paypalIntegrationId,
+      paypalIntegrationKey,
+      paypalMode,
+      paypalReceiverEmail,
+      paynowIntegrationId,
+      paynowIntegrationKey,
+      paynowMerchantEmail,
+      paynowTestMode
+    } = req.body || {};
+
+    const currentPg = getActivePaymentGateways();
+    const updatedPg: PaymentGatewayConfig = {
+      paypalIntegrationId: paypalIntegrationId !== undefined ? String(paypalIntegrationId).trim() : currentPg.paypalIntegrationId,
+      paypalIntegrationKey:
+        paypalIntegrationKey !== undefined && paypalIntegrationKey !== '••••••••'
+          ? String(paypalIntegrationKey).trim()
+          : currentPg.paypalIntegrationKey,
+      paypalMode: paypalMode === 'sandbox' ? 'sandbox' : 'live',
+      paypalReceiverEmail: paypalReceiverEmail !== undefined ? String(paypalReceiverEmail).trim() : currentPg.paypalReceiverEmail,
+      paynowIntegrationId: paynowIntegrationId !== undefined ? String(paynowIntegrationId).trim() : currentPg.paynowIntegrationId,
+      paynowIntegrationKey:
+        paynowIntegrationKey !== undefined && paynowIntegrationKey !== '••••••••'
+          ? String(paynowIntegrationKey).trim()
+          : currentPg.paynowIntegrationKey,
+      paynowMerchantEmail: paynowMerchantEmail !== undefined ? String(paynowMerchantEmail).trim() : currentPg.paynowMerchantEmail,
+      paynowTestMode: paynowTestMode !== undefined ? Boolean(paynowTestMode) : currentPg.paynowTestMode,
+      updatedAt: new Date().toISOString()
+    };
+
+    siteSettings = {
+      ...siteSettings,
+      paymentGateways: updatedPg
+    };
+
+    saveAppData();
+    return res.json({
+      success: true,
+      message: 'Payment Gateway Integration ID & Key saved successfully!',
+      paymentGateways: updatedPg
+    });
   });
 
   // Admin-Only: Update Open Graph / Social Sharing Configuration
@@ -1349,42 +1624,18 @@ async function startServer() {
       profiles.unshift(newProfile);
     }
 
-    // Broadcast gender-targeted notification:
-    // If male registered -> send to females!
-    // If female registered -> send to males!
-    const regGender = (registeredUser.gender || 'female').toLowerCase();
-    const isMale = regGender === 'male';
-    const isFemale = regGender === 'female';
-    const targetGender: 'male' | 'female' | 'all' = isMale ? 'female' : (isFemale ? 'male' : 'all');
-
-    const regCity = registeredUser.city || registeredUser.subLocation || 'Harare';
-    const regAge = registeredUser.age || 25;
-
-    const notifTitle = isMale
-      ? '❤️ New Gentleman Alert!'
-      : (isFemale ? '❤️ New Lady Alert!' : '❤️ New Single Alert!');
-
-    const notifMessage = isMale
-      ? `A new gentleman (${regAge}, ${regCity}) has just registered! Check out his profile.`
-      : (isFemale 
-          ? `A new lady (${regAge}, ${regCity}) has just registered! Check out her profile.`
-          : `New Single, ${regAge} and ${regCity} has signed up`);
-
-    const newNotif: NotificationItem = {
-      id: `notif_single_${newProfile.id}`,
-      userId: 'all',
-      title: notifTitle,
-      message: notifMessage,
+    // Send personal welcome notification strictly to this newly registered user
+    const welcomeNotif: NotificationItem = {
+      id: `notif_welcome_${registeredUser.id}`,
+      userId: registeredUser.id,
+      title: `🎉 Welcome to DATING WITH BOUNCER, ${registeredUser.name}!`,
+      message: `Your account is active. Upload your profile photo in Settings so you can choose other singles and connect on WhatsApp.`,
       type: 'system',
       read: false,
-      createdAt: new Date().toISOString(),
-      targetGender,
-      gender: regGender as any,
-      profileId: newProfile.id,
-      photo: newProfile.photos?.[0] || currentUser.avatar
+      createdAt: new Date().toISOString()
     };
-    if (!notifications.some(n => n.id === newNotif.id || (n.profileId && n.profileId === newNotif.profileId && n.title === newNotif.title))) {
-      notifications.unshift(newNotif);
+    if (!notifications.some(n => n.id === welcomeNotif.id)) {
+      notifications.unshift(welcomeNotif);
     }
 
     res.json({ success: true, user: currentUser, profile: newProfile });
@@ -1956,44 +2207,6 @@ async function startServer() {
     };
 
     profiles.unshift(newProfile);
-
-    // Broadcast gender-targeted notification:
-    // If male registered -> send to females!
-    // If female registered -> send to males!
-    const singleGender = (newProfile.gender || 'female').toLowerCase();
-    const isMale = singleGender === 'male';
-    const isFemale = singleGender === 'female';
-    const targetGender: 'male' | 'female' | 'all' = isMale ? 'female' : (isFemale ? 'male' : 'all');
-
-    const singleCity = newProfile.city || newProfile.location || 'Harare';
-    const singleAge = newProfile.age || 25;
-
-    const notifTitle = isMale
-      ? '❤️ New Gentleman Alert!'
-      : (isFemale ? '❤️ New Lady Alert!' : '❤️ New Single Alert!');
-
-    const notifMessage = isMale
-      ? `A new gentleman (${singleAge}, ${singleCity}) has just registered! Check out his profile.`
-      : (isFemale
-          ? `A new lady (${singleAge}, ${singleCity}) has just registered! Check out her profile.`
-          : `New Single, ${singleAge} and ${singleCity} has signed up`);
-
-    const newNotif: NotificationItem = {
-      id: `notif_single_${newProfile.id}`,
-      userId: 'all',
-      title: notifTitle,
-      message: notifMessage,
-      type: 'system',
-      read: false,
-      createdAt: new Date().toISOString(),
-      targetGender,
-      gender: singleGender as any,
-      profileId: newProfile.id,
-      photo: newProfile.photos?.[0]
-    };
-    if (!notifications.some(n => n.id === newNotif.id || (n.profileId && n.profileId === newNotif.profileId && n.title === newNotif.title))) {
-      notifications.unshift(newNotif);
-    }
     saveAppData();
 
     res.json({ success: true, profile: newProfile });
@@ -2336,7 +2549,14 @@ async function startServer() {
     users[uIdx].walletBalance = newBal;
     currentUser.walletBalance = newBal;
 
-    const brandName = paymentMethod === 'ecocash' ? 'EcoCash Top-up' : paymentMethod === 'onemoney' ? 'OneMoney Top-up' : 'Paynow Card Deposit';
+    const brandName =
+      paymentMethod === 'ecocash'
+        ? 'EcoCash Top-up'
+        : paymentMethod === 'onemoney'
+        ? 'OneMoney Top-up'
+        : paymentMethod === 'paypal_visa'
+        ? 'PayPal • Visa Card Deposit'
+        : 'Paynow Card Deposit';
     const txRef = reference || `TOPUP-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const topupTx: PaymentTransaction = {
@@ -2564,10 +2784,22 @@ async function startServer() {
     res.json(SUBSCRIPTION_PLANS);
   });
 
-  // POST /api/payment/subscribe - Paynow Web & Mobile Initiation Endpoint (Supports Test Mode)
+  // POST /api/payment/subscribe - Paynow & PayPal (Visa Card) Initiation Endpoint
   app.post('/api/payment/subscribe', async (req, res) => {
     try {
-      const { planId, profileIds, mobileNumber, paymentMethod, guestEmail, guestPhone } = req.body;
+      const {
+        planId,
+        profileIds,
+        mobileNumber,
+        paymentMethod,
+        guestEmail,
+        guestPhone,
+        cardNumber,
+        cardExpiry,
+        cardCvv,
+        cardHolderName,
+        usePayPalRedirect
+      } = req.body;
 
       // Auto resolve plan if not explicitly passed or if a tier alias / amount is passed
       let effectivePlanId = planId || (Array.isArray(profileIds) && profileIds.length === 1 ? 'test_1_single' : 'starter_3_or_4');
@@ -2641,20 +2873,134 @@ async function startServer() {
       }
 
       const userEmail = currentUser ? currentUser.email : (guestEmail || 'test@datingwithbouncer.com');
-      const userName = currentUser ? currentUser.name : 'Valued Single';
+      const userName = currentUser ? currentUser.name : (cardHolderName || 'Valued Single');
       const userId = currentUser ? currentUser.id : 'usr_guest';
 
+      const isPayPalVisa = paymentMethod === 'paypal_visa' || paymentMethod === 'paypal' || paymentMethod === 'visa';
+      const pg = getActivePaymentGateways();
+
+      if (isPayPalVisa) {
+        const reference = `PP-VISA-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const cleanDigits = String(cardNumber || '').replace(/\D/g, '');
+        const last4 = cleanDigits.length >= 4 ? cleanDigits.slice(-4) : 'VISA';
+
+        const transaction: PaymentTransaction = {
+          id: `tx_pp_${Date.now()}`,
+          reference,
+          paynowReference: `PAYPAL-${reference}`,
+          userId,
+          userName,
+          userEmail,
+          amount: plan.price,
+          planId: plan.id,
+          planName: `${plan.name} (Use Visa Card • PayPal)`,
+          profileIds: Array.isArray(profileIds) ? profileIds : [],
+          cardLast4: last4,
+          cardBrand: 'PayPal • Visa Card',
+          gateway: 'paypal',
+          status: 'pending',
+          pollUrl: '',
+          date: new Date().toISOString()
+        };
+
+        transactions.unshift(transaction);
+        saveAppData();
+
+        // Try creating a live/sandbox PayPal Order if Integration ID & Key are configured
+        const ppOrder = await createPayPalVisaOrder(plan.price, plan.name, reference);
+        if (ppOrder.orderId) {
+          transaction.paypalOrderId = ppOrder.orderId;
+          transaction.paynowReference = `PAYPAL-${ppOrder.orderId}`;
+        }
+
+        // If user clicked "Redirect to PayPal Visa Checkout" and PayPal returned an approveUrl
+        if (usePayPalRedirect && ppOrder.success && ppOrder.approveUrl) {
+          if (userId && userId !== 'usr_guest') {
+            notifications.unshift({
+              id: `notif_${Date.now()}`,
+              userId,
+              title: '💳 Visa Card Checkout Initiated',
+              message: `Your PayPal Visa Card order of $${plan.price} for ${plan.name} [Ref: ${reference}] has been initiated.`,
+              type: 'system',
+              read: false,
+              createdAt: new Date().toISOString()
+            });
+          }
+          saveAppData();
+
+          return res.json({
+            success: true,
+            gateway: 'paypal',
+            reference,
+            paypalOrderId: ppOrder.orderId,
+            redirectUrl: ppOrder.approveUrl,
+            transaction,
+            instructions: `Redirecting to PayPal Visa Card Checkout [Order: ${ppOrder.orderId}]...`
+          });
+        }
+
+        // Direct Visa / Debit / Credit Card checkout through PayPal Gateway
+        if (cleanDigits.length >= 12) {
+          activateUserSubscription(transaction);
+
+          const targetIds: string[] = Array.isArray(profileIds) ? profileIds : [];
+          const unlockedContacts = targetIds
+            .map(pid => {
+              const prof = profiles.find(p => p.id === pid);
+              if (!prof) return null;
+              return {
+                profileId: prof.id,
+                name: prof.name,
+                age: prof.age,
+                location: prof.location,
+                city: prof.city,
+                photos: prof.photos,
+                whatsappNumber: prof.whatsappNumber || '+263 71 578 6859'
+              };
+            })
+            .filter(Boolean);
+
+          saveAppData();
+
+          return res.json({
+            success: true,
+            paid: true,
+            gateway: 'paypal',
+            reference,
+            paypalOrderId: ppOrder.orderId || `PP-CARD-${Date.now()}`,
+            transaction,
+            unlockedContacts,
+            instructions: `Visa Card payment of $${plan.price}.00 processed via PayPal Gateway! WhatsApp numbers unlocked.`
+          });
+        }
+
+        // If no card digits entered and PayPal returned an approveUrl, redirect to PayPal Visa billing page
+        if (ppOrder.success && ppOrder.approveUrl) {
+          saveAppData();
+          return res.json({
+            success: true,
+            gateway: 'paypal',
+            reference,
+            paypalOrderId: ppOrder.orderId,
+            redirectUrl: ppOrder.approveUrl,
+            transaction,
+            instructions: `Opening PayPal Visa Card Checkout [Order: ${ppOrder.orderId}]...`
+          });
+        }
+
+        return res.status(400).json({
+          success: false,
+          error: 'Please enter your Visa Card details (Card Number, Expiry, and CVV) to complete payment via PayPal Visa Gateway.'
+        });
+      }
+
       const reference = `BOUNCER-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-      const isTestMode = IS_PAYNOW_TEST_MODE || process.env.PAYNOW_TEST_MODE === 'true';
-      const authEmail = getPaynowAuthEmail(userEmail);
-      // In Test Mode, ensure authemail is explicitly set to PAYNOW_MERCHANT_EMAIL and NEVER customer's email
-      const paymentAuthEmail = isTestMode ? PAYNOW_MERCHANT_EMAIL : authEmail;
+      const paymentAuthEmail = getPaynowAuthEmail(userEmail) || pg.paynowMerchantEmail || PAYNOW_MERCHANT_EMAIL;
 
       const isMobileMethod = paymentMethod === 'ecocash' || paymentMethod === 'onemoney';
       const phoneToUse = (mobileNumber || guestPhone || '0771490167').replace(/\s+/g, '');
 
       // CREATE AND PERSIST TRANSACTION IMMEDIATELY BEFORE SENDING TO PAYNOW
-      // This guarantees that any instant Paynow callback or poll finds the record with zero race conditions
       const transaction: PaymentTransaction = {
         id: `tx_${Date.now()}`,
         reference,
@@ -2668,6 +3014,7 @@ async function startServer() {
         profileIds: Array.isArray(profileIds) ? profileIds : [],
         cardLast4: '',
         cardBrand: isMobileMethod ? (paymentMethod === 'ecocash' ? 'EcoCash' : 'OneMoney') : 'Paynow',
+        gateway: 'paynow',
         status: 'pending',
         pollUrl: '',
         date: new Date().toISOString()
@@ -2676,54 +3023,49 @@ async function startServer() {
       transactions.unshift(transaction);
       saveAppData();
 
-      const payment = paynow.createPayment(reference, paymentAuthEmail);
+      const activePaynow = getPaynowClient();
+      const payment = activePaynow.createPayment(reference, paymentAuthEmail);
       payment.add(plan.name, plan.price);
 
       let response: any = null;
-      let usedTestMode = false;
 
       try {
         if (isMobileMethod && phoneToUse) {
-          response = await paynow.sendMobile(payment, phoneToUse, paymentMethod);
+          response = await activePaynow.sendMobile(payment, phoneToUse, paymentMethod);
         } else {
-          response = await paynow.send(payment);
+          response = await activePaynow.send(payment);
         }
       } catch (sdkErr: any) {
-        console.warn('Paynow live API call notice (falling back to Test Mode):', sdkErr?.message || sdkErr);
+        console.error('Paynow live API error:', sdkErr?.message || sdkErr);
+        return res.status(502).json({
+          success: false,
+          error: sdkErr?.message || 'Could not connect to Paynow Zimbabwe gateway. Please try again.'
+        });
       }
 
-      // If live Paynow call returned unsuccessful or threw, activate Paynow Test Mode seamlessly
       if (!response || !response.success) {
-        usedTestMode = true;
-        const testPollUrl = `https://www.paynow.co.zw/Interface/CheckPayment/?guid=test_${Date.now()}_${reference}`;
-        const testRedirectUrl = `https://www.paynow.co.zw/Payment/ConfirmPayment/${reference}?test=true`;
-        const testInstructions = isMobileMethod
-          ? `[Paynow Test Mode] Dial ${paymentMethod === 'ecocash' ? '*151*2*2#' : '*111*2#'} on phone ${phoneToUse} and confirm payment of $${plan.price} USD for ${plan.name}.`
-          : `[Paynow Test Mode] Complete your test checkout on Paynow redirect window.`;
-
-        response = {
-          success: true,
-          redirectUrl: testRedirectUrl,
-          pollUrl: testPollUrl,
-          instructions: testInstructions
-        };
-
-        transaction.paynowReference = `PN-TEST-${reference}`;
-        transaction.pollUrl = testPollUrl;
-      } else {
-        if (response.pollUrl) transaction.pollUrl = response.pollUrl;
-        if (response.paynowReference) transaction.paynowReference = response.paynowReference;
+        transaction.status = 'failed';
+        saveAppData();
+        return res.status(400).json({
+          success: false,
+          error: response?.error || 'Paynow transaction could not be initiated. Please check your mobile number or payment details and try again.'
+        });
       }
 
-      notifications.unshift({
-        id: `notif_${Date.now()}`,
-        userId: 'usr_admin',
-        title: '💳 Paynow Payment Initiated',
-        message: `New Paynow ${usedTestMode ? '[Test Mode] ' : ''}transaction of $${plan.price} initiated by ${userName} (${userEmail}) for ${plan.name} [Ref: ${reference}].`,
-        type: 'system',
-        read: false,
-        createdAt: new Date().toISOString()
-      });
+      if (response.pollUrl) transaction.pollUrl = response.pollUrl;
+      if (response.paynowReference) transaction.paynowReference = response.paynowReference;
+
+      if (userId && userId !== 'usr_guest') {
+        notifications.unshift({
+          id: `notif_${Date.now()}`,
+          userId,
+          title: '💳 Paynow Payment Initiated',
+          message: `Your Paynow transaction of $${plan.price} for ${plan.name} [Ref: ${reference}] has been initiated.`,
+          type: 'system',
+          read: false,
+          createdAt: new Date().toISOString()
+        });
+      }
 
       saveAppData();
 
@@ -2731,7 +3073,7 @@ async function startServer() {
         success: true,
         reference,
         transaction,
-        testMode: usedTestMode || IS_PAYNOW_TEST_MODE,
+        testMode: false,
         redirectUrl: response.redirectUrl,
         pollUrl: response.pollUrl,
         instructions: response.instructions
@@ -2770,9 +3112,9 @@ async function startServer() {
       }
 
       // If transaction is not marked succeeded yet and has a pollUrl, poll Paynow
-      if (tx.status !== 'succeeded' && tx.pollUrl && !tx.pollUrl.includes('test_')) {
+      if (tx.status !== 'succeeded' && tx.pollUrl) {
         try {
-          const pollResult = await paynow.pollTransaction(tx.pollUrl);
+          const pollResult = await getPaynowClient().pollTransaction(tx.pollUrl);
           if (pollResult) {
             if (pollResult.paynowReference) {
               tx.paynowReference = pollResult.paynowReference;
@@ -2869,9 +3211,9 @@ async function startServer() {
         isPaid = true;
       }
 
-      if (tx.pollUrl && !tx.pollUrl.includes('test_')) {
+      if (tx.pollUrl) {
         try {
-          const pollResult = await paynow.pollTransaction(tx.pollUrl);
+          const pollResult = await getPaynowClient().pollTransaction(tx.pollUrl);
           if (pollResult) {
             if (pollResult.paynowReference) {
               tx.paynowReference = pollResult.paynowReference;
@@ -2917,7 +3259,7 @@ async function startServer() {
 
       if (tx.pollUrl) {
         try {
-          const pollResult = await paynow.pollTransaction(tx.pollUrl);
+          const pollResult = await getPaynowClient().pollTransaction(tx.pollUrl);
           if (pollResult) {
             if (pollResult.paynowReference) {
               tx.paynowReference = pollResult.paynowReference;
@@ -3334,51 +3676,21 @@ async function startServer() {
   });
 
   // ==========================================
-  // NOTIFICATIONS ENDPOINTS
+  // NOTIFICATIONS ENDPOINTS (STRICTLY USER-SCOPED)
   // ==========================================
   app.get('/api/notifications', (req, res) => {
-    const userGender = (req.query.gender as string)?.toLowerCase();
-    const userId = req.query.userId as string;
-    const role = req.query.role as string;
+    const userId =
+      (req.query.userId as string) ||
+      (req.headers['x-user-id'] as string) ||
+      currentUser?.id ||
+      '';
 
-    const seenKeys = new Set<string>();
-    const dedupeList = (list: NotificationItem[]) => {
-      return list.filter(n => {
-        const key = n.profileId ? `prof:${n.profileId}:${n.title}` : `msg:${n.userId || 'all'}:${n.title}:${n.message}`;
-        if (seenKeys.has(n.id) || seenKeys.has(key)) return false;
-        seenKeys.add(n.id);
-        seenKeys.add(key);
-        return true;
-      });
-    };
-
-    // Admins see all notifications (deduplicated)
-    if (role === 'admin') {
-      return res.json(dedupeList(notifications));
+    if (!userId || userId === 'all' || userId === 'usr_guest') {
+      return res.json([]);
     }
 
-    // Filter notifications based on targetGender:
-    // If a male registered, targetGender is 'female' -> only sent to females
-    // If a female registered, targetGender is 'male' -> only sent to males
-    const filtered = notifications.filter(n => {
-      // Direct personal notifications for this user
-      if (n.userId && n.userId !== 'all') {
-        return n.userId === userId;
-      }
-
-      // If notification has a specific target gender:
-      if (n.targetGender && n.targetGender !== 'all') {
-        if (userGender) {
-          return n.targetGender === userGender;
-        }
-        // Visitor without selected gender sees all or general
-        return true;
-      }
-
-      return true;
-    });
-
-    res.json(dedupeList(filtered));
+    const userPersonalNotifs = getNotificationsForUser(userId);
+    res.json(userPersonalNotifs);
   });
 
   app.post('/api/notifications/:id/read', (req, res) => {
@@ -3388,46 +3700,36 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  app.post('/api/notifications/clear', (_req, res) => {
-    notifications = [];
-    saveAppData();
+  app.post('/api/notifications/clear', (req, res) => {
+    const targetUserId =
+      (req.body?.userId as string) ||
+      (req.query.userId as string) ||
+      (req.headers['x-user-id'] as string) ||
+      currentUser?.id ||
+      '';
+
+    if (targetUserId && targetUserId !== 'all') {
+      const targetUser = users.find(
+        u => u.id === targetUserId || (u.email && u.email.toLowerCase() === targetUserId.toLowerCase())
+      );
+      const effectiveUserId = targetUser ? targetUser.id : targetUserId;
+      const ownedProfileIds = new Set<string>(
+        profiles
+          .filter(
+            p =>
+              p.id === effectiveUserId ||
+              p.id === `p_${effectiveUserId}` ||
+              (targetUser?.name && p.name && p.name.toLowerCase() === targetUser.name.toLowerCase())
+          )
+          .map(p => p.id)
+      );
+
+      notifications = notifications.filter(
+        n => n.userId !== effectiveUserId && !ownedProfileIds.has(n.userId)
+      );
+      saveAppData();
+    }
     res.json({ success: true });
-  });
-
-  app.post('/api/notifications/test-new-single', (req, res) => {
-    const age = Number(req.body?.age) || 24;
-    const location = req.body?.city || req.body?.location || 'Harare';
-    const gender = ((req.body?.gender as string) || 'male').toLowerCase();
-    const isMale = gender === 'male';
-    const isFemale = gender === 'female';
-    const targetGender: 'male' | 'female' | 'all' = isMale ? 'female' : (isFemale ? 'male' : 'all');
-
-    const notifTitle = isMale
-      ? '❤️ New Gentleman Alert!'
-      : (isFemale ? '❤️ New Lady Alert!' : '❤️ New Single Alert!');
-
-    const notifMessage = isMale
-      ? `A new gentleman (${age}, ${location}) has just registered! Check out his profile.`
-      : (isFemale
-          ? `A new lady (${age}, ${location}) has just registered! Check out her profile.`
-          : `New Single, ${age} and ${location} has signed up`);
-
-    const testNotif: NotificationItem = {
-      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      userId: 'all',
-      title: notifTitle,
-      message: notifMessage,
-      type: 'system',
-      read: false,
-      createdAt: new Date().toISOString(),
-      targetGender,
-      gender: gender as any,
-      profileId: req.body?.profileId,
-      photo: req.body?.photo || (isMale ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400' : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400')
-    };
-    notifications.unshift(testNotif);
-    saveAppData();
-    res.json({ success: true, notification: testNotif });
   });
 
   // ==========================================

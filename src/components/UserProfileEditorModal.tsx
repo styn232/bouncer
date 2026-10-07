@@ -693,7 +693,8 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                       >
                         <option value="ecocash">📱 EcoCash Zimbabwe</option>
                         <option value="onemoney">📶 OneMoney Zimbabwe</option>
-                        <option value="paynow">💳 Paynow Card / Visa / Mastercard</option>
+                        <option value="paynow">💳 Paynow Local Card</option>
+                        <option value="paypal_visa">💳 Use Visa Card Here (PayPal Gateway)</option>
                       </select>
                     </div>
                   </div>

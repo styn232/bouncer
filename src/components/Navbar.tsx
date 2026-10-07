@@ -217,12 +217,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
-            {/* Notifications & Push Alerts Bell */}
-            {onOpenNotifications && (
+            {/* Personal Notifications Bell (Only for signed-in users) */}
+            {currentUser && onOpenNotifications && (
               <button
                 onClick={onOpenNotifications}
                 className="relative p-2 sm:px-3 sm:py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/30 text-rose-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
-                title="Match Alerts & Push Notifications"
+                title="My Personal Notifications"
               >
                 <div className="relative">
                   <Bell className="w-4 h-4 text-rose-400" />
@@ -232,7 +232,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </span>
                   )}
                 </div>
-                <span className="hidden sm:inline text-xs font-bold">Alerts</span>
+                <span className="hidden sm:inline text-xs font-bold">Notifications</span>
               </button>
             )}
 
@@ -604,7 +604,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>Singles</span>
         </button>
 
-        {onOpenNotifications && (
+        {currentUser && onOpenNotifications && (
           <button
             onClick={onOpenNotifications}
             className="relative flex flex-col items-center gap-1 text-[10px] font-bold text-rose-300 hover:text-rose-100 transition-all active:scale-105"

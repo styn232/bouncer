@@ -21,7 +21,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     features: [
       'Unlock & view exactly 1 Single Profile',
       'Unlock Direct WhatsApp Phone Number',
-      'Instant Live Test & Direct Connection',
+      'Instant Direct WhatsApp Connection',
       'Bouncer Security Vetting & ID Verification'
     ]
   },

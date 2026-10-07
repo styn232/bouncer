@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trash2, MessageSquare, ShieldCheck, ArrowRight, Sparkles, Check, Clock, UserCheck, MessageCircle, Star, Phone, CreditCard, X, Mail } from 'lucide-react';
+import { Trash2, MessageSquare, ShieldCheck, ArrowRight, Sparkles, Check, Clock, UserCheck, MessageCircle, Star, Phone, CreditCard, X, Mail, Lock, ImageOff } from 'lucide-react';
 import { CartItem, DateType, User } from '../types';
+import { hasValidProfilePhoto } from '../utils/format';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -43,10 +44,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     { profileId: string; name: string; age?: number; location?: string; city?: string; photos?: string[]; whatsappNumber: string }[]
   >([]);
 
-  const [paymentMethod, setPaymentMethod] = useState<'web' | 'ecocash' | 'onemoney'>('web');
+  const [paymentMethod, setPaymentMethod] = useState<'web' | 'ecocash' | 'onemoney' | 'paypal_visa'>('web');
   const [mobileNumber, setMobileNumber] = useState(currentUser?.whatsappNumber || '0771490167');
   const [mobileInstructions, setMobileInstructions] = useState<string | null>(null);
-  const [isTestMode, setIsTestMode] = useState(true);
+
+  // PayPal Visa Card Gateway Form States ("Use Visa Card Here")
+  const [cardHolderName, setCardHolderName] = useState(currentUser?.name || '');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
 
   if (!isOpen) return null;
 
@@ -110,8 +116,76 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     }
   };
 
+  const handlePayPalVisaCheckout = async (useRedirect: boolean = false) => {
+    if (cartItems.length === 0) return;
+    setPaymentMethod('paypal_visa');
+
+    const cleanCardDigits = cardNumber.replace(/\D/g, '');
+    if (!useRedirect && cleanCardDigits.length < 12) {
+      setVerificationError('Please enter your 16-digit Visa Card number, Expiry (MM/YY), and CVV in the "Use Visa Card Here (PayPal)" fields above.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setVerificationError(null);
+    setMobileInstructions(null);
+    try {
+      const planId = getPlanId(cartItems.length);
+      const profileIds = cartItems.map(i => i.profileId);
+      const res = await fetch('/api/payment/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId,
+          profileIds,
+          paymentMethod: 'paypal_visa',
+          cardHolderName: cardHolderName || currentUser?.name || 'Visa Cardholder',
+          cardNumber: cleanCardDigits,
+          cardExpiry,
+          cardCvv,
+          usePayPalRedirect: useRedirect,
+          guestPhone: currentUser ? undefined : (mobileNumber || guestPhone),
+          guestEmail: currentUser ? undefined : guestEmail
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        if (data.reference) {
+          setPaynowRef(data.reference);
+        }
+        if (data.paid && data.unlockedContacts && data.unlockedContacts.length > 0) {
+          setUnlockedContacts(data.unlockedContacts);
+          setCheckoutSuccess(true);
+          setVerificationError(null);
+          onCheckout();
+          return;
+        }
+        if (data.redirectUrl) {
+          setPaynowUrl(data.redirectUrl);
+          window.location.href = data.redirectUrl;
+          return;
+        }
+        if (data.reference) {
+          await verifyPaymentStatus(data.reference);
+        }
+      } else {
+        setVerificationError(data.error || 'Could not process Visa Card payment via PayPal Gateway.');
+      }
+    } catch (err) {
+      console.error('PayPal Visa checkout error:', err);
+      setVerificationError('PayPal Visa Card gateway communication error. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handlePaynowCheckout = async () => {
     if (cartItems.length === 0) return;
+    if (paymentMethod === 'paypal_visa') {
+      await handlePayPalVisaCheckout(false);
+      return;
+    }
     setIsSubmitting(true);
     setVerificationError(null);
     setMobileInstructions(null);
@@ -133,9 +207,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
       const data = await res.json();
       if (data.success) {
-        if (data.testMode) {
-          setIsTestMode(true);
-        }
         if (data.instructions) {
           setMobileInstructions(data.instructions);
         }
@@ -230,11 +301,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 }`}
               >
                 <div className="flex justify-between items-center">
-                  <span className="text-emerald-900 font-extrabold text-[11px]">🧪 1 Single Test</span>
+                  <span className="text-emerald-900 font-extrabold text-[11px]">✨ 1 Single Starter</span>
                   <span className="text-emerald-700 font-black text-xs">$3.00 Flat</span>
                 </div>
                 <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">
-                  Test & verify 1 single's WhatsApp number.
+                  Unlock & verify 1 single's WhatsApp number.
                 </p>
               </div>
 
@@ -339,12 +410,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         className="bg-emerald-50/80 border-2 border-emerald-300 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md"
                       >
                         <div className="flex items-center gap-3 w-full sm:w-auto">
-                          <img
-                            src={contact.photos && contact.photos.length > 0 ? contact.photos[0] : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
-                            alt={contact.name}
-                            referrerPolicy="no-referrer"
-                            className="w-14 h-14 rounded-2xl object-cover ring-2 ring-emerald-500 shadow-sm shrink-0"
-                          />
+                          {hasValidProfilePhoto(contact.photos?.[0]) ? (
+                            <img
+                              src={contact.photos![0]}
+                              alt={contact.name}
+                              referrerPolicy="no-referrer"
+                              className="w-14 h-14 rounded-2xl object-cover ring-2 ring-emerald-500 shadow-sm shrink-0"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-700 flex flex-col items-center justify-center text-slate-400 shrink-0">
+                              <ImageOff className="w-5 h-5" />
+                              <span className="text-[7px] font-black uppercase">No Pic</span>
+                            </div>
+                          )}
                           <div>
                             <h4 className="text-base font-extrabold text-slate-900 font-serif">
                               {contact.name}, <span className="text-emerald-700 font-sans">{contact.age}</span>
@@ -432,12 +510,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 >
                   {/* Single Summary Info: Name, Age, Location */}
                   <div className="flex items-center gap-3 shrink-0 w-full md:w-56">
-                    <img
-                      src={item.profile?.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
-                      alt={item.profile?.name || 'Single'}
-                      referrerPolicy="no-referrer"
-                      className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-2 ring-emerald-400/50 shadow-sm"
-                    />
+                    {hasValidProfilePhoto(item.profile?.photos?.[0]) ? (
+                      <img
+                        src={item.profile.photos[0]}
+                        alt={item.profile?.name || 'Single'}
+                        referrerPolicy="no-referrer"
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-2 ring-emerald-400/50 shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-900 border border-slate-700 flex flex-col items-center justify-center text-slate-400 shrink-0">
+                        <ImageOff className="w-6 h-6" />
+                        <span className="text-[8px] font-black uppercase mt-0.5">No Picture</span>
+                      </div>
+                    )}
                     <div>
                       <div className="flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 mb-1 w-fit">
                         <Star className="w-3 h-3 text-amber-500 fill-amber-400" />
@@ -600,16 +685,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   </div>
                 </div>
 
-                {/* Paynow Method Selector */}
-                <div className="mb-4 space-y-2">
+                {/* Paynow & PayPal (Use Visa Card Here) Method Selector */}
+                <div className="mb-4 space-y-3">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                    Select Paynow Payment Method:
+                    Select Payment Gateway (Paynow or Use Visa Card Here via PayPal):
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('web')}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         paymentMethod === 'web'
                           ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-extrabold ring-2 ring-emerald-400/50'
                           : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -619,13 +704,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         <span>💳</span>
                         <span>Paynow Web</span>
                       </div>
-                      <div className="text-[9px] text-slate-500 font-normal">Card / Zimswitch</div>
+                      <div className="text-[9px] text-slate-500 font-normal">Zimswitch / Local</div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('ecocash')}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         paymentMethod === 'ecocash'
                           ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-extrabold ring-2 ring-emerald-400/50'
                           : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -641,7 +726,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('onemoney')}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         paymentMethod === 'onemoney'
                           ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-extrabold ring-2 ring-emerald-400/50'
                           : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -652,6 +737,23 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         <span>OneMoney</span>
                       </div>
                       <div className="text-[9px] text-slate-500 font-normal">NetOne Number</div>
+                    </button>
+
+                    {/* PAYPAL PAYMENT GATEWAY FOR VISA CARD: "Use Visa Card Here" */}
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('paypal_visa')}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        paymentMethod === 'paypal_visa'
+                          ? 'border-blue-600 bg-blue-50 text-blue-950 font-extrabold ring-2 ring-blue-500/40 shadow-sm'
+                          : 'border-blue-200 bg-blue-50/40 text-blue-900 hover:bg-blue-50'
+                      }`}
+                    >
+                      <div className="text-xs flex items-center gap-1 font-extrabold text-blue-900">
+                        <span>💳</span>
+                        <span>Use Visa Card Here</span>
+                      </div>
+                      <div className="text-[9px] text-blue-700 font-bold">PayPal • Visa / Mastercard</div>
                     </button>
                   </div>
 
@@ -667,6 +769,108 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         placeholder="0771490167"
                         className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-600"
                       />
+                    </div>
+                  )}
+
+                  {/* PAYPAL VISA CARD CHECKOUT FORM ("Use Visa Card Here") */}
+                  {paymentMethod === 'paypal_visa' && (
+                    <div className="p-4 rounded-2xl bg-blue-50/80 border-2 border-blue-400 space-y-3 mt-2">
+                      <div className="flex items-center justify-between border-b border-blue-200 pb-2">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-blue-700" />
+                          <span className="text-xs font-black uppercase tracking-wider text-blue-950">
+                            Use Visa Card Here — PayPal Payment Gateway
+                          </span>
+                        </div>
+                        <span className="bg-blue-700 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                          PayPal • Visa / Mastercard
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                            Name on Visa Card
+                          </label>
+                          <input
+                            type="text"
+                            value={cardHolderName}
+                            onChange={(e) => setCardHolderName(e.target.value)}
+                            placeholder="e.g. Tendai Moyo"
+                            className="w-full bg-white border border-blue-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                            Visa / Mastercard Number
+                          </label>
+                          <input
+                            type="text"
+                            maxLength={19}
+                            value={cardNumber}
+                            onChange={(e) => {
+                              const digits = e.target.value.replace(/\D/g, '').slice(0, 16);
+                              const formatted = digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+                              setCardNumber(formatted);
+                            }}
+                            placeholder="4532 •••• •••• ••••"
+                            className="w-full bg-white border border-blue-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                            Expiry Date (MM/YY)
+                          </label>
+                          <input
+                            type="text"
+                            maxLength={5}
+                            value={cardExpiry}
+                            onChange={(e) => {
+                              let v = e.target.value.replace(/[^\d/]/g, '');
+                              if (v.length === 2 && !v.includes('/') && cardExpiry.length < 2) {
+                                v = `${v}/`;
+                              }
+                              setCardExpiry(v.slice(0, 5));
+                            }}
+                            placeholder="08/28"
+                            className="w-full bg-white border border-blue-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                            Security Code (CVV)
+                          </label>
+                          <div className="relative">
+                            <Lock className="w-3.5 h-3.5 text-blue-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="password"
+                              maxLength={4}
+                              value={cardCvv}
+                              onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                              placeholder="123"
+                              className="w-full bg-white border border-blue-300 rounded-xl pl-8 pr-3 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:border-blue-600"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+                        <span className="text-[10px] text-blue-800 font-semibold flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5 text-blue-700" />
+                          <span>Processed securely by PayPal Visa Card Gateway</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handlePayPalVisaCheckout(true)}
+                          disabled={isSubmitting}
+                          className="text-[11px] font-extrabold text-blue-700 hover:text-blue-900 underline cursor-pointer"
+                        >
+                          Or Redirect to PayPal Hosted Card Page →
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -724,28 +928,62 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   </div>
                 )}
 
-                {/* Payment Action Buttons */}
+                {/* Payment Action Buttons: Paynow & PayPal ("Use Visa Card Here") Side-by-Side */}
                 <div className="space-y-2.5">
-                  {/* Paynow Direct Gateway Checkout Button */}
-                  <button
-                    type="button"
-                    onClick={handlePaynowCheckout}
-                    disabled={isSubmitting || isVerifying}
-                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 ring-2 ring-amber-300 active:scale-[0.99]"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                        Connecting to Paynow Gateway...
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="w-5 h-5 text-slate-950" />
-                        Pay via Paynow (${calculatedFee}.00) & Unlock WhatsApp Numbers
-                        <ArrowRight className="w-5 h-5 text-slate-950" />
-                      </>
-                    )}
-                  </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Paynow Direct Gateway Checkout Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (paymentMethod === 'paypal_visa') {
+                          setPaymentMethod('web');
+                        }
+                        handlePaynowCheckout();
+                      }}
+                      disabled={isSubmitting || isVerifying}
+                      className="w-full py-4 px-3 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 ring-2 ring-amber-300 active:scale-[0.99] cursor-pointer"
+                    >
+                      {isSubmitting && paymentMethod !== 'paypal_visa' ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                          <span>Connecting to Paynow...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-5 h-5 text-slate-950 shrink-0" />
+                          <span>Pay via Paynow (${calculatedFee}.00)</span>
+                          <ArrowRight className="w-4 h-4 text-slate-950 shrink-0" />
+                        </>
+                      )}
+                    </button>
+
+                    {/* PayPal Payment Gateway for Visa Card Button: Labeled "Use Visa Card Here" */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (paymentMethod !== 'paypal_visa') {
+                          setPaymentMethod('paypal_visa');
+                          return;
+                        }
+                        handlePayPalVisaCheckout(false);
+                      }}
+                      disabled={isSubmitting || isVerifying}
+                      className="w-full py-4 px-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 ring-2 ring-blue-400 active:scale-[0.99] cursor-pointer"
+                    >
+                      {isSubmitting && paymentMethod === 'paypal_visa' ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Processing Visa Card...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-5 h-5 text-amber-300 shrink-0" />
+                          <span>Use Visa Card Here • PayPal (${calculatedFee}.00)</span>
+                          <ArrowRight className="w-4 h-4 text-white shrink-0" />
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                   {/* Verification & Reveal Trigger Button */}
                   <button

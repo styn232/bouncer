@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Crown, ShieldCheck, Check, Sparkles, X, AlertCircle, ArrowRight, ExternalLink, RefreshCw, Phone, Mail } from 'lucide-react';
+import { Crown, ShieldCheck, Check, Sparkles, X, AlertCircle, ArrowRight, ExternalLink, RefreshCw, Phone, Mail, CreditCard, Lock } from 'lucide-react';
 import { SubscriptionPlan, SubscriptionPlanId, User } from '../types';
 
 interface PaymentModalProps {
@@ -19,10 +19,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onPaymentSuccess
 }) => {
   const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>('starter_3_or_4');
-  const [paymentMethod, setPaymentMethod] = useState<'web' | 'ecocash' | 'onemoney'>('web');
+  const [paymentMethod, setPaymentMethod] = useState<'web' | 'ecocash' | 'onemoney' | 'paypal_visa'>('web');
   const [mobileNumber, setMobileNumber] = useState(currentUser?.whatsappNumber || '0771490167');
   const [guestEmail, setGuestEmail] = useState(currentUser?.email || '');
   const [guestPhone, setGuestPhone] = useState('');
+
+  // PayPal Visa Card Form State ("Use Visa Card Here")
+  const [cardHolderName, setCardHolderName] = useState(currentUser?.name || '');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -35,8 +41,72 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handlePayPalVisaInitiate = async (useRedirect: boolean = false) => {
+    setPaymentMethod('paypal_visa');
+    const cleanDigits = cardNumber.replace(/\D/g, '');
+    if (!useRedirect && cleanDigits.length < 12) {
+      setErrorMsg('Please enter your 16-digit Visa Card number, Expiry (MM/YY), and CVV in the "Use Visa Card Here (PayPal)" section.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setErrorMsg('');
+    setSuccessInfo(null);
+
+    try {
+      const response = await fetch('/api/payment/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planId: selectedPlanId,
+          paymentMethod: 'paypal_visa',
+          cardHolderName: cardHolderName || currentUser?.name || 'Visa Cardholder',
+          cardNumber: cleanDigits,
+          cardExpiry,
+          cardCvv,
+          usePayPalRedirect: useRedirect,
+          guestPhone: currentUser ? undefined : (mobileNumber || guestPhone),
+          guestEmail: currentUser ? undefined : (guestEmail || 'customer@datingwithbouncer.com')
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.reference) {
+          setPaynowRef(data.reference);
+        }
+        if (data.paid) {
+          onPaymentSuccess(selectedPlanId, data.transaction || { reference: data.reference, amount: selectedPlan.price });
+          onClose();
+          return;
+        }
+        if (data.redirectUrl) {
+          setPaynowRedirectUrl(data.redirectUrl);
+          setSuccessInfo('Redirecting to PayPal Visa Card Checkout...');
+          setTimeout(() => {
+            window.location.href = data.redirectUrl;
+          }, 400);
+          return;
+        }
+        setSuccessInfo(data.instructions || `Visa Card payment initiated via PayPal [Ref: ${data.reference}].`);
+      } else {
+        setErrorMsg(data.error || 'Failed to process Visa Card payment via PayPal Gateway.');
+      }
+    } catch (err: any) {
+      console.error('PayPal Visa error:', err);
+      setErrorMsg('Communication error connecting to PayPal Visa Card gateway.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handlePaynowInitiate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (paymentMethod === 'paypal_visa') {
+      await handlePayPalVisaInitiate(false);
+      return;
+    }
     setIsProcessing(true);
     setErrorMsg('');
     setSuccessInfo(null);
@@ -225,18 +295,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               ))}
             </div>
 
-            {/* Paynow Payment Method Selection */}
+            {/* Paynow & PayPal (Use Visa Card Here) Payment Method Selection */}
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 mb-6">
               <label className="block text-xs font-black text-amber-400 uppercase tracking-wider mb-3">
-                Select Paynow Payment Method:
+                Select Payment Gateway (Paynow or Use Visa Card Here via PayPal):
               </label>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                 {/* Option 1: Paynow Web / Card */}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('web')}
-                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                     paymentMethod === 'web'
                       ? 'border-amber-500 bg-amber-500/10 text-white ring-2 ring-amber-500/30'
                       : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'
@@ -247,7 +317,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     <span>Paynow Web / Card</span>
                   </div>
                   <p className="text-[10px] text-slate-400 leading-tight">
-                    Visa, Mastercard, Zimswitch (Opens on same tab)
+                    Zimswitch / Local Card (Opens on same tab)
                   </p>
                 </button>
 
@@ -255,7 +325,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('ecocash')}
-                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                     paymentMethod === 'ecocash'
                       ? 'border-amber-500 bg-amber-500/10 text-white ring-2 ring-amber-500/30'
                       : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'
@@ -274,7 +344,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('onemoney')}
-                  className={`p-3.5 rounded-xl border text-left transition-all ${
+                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                     paymentMethod === 'onemoney'
                       ? 'border-amber-500 bg-amber-500/10 text-white ring-2 ring-amber-500/30'
                       : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700'
@@ -288,7 +358,123 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     Instant USSD PIN prompt to NetOne mobile
                   </p>
                 </button>
+
+                {/* Option 4: PayPal Payment Gateway for Visa Card ("Use Visa Card Here") */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('paypal_visa')}
+                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    paymentMethod === 'paypal_visa'
+                      ? 'border-blue-400 bg-blue-500/20 text-white ring-2 ring-blue-500/40 shadow-md'
+                      : 'border-blue-500/30 bg-blue-950/30 text-blue-200 hover:border-blue-400/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-blue-300 mb-1">
+                    <span>💳</span>
+                    <span>Use Visa Card Here</span>
+                  </div>
+                  <p className="text-[10px] text-blue-200/80 leading-tight font-semibold">
+                    PayPal Gateway • Visa / Mastercard
+                  </p>
+                </button>
               </div>
+
+              {/* PayPal Visa Card Form ("Use Visa Card Here") */}
+              {paymentMethod === 'paypal_visa' && (
+                <div className="mb-4 p-4 rounded-2xl bg-blue-950/40 border border-blue-500/40 space-y-3">
+                  <div className="flex items-center justify-between border-b border-blue-800/60 pb-2">
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-blue-300">
+                      <CreditCard className="w-4 h-4 text-blue-400" />
+                      <span>Use Visa Card Here — PayPal Payment Gateway</span>
+                    </div>
+                    <span className="bg-blue-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                      PayPal • Visa
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-blue-200 uppercase mb-1">
+                        Name on Visa Card
+                      </label>
+                      <input
+                        type="text"
+                        value={cardHolderName}
+                        onChange={(e) => setCardHolderName(e.target.value)}
+                        placeholder="e.g. Tendai Moyo"
+                        className="w-full bg-slate-900 border border-blue-500/40 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-blue-200 uppercase mb-1">
+                        Visa / Mastercard Number
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={19}
+                        value={cardNumber}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, '').slice(0, 16);
+                          setCardNumber(digits.replace(/(\d{4})(?=\d)/g, '$1 '));
+                        }}
+                        placeholder="4532 •••• •••• ••••"
+                        className="w-full bg-slate-900 border border-blue-500/40 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-blue-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-blue-200 uppercase mb-1">
+                        Expiry Date (MM/YY)
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={5}
+                        value={cardExpiry}
+                        onChange={(e) => {
+                          let v = e.target.value.replace(/[^\d/]/g, '');
+                          if (v.length === 2 && !v.includes('/') && cardExpiry.length < 2) v = `${v}/`;
+                          setCardExpiry(v.slice(0, 5));
+                        }}
+                        placeholder="08/28"
+                        className="w-full bg-slate-900 border border-blue-500/40 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-blue-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-blue-200 uppercase mb-1">
+                        CVV Security Code
+                      </label>
+                      <div className="relative">
+                        <Lock className="w-3.5 h-3.5 text-blue-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="password"
+                          maxLength={4}
+                          value={cardCvv}
+                          onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          placeholder="123"
+                          className="w-full bg-slate-900 border border-blue-500/40 rounded-xl pl-8 pr-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-blue-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-blue-300/80 flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Instant Visa Card checkout via PayPal Gateway</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handlePayPalVisaInitiate(true)}
+                      disabled={isProcessing}
+                      className="text-[11px] font-extrabold text-blue-300 hover:text-white underline cursor-pointer"
+                    >
+                      Or Open PayPal Hosted Card Page →
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Mobile Phone Input for EcoCash / OneMoney */}
               {(paymentMethod === 'ecocash' || paymentMethod === 'onemoney') && (
@@ -383,13 +569,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <span>All payments processed securely through <strong>Paynow Zimbabwe</strong></span>
               </div>
 
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
                 {paynowRef && (
                   <button
                     type="button"
                     onClick={handleVerifyPayment}
                     disabled={isVerifying || isProcessing}
-                    className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    className="flex-1 sm:flex-none px-5 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                   >
                     {isVerifying ? (
                       <>
@@ -407,19 +593,50 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => handlePaynowInitiate()}
+                  onClick={() => {
+                    if (paymentMethod === 'paypal_visa') {
+                      setPaymentMethod('web');
+                    }
+                    handlePaynowInitiate();
+                  }}
                   disabled={isProcessing || isVerifying}
-                  className="flex-1 sm:flex-none px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider shadow-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                  className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider shadow-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
                 >
-                  {isProcessing ? (
+                  {isProcessing && paymentMethod !== 'paypal_visa' ? (
                     <>
                       <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                      Connecting to Paynow...
+                      <span>Connecting to Paynow...</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 fill-slate-950" />
-                      Pay ${selectedPlan.price} via Paynow & Reveal Number
+                      <span>Pay ${selectedPlan.price} via Paynow</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (paymentMethod !== 'paypal_visa') {
+                      setPaymentMethod('paypal_visa');
+                      return;
+                    }
+                    handlePayPalVisaInitiate(false);
+                  }}
+                  disabled={isProcessing || isVerifying}
+                  className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider shadow-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer border border-blue-400/50"
+                >
+                  {isProcessing && paymentMethod === 'paypal_visa' ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Processing Visa...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4 text-amber-300" />
+                      <span>Use Visa Card Here • PayPal (${selectedPlan.price})</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

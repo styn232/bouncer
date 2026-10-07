@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image as ImageIcon, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database, Wallet, ArrowUpRight, ArrowDownLeft, X, UserCheck, Gift, ImageOff } from 'lucide-react';
+import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image as ImageIcon, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database, Wallet, ArrowUpRight, ArrowDownLeft, X, UserCheck, Gift, ImageOff, CreditCard } from 'lucide-react';
 import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings, DatingIntent, AffiliateWithdrawalRequest } from '../types';
 import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getCitiesByProvince, getSubLocationsForCity, getProvinceForCity } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -41,8 +41,82 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRejectPayment,
   onRefreshData
 }) => {
-  const [activeTab, setActiveTab] = useState<'profiles' | 'queue' | 'subscriptions' | 'audit' | 'orders' | 'branding' | 'views' | 'admins' | 'affiliate'>('profiles');
+  const [activeTab, setActiveTab] = useState<'profiles' | 'queue' | 'subscriptions' | 'audit' | 'orders' | 'branding' | 'views' | 'admins' | 'affiliate' | 'gateways'>('profiles');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Payment Gateways Admin State (PayPal "Use Visa Card Here" & Paynow Integration ID & Key Slots)
+  const [paypalIntegrationId, setPaypalIntegrationId] = useState<string>(siteSettings?.paymentGateways?.paypalIntegrationId || '');
+  const [paypalIntegrationKey, setPaypalIntegrationKey] = useState<string>(siteSettings?.paymentGateways?.paypalIntegrationKey || '');
+  const [paypalMode, setPaypalMode] = useState<'live' | 'sandbox'>(siteSettings?.paymentGateways?.paypalMode || 'live');
+  const [paypalReceiverEmail, setPaypalReceiverEmail] = useState<string>(siteSettings?.paymentGateways?.paypalReceiverEmail || 'jobsatespace@gmail.com');
+  const [paynowIntegrationId, setPaynowIntegrationId] = useState<string>(siteSettings?.paymentGateways?.paynowIntegrationId || '25938');
+  const [paynowIntegrationKey, setPaynowIntegrationKey] = useState<string>(siteSettings?.paymentGateways?.paynowIntegrationKey || 'd20d903a-d31a-47f1-8a65-5f9c9d3f0c07');
+  const [paynowMerchantEmail, setPaynowMerchantEmail] = useState<string>(siteSettings?.paymentGateways?.paynowMerchantEmail || 'francismugebe@gmail.com');
+  const [gatewayStatusMsg, setGatewayStatusMsg] = useState<string | null>(null);
+  const [isSavingGateways, setIsSavingGateways] = useState<boolean>(false);
+
+  const fetchAdminPaymentGateways = async () => {
+    try {
+      const res = await fetch('/api/admin/payment-gateways', {
+        headers: {
+          'x-user-role': 'admin',
+          'x-user-email': 'jobsatespace@gmail.com'
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const pg = data.paymentGateways;
+        if (pg) {
+          setPaypalIntegrationId(pg.paypalIntegrationId || '');
+          setPaypalIntegrationKey(pg.paypalIntegrationKey || '');
+          setPaypalMode(pg.paypalMode === 'sandbox' ? 'sandbox' : 'live');
+          setPaypalReceiverEmail(pg.paypalReceiverEmail || 'jobsatespace@gmail.com');
+          setPaynowIntegrationId(pg.paynowIntegrationId || '25938');
+          setPaynowIntegrationKey(pg.paynowIntegrationKey || '');
+          setPaynowMerchantEmail(pg.paynowMerchantEmail || 'francismugebe@gmail.com');
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSavePaymentGateways = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsSavingGateways(true);
+    setGatewayStatusMsg(null);
+    try {
+      const res = await fetch('/api/admin/payment-gateways', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': 'admin',
+          'x-user-email': 'jobsatespace@gmail.com'
+        },
+        body: JSON.stringify({
+          paypalIntegrationId: paypalIntegrationId.trim(),
+          paypalIntegrationKey: paypalIntegrationKey.trim(),
+          paypalMode,
+          paypalReceiverEmail: paypalReceiverEmail.trim(),
+          paynowIntegrationId: paynowIntegrationId.trim(),
+          paynowIntegrationKey: paynowIntegrationKey.trim(),
+          paynowMerchantEmail: paynowMerchantEmail.trim(),
+          paynowTestMode: false
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setGatewayStatusMsg('✅ PayPal ("Use Visa Card Here") & Paynow Integration ID and Key saved successfully!');
+        onRefreshData();
+      } else {
+        setGatewayStatusMsg(`❌ ${data.error || 'Could not save Payment Gateway credentials.'}`);
+      }
+    } catch {
+      setGatewayStatusMsg('❌ Network error saving Payment Gateway credentials.');
+    } finally {
+      setIsSavingGateways(false);
+    }
+  };
 
   // Affiliate & Withdrawals Admin State
   const [affiliateRewardRate, setAffiliateRewardRate] = useState<number>(siteSettings?.affiliateRewardPerInvite ?? 0.25);
@@ -74,6 +148,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   useEffect(() => {
     fetchAdminAffiliateData();
+    fetchAdminPaymentGateways();
   }, [activeTab]);
   
   // Firebase Admin Creation in Panel
@@ -736,6 +811,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveTab('gateways')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all flex items-center gap-2 ${
+            activeTab === 'gateways'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+              : 'bg-slate-900 text-blue-300 hover:bg-slate-800 border border-blue-500/30'
+          }`}
+        >
+          <CreditCard className="w-4 h-4" />
+          Payment Gateways (Visa / PayPal & Paynow)
+        </button>
+
+        <button
           onClick={() => setActiveTab('affiliate')}
           className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all flex items-center gap-2 ${
             activeTab === 'affiliate'
@@ -967,6 +1054,197 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* PAYMENT GATEWAY INTEGRATION ID & KEY SLOTS (PayPal "Use Visa Card Here" & Paynow) */}
+      {(activeTab === 'gateways' || activeTab === 'subscriptions') && (
+        <div className="bg-slate-900 border-2 border-blue-500/40 rounded-3xl p-6 shadow-2xl mb-6 space-y-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-blue-500/20 border border-blue-500/40 text-blue-400">
+                <CreditCard className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-xl font-extrabold text-white font-serif">
+                    Payment Gateways — PayPal (&ldquo;Use Visa Card Here&rdquo;) &amp; Paynow
+                  </h3>
+                  <span className="bg-blue-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                    Visa Card &amp; Paynow Slots
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Enter your <strong>Integration ID</strong> and <strong>Integration Key</strong> for <strong>PayPal (Use Visa Card Here)</strong> alongside <strong>Paynow</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {gatewayStatusMsg && (
+            <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-between">
+              <span>{gatewayStatusMsg}</span>
+              <button
+                type="button"
+                onClick={() => setGatewayStatusMsg(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleSavePaymentGateways} className="space-y-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* SLOT 1: PAYPAL PAYMENT GATEWAY FOR VISA CARD ("Use Visa Card Here") */}
+              <div className="bg-slate-950 border-2 border-blue-500/40 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                      <CreditCard className="w-4 h-4" />
+                      <span>PayPal Gateway • &ldquo;Use Visa Card Here&rdquo;</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Processes Visa &amp; Mastercard payments alongside Paynow
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-blue-500/20 border border-blue-500/40 text-blue-300 text-[10px] font-black uppercase">
+                    Use Visa Card Here
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-extrabold text-blue-300 uppercase tracking-wider mb-1.5">
+                    PayPal Integration ID (Client ID / Merchant ID)
+                  </label>
+                  <input
+                    type="text"
+                    value={paypalIntegrationId}
+                    onChange={(e) => setPaypalIntegrationId(e.target.value)}
+                    placeholder="Enter PayPal Integration ID / Client ID..."
+                    className="w-full bg-slate-900 border border-blue-500/40 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-extrabold text-blue-300 uppercase tracking-wider mb-1.5">
+                    PayPal Integration Key (Secret Key / API Key)
+                  </label>
+                  <input
+                    type="text"
+                    value={paypalIntegrationKey}
+                    onChange={(e) => setPaypalIntegrationKey(e.target.value)}
+                    placeholder="Enter PayPal Integration Key / Secret Key..."
+                    className="w-full bg-slate-900 border border-blue-500/40 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                      PayPal Environment Mode
+                    </label>
+                    <select
+                      value={paypalMode}
+                      onChange={(e) => setPaypalMode(e.target.value as 'live' | 'sandbox')}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-blue-400"
+                    >
+                      <option value="live">🟢 Live (Production Visa Cards)</option>
+                      <option value="sandbox">🧪 Sandbox (Testing Mode)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                      PayPal Receiver / Business Email
+                    </label>
+                    <input
+                      type="email"
+                      value={paypalReceiverEmail}
+                      onChange={(e) => setPaypalReceiverEmail(e.target.value)}
+                      placeholder="merchant@yourdomain.com"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SLOT 2: PAYNOW PAYMENT GATEWAY CREDENTIALS */}
+              <div className="bg-slate-950 border-2 border-amber-500/30 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4" />
+                      <span>Paynow Zimbabwe Gateway</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Processes EcoCash, OneMoney &amp; Zimswitch payments
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-black uppercase">
+                    Paynow Active
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-extrabold text-amber-300 uppercase tracking-wider mb-1.5">
+                    Paynow Integration ID
+                  </label>
+                  <input
+                    type="text"
+                    value={paynowIntegrationId}
+                    onChange={(e) => setPaynowIntegrationId(e.target.value)}
+                    placeholder="e.g. 25938"
+                    className="w-full bg-slate-900 border border-amber-500/40 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-extrabold text-amber-300 uppercase tracking-wider mb-1.5">
+                    Paynow Integration Key
+                  </label>
+                  <input
+                    type="text"
+                    value={paynowIntegrationKey}
+                    onChange={(e) => setPaynowIntegrationKey(e.target.value)}
+                    placeholder="Enter Paynow Integration Key..."
+                    className="w-full bg-slate-900 border border-amber-500/40 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                      Paynow Merchant Email
+                    </label>
+                    <input
+                      type="email"
+                      value={paynowMerchantEmail}
+                      onChange={(e) => setPaynowMerchantEmail(e.target.value)}
+                      placeholder="merchant@gmail.com"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div className="flex items-end pb-1">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-extrabold">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>🟢 Live Production Mode Active</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="submit"
+                disabled={isSavingGateways}
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white font-black text-xs uppercase tracking-wider shadow-xl flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{isSavingGateways ? 'Saving Gateway Keys...' : 'Save PayPal (Visa Card) & Paynow Integration ID & Key'}</span>
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

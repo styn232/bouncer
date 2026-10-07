@@ -15,8 +15,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { AuthModal, AuthModalMode } from './components/AuthModal';
 import { ToastNotification, Toast } from './components/ToastNotification';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
-import { PushNotificationBanner } from './components/PushNotificationBanner';
-import { playRomanticChime, triggerBrowserPushNotification, formatGenderTargetedNotification, hasReceivedNotification, markNotificationReceived, getNotificationDedupeKeys } from './utils/pushNotification';
+import { markNotificationReceived, getNotificationDedupeKeys } from './utils/pushNotification';
 import { dataCache, INITIAL_LOADING_STATE } from './utils/dataCache';
 
 // Dating with Bouncer Components
@@ -445,14 +444,19 @@ export default function App() {
 
     try {
       await dataCache.dedupe('social_batch_fetch', async () => {
-        const notifUrl = `/api/notifications?gender=${encodeURIComponent(currentUser?.gender || '')}&userId=${encodeURIComponent(currentUser?.id || '')}&role=${encodeURIComponent(currentUser?.role || '')}`;
+        const notifPromise = currentUser?.id
+          ? fetch(`/api/notifications?userId=${encodeURIComponent(currentUser.id)}`, {
+              headers: { 'x-user-id': currentUser.id }
+            }).then(r => (r.ok ? r.json() : null))
+          : Promise.resolve([]);
+
         const results = await Promise.allSettled([
           fetch('/api/reels').then(r => r.ok ? r.json() : null),
           fetch('/api/stories').then(r => r.ok ? r.json() : null),
           fetch('/api/posts').then(r => r.ok ? r.json() : null),
           fetch('/api/conversations').then(r => r.ok ? r.json() : null),
           fetch('/api/who-liked-me').then(r => r.ok ? r.json() : null),
-          fetch(notifUrl).then(r => r.ok ? r.json() : null)
+          notifPromise
         ]);
 
         const [reelsRes, storiesRes, postsRes, convsRes, likersRes, notifsRes] = results;
@@ -467,61 +471,14 @@ export default function App() {
           }
         }
         if (likersRes.status === 'fulfilled' && Array.isArray(likersRes.value)) setLikers(likersRes.value);
-        if (notifsRes.status === 'fulfilled' && Array.isArray(notifsRes.value)) {
+        if (!currentUser?.id) {
+          setNotifications([]);
+        } else if (notifsRes.status === 'fulfilled' && Array.isArray(notifsRes.value)) {
           const freshNotifs = dedupeNotificationsList(notifsRes.value);
           setNotifications(freshNotifs);
-
-          // Alert for unread New Single sign-ups (with gender routing & strict deduplication so it never repeats)
           freshNotifs.forEach((n: NotificationItem) => {
-            const dedupeKeys = getNotificationDedupeKeys(n);
-            const alreadyReceived = seenNotifIdsRef.current.has(n.id) || hasReceivedNotification(dedupeKeys);
-
-            if (!n.read && !alreadyReceived) {
-              seenNotifIdsRef.current.add(n.id);
-              markNotificationReceived(dedupeKeys);
-
-              const userGender = currentUser?.gender?.toLowerCase();
-              const isAdmin = currentUser?.role === 'admin';
-              const isTargetedToMe = isAdmin || !userGender || !n.targetGender || n.targetGender === 'all' || n.targetGender === userGender;
-
-              const isSingleAlert = n.title.toLowerCase().includes('single') ||
-                                    n.title.toLowerCase().includes('gentleman') ||
-                                    n.title.toLowerCase().includes('lady') ||
-                                    n.message.toLowerCase().includes('registered') ||
-                                    n.message.toLowerCase().includes('signed up');
-
-              if (isSingleAlert && isTargetedToMe) {
-                playRomanticChime();
-                triggerBrowserPushNotification(n.title, n.message, {
-                  icon: n.photo,
-                  tag: n.id,
-                  onClick: () => {
-                    if (n.profileId) {
-                      const found = profiles.find((p) => p.id === n.profileId);
-                      if (found) setSelectedProfileModal(found);
-                    } else {
-                      setActiveTab('home');
-                    }
-                  }
-                });
-                addToast(n.title, n.message, 'new_single', {
-                  photo: n.photo,
-                  profileId: n.profileId,
-                  actionLabel: 'View Profile',
-                  onAction: () => {
-                    if (n.profileId) {
-                      const found = profiles.find((p) => p.id === n.profileId);
-                      if (found) setSelectedProfileModal(found);
-                    } else {
-                      setActiveTab('home');
-                    }
-                  }
-                });
-              }
-            } else {
-              if (n.id) seenNotifIdsRef.current.add(n.id);
-              markNotificationReceived(dedupeKeys);
-            }
+            if (n.id) seenNotifIdsRef.current.add(n.id);
+            markNotificationReceived(getNotificationDedupeKeys(n));
           });
         }
       });
@@ -553,6 +510,7 @@ export default function App() {
   useEffect(() => {
     localStorage.removeItem('bouncer_logged_user');
     setCurrentUser(null);
+    setNotifications([]);
     if (auth) {
       signOut(auth).catch(() => {});
     }
@@ -572,10 +530,21 @@ export default function App() {
         const currentSessionUser: User | null = options?.sessionUser !== undefined ? options.sessionUser : currentUser;
         const isUserAdmin = currentSessionUser?.role === 'admin';
         const adminEmail = currentSessionUser?.email || '';
+        const sessionUserId = currentSessionUser?.id || '';
+
+        const reqHeaders: Record<string, string> = {};
+        if (sessionUserId) reqHeaders['x-user-id'] = sessionUserId;
+        if (isUserAdmin) {
+          reqHeaders['x-user-role'] = 'admin';
+          reqHeaders['x-user-email'] = adminEmail;
+        }
 
         // Single fast bootstrap request instead of 6+ separate sequential calls
-        const bootRes = await fetch('/api/bootstrap', {
-          headers: isUserAdmin ? { 'x-user-role': 'admin', 'x-user-email': adminEmail } : undefined
+        const bootUrl = sessionUserId
+          ? `/api/bootstrap?userId=${encodeURIComponent(sessionUserId)}`
+          : '/api/bootstrap';
+        const bootRes = await fetch(bootUrl, {
+          headers: Object.keys(reqHeaders).length > 0 ? reqHeaders : undefined
         }).catch(() => null);
 
         if (bootRes && bootRes.ok) {
@@ -602,10 +571,11 @@ export default function App() {
             if (Array.isArray(boot.matchOrders)) {
               setMatchOrders(boot.matchOrders);
             }
-            if (Array.isArray(boot.notifications)) {
+            if (!sessionUserId) {
+              setNotifications([]);
+            } else if (Array.isArray(boot.notifications)) {
               const dedupedBootNotifs = dedupeNotificationsList(boot.notifications);
               setNotifications(dedupedBootNotifs);
-              // Mark initial bootstrap notifications as seen so they never repeat popups on background sync
               dedupedBootNotifs.forEach((n: NotificationItem) => {
                 if (n.id) seenNotifIdsRef.current.add(n.id);
                 markNotificationReceived(getNotificationDedupeKeys(n));
@@ -959,6 +929,7 @@ export default function App() {
     dataCache.invalidateAll();
     localStorage.removeItem('bouncer_logged_user');
     setCurrentUser(null);
+    setNotifications([]);
     setActiveTab('home');
     addToast('Logged Out', 'You have been logged out successfully.', 'info');
   };
@@ -972,15 +943,7 @@ export default function App() {
         body: JSON.stringify(newProfData)
       });
       if (res.ok) {
-        const addedData = await res.json();
-        const profile = addedData.profile || newProfData;
-        notifyNewSingleSignedUp({
-          age: profile.age || newProfData.age || 24,
-          city: profile.city || profile.location || newProfData.city || newProfData.location || 'Harare',
-          location: profile.location || profile.city || 'Harare',
-          photos: profile.photos || newProfData.photos,
-          id: profile.id
-        });
+        addToast('Single Profile Added', 'New single profile added to the directory.', 'success');
         handleResetFilters();
         dataCache.invalidateProfiles();
         fetchProfiles({ force: true, silent: true });
@@ -1136,13 +1099,6 @@ export default function App() {
       <div className="fixed bottom-0 right-0 pointer-events-none w-96 h-96 bg-rose-600/5 rounded-full blur-3xl z-0" />
 
       <div className="relative z-10 flex flex-col flex-1">
-        {/* Push Notification Opt-in Banner */}
-        <PushNotificationBanner
-          onEnabled={() => {
-            addToast('Push Notifications Active ❤️', 'You will receive instant alerts whenever new singles sign up in Zimbabwe!', 'new_single');
-          }}
-        />
-
         {/* Toast Notification Container */}
         <ToastNotification toasts={toasts} onDismiss={removeToast} />
 
@@ -1155,7 +1111,7 @@ export default function App() {
           siteSettings={siteSettings}
           isLoggedIn={!!currentUser}
           loadingState={loadingState}
-          unreadNotifCount={notifications.filter((n) => !n.read).length}
+          unreadNotifCount={currentUser ? notifications.filter((n) => !n.read && n.userId === currentUser.id).length : 0}
           onOpenNotifications={() => setIsNotificationCenterOpen(true)}
           onLogout={handleLogout}
           onOpenCart={() => setIsCartOpen(true)}
@@ -1271,19 +1227,9 @@ export default function App() {
                   <span>Discover Vetted Singles</span>
                 </h2>
                 <p className="text-xs sm:text-sm text-rose-300/70 mt-1">
-                  Browse verified singles in Zimbabwe vetted by Bouncer Security. Get instant alerts when new singles sign up!
+                  Browse verified singles in Zimbabwe vetted by Bouncer Security. Choose your match and connect on WhatsApp!
                 </p>
               </div>
-              <button
-                onClick={() => setIsNotificationCenterOpen(true)}
-                className="self-start sm:self-auto px-3.5 py-1.5 rounded-full bg-gradient-to-r from-rose-950/80 to-pink-950/80 border border-rose-700/40 text-rose-200 text-xs font-semibold hover:border-rose-500 flex items-center gap-2 transition-all shadow-sm active:scale-95"
-              >
-                <Bell className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
-                <span>New Singles Alerts</span>
-                {notifications.filter((n) => !n.read).length > 0 && (
-                  <span className="w-2 h-2 rounded-full bg-rose-500" />
-                )}
-              </button>
             </div>
 
             <div className="flex flex-col lg:flex-row items-start gap-8">
@@ -1844,7 +1790,7 @@ export default function App() {
         }}
       />
 
-      {/* Notification Center Modal */}
+      {/* Notification Center Modal (Strictly Personal Per User) */}
       <NotificationCenterModal
         isOpen={isNotificationCenterOpen}
         onClose={() => setIsNotificationCenterOpen(false)}
@@ -1857,7 +1803,16 @@ export default function App() {
         }}
         onClearAll={async () => {
           setNotifications([]);
-          await fetch('/api/notifications/clear', { method: 'POST' }).catch(() => {});
+          if (currentUser?.id) {
+            await fetch('/api/notifications/clear', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-user-id': currentUser.id
+              },
+              body: JSON.stringify({ userId: currentUser.id })
+            }).catch(() => {});
+          }
         }}
         onViewProfile={(profileId) => {
           const found = profiles.find((p) => p.id === profileId);
@@ -1865,23 +1820,6 @@ export default function App() {
             setSelectedProfileModal(found);
             setIsNotificationCenterOpen(false);
           }
-        }}
-        onSimulateTestPush={(gender?: 'male' | 'female') => {
-          const chosenGender = gender || (currentUser?.gender === 'female' ? 'male' : 'female');
-          const sample = profiles.find(p => p.gender === chosenGender) || profiles[Math.floor(Math.random() * profiles.length)] || {
-            age: 26,
-            city: 'Harare',
-            location: 'Harare'
-          };
-          notifyNewSingleSignedUp({
-            age: sample.age || 26,
-            city: sample.city || sample.location || 'Harare',
-            location: sample.location || sample.city || 'Harare',
-            photos: sample.photos,
-            id: sample.id,
-            gender: chosenGender,
-            forceSimulate: true
-          });
         }}
       />
 
@@ -1928,14 +1866,6 @@ export default function App() {
             <span>•</span>
             <button onClick={() => setActiveTab('wholikedme')} className="hover:text-white transition-colors">
               Who Liked Me
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => setIsNotificationCenterOpen(true)}
-              className="text-rose-400 hover:text-rose-300 flex items-center gap-1 font-semibold transition-colors"
-            >
-              <Bell className="w-3.5 h-3.5 text-rose-400" />
-              Singles Alerts
             </button>
             <span>•</span>
             <button
