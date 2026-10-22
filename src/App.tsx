@@ -13,9 +13,16 @@ import { PaymentModal } from './components/PaymentModal';
 import { UserProfileEditorModal } from './components/UserProfileEditorModal';
 import { AdminPanel } from './components/AdminPanel';
 import { AuthModal, AuthModalMode } from './components/AuthModal';
-import { ToastNotification, Toast } from './components/ToastNotification';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
-import { markNotificationReceived, getNotificationDedupeKeys } from './utils/pushNotification';
+import { ToastNotification, Toast } from './components/ToastNotification';
+import { 
+  markNotificationReceived, 
+  getNotificationDedupeKeys,
+  formatGenderTargetedNotification,
+  hasReceivedNotification,
+  playRomanticChime,
+  triggerBrowserPushNotification
+} from './utils/pushNotification';
 import { dataCache, INITIAL_LOADING_STATE } from './utils/dataCache';
 
 // Dating with Bouncer Components
@@ -73,9 +80,9 @@ export default function App() {
     summaryTitle: string;
     summaryText: string;
   }>({
-    name: 'Super Admin',
+    name: 'Bouncer Admin',
     email: 'jobsatespace@gmail.com',
-    role: 'Super Admin & Head Bouncer',
+    role: 'Bouncer Admin & Chief Moderator',
     location: 'Harare HQ, Zimbabwe',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800',
     bio: 'Head Bouncer and Dating Platform Administrator for DATING WITH BOUNCER Zimbabwe.',
@@ -86,14 +93,14 @@ export default function App() {
 
   // Sync OpenGraph / Link Preview Meta Tags with Admin Profile & Summary
   useEffect(() => {
-    const titleText = `${adminPreview.name} • ${siteSettings.siteName || 'DATING WITH BOUNCER'} | Official Admin Profile & Summary`;
-    document.title = titleText;
+    const siteTitle = siteSettings.siteName || 'DATING WITH BOUNCER';
+    document.title = siteTitle;
     const setMeta = (id: string, content: string) => {
       const el = document.getElementById(id) as HTMLMetaElement | null;
       if (el) el.content = content;
     };
-    setMeta('og-title', titleText);
-    setMeta('twitter-title', titleText);
+    setMeta('og-title', siteTitle);
+    setMeta('twitter-title', siteTitle);
     setMeta('og-description', adminPreview.summaryText);
     setMeta('twitter-description', adminPreview.summaryText);
     const ogImgUrl = `${window.location.origin}/api/og-admin-image`;
@@ -175,13 +182,13 @@ export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // Dynamic Tiered Pricing: 1 = $3, 2-3 = $6, 4-10 = $10, 11+ = $15
+  // Dynamic Tiered Pricing: 1-2 singles = $3, 3-4 = $6, >10 singles = $10, unlimited = $30
   const calculateSinglesFee = (count: number) => {
     if (count === 0) return 0;
-    if (count === 1) return 3;
-    if (count <= 3) return 6;
-    if (count <= 10) return 10;
-    return 15;
+    if (count <= 2) return 3;
+    if (count <= 4) return 6;
+    if (count <= 15) return 10;
+    return 30;
   };
 
   // Modals state
@@ -217,6 +224,9 @@ export default function App() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   const seenNotifIdsRef = useRef<Set<string>>(new Set());
+
+  // Likes tracking
+  const [myLikedProfileIds, setMyLikedProfileIds] = useState<string[]>([]);
 
   // Deduplicate notifications list so a user never sees repeated notifications
   const dedupeNotificationsList = (list: NotificationItem[]): NotificationItem[] => {
@@ -592,6 +602,9 @@ export default function App() {
             if (Array.isArray(boot.matchOrders)) {
               setMatchOrders(boot.matchOrders);
             }
+            if (Array.isArray(boot.likedProfileIds)) {
+              setMyLikedProfileIds(boot.likedProfileIds);
+            }
             if (!sessionUserId) {
               setNotifications([]);
             } else if (Array.isArray(boot.notifications)) {
@@ -805,8 +818,19 @@ export default function App() {
     }
   };
 
-  // Swipe & Like Actions
-  const handleLikeProfile = async (targetId: string, type: 'like' | 'pass' | 'superlike') => {
+  // Swipe & Like Actions (1-Click toggle like on singles)
+  const handleLikeProfile = async (targetId: string, type: 'like' | 'pass' | 'superlike' | 'toggle' = 'toggle') => {
+    if (!currentUser) {
+      setAuthModalInitialMode('user_login');
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    // Optimistic toggle
+    setMyLikedProfileIds((prev) =>
+      prev.includes(targetId) ? prev.filter((id) => id !== targetId) : [...prev, targetId]
+    );
+
     try {
       const res = await fetch('/api/likes', {
         method: 'POST',
@@ -815,11 +839,16 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
+        if (Array.isArray(data.likedProfileIds)) {
+          setMyLikedProfileIds(data.likedProfileIds);
+        }
         if (data.isMatch) {
-          addToast('IT\'S A MATCH! ❤️', `You and ${data.targetProfile?.name || 'a single'} liked each other! Start chatting now.`, 'bouncer');
+          addToast("IT'S A MATCH! ❤️", `You and ${data.targetProfile?.name || 'your match'} both liked each other! Start chatting now.`, 'bouncer');
           fetchSocialData();
-        } else if (type === 'like' || type === 'superlike') {
-          addToast('Liked Profile ❤️', `Sent interest to ${data.targetProfile?.name || 'single'}.`, 'success');
+        } else if (data.isLiked) {
+          addToast('Liked Profile ❤️', `You liked ${data.targetProfile?.name || 'this single'}!`, 'success');
+        } else if (!data.isLiked && type === 'toggle') {
+          addToast('Unliked', `Removed like from ${data.targetProfile?.name || 'this single'}.`, 'info');
         }
       }
     } catch (err) {
@@ -1288,6 +1317,26 @@ export default function App() {
         {/* DISCOVER & HOME TAB: DIRECT SINGLES DIRECTORY */}
         {(activeTab === 'discover' || activeTab === 'home') && (
           <div className="space-y-6">
+            {/* 1. MODERN HOMEPAGE HERO SECTION */}
+            {activeTab === 'home' && (
+              <HeroSection
+                profiles={profiles}
+                plans={subscriptionPlans}
+                onFindMatch={() => setActiveTab('discover')}
+                onExploreClick={() => setActiveTab('discover')}
+                onOpenRegister={() => {
+                  setAuthModalInitialMode('user_register');
+                  setIsAuthModalOpen(true);
+                }}
+                onSelectProfile={(prof) => setSelectedProfileModal(prof)}
+                onLikeProfile={(prof) => handleLikeProfile(prof.id, 'toggle')}
+                onOpenPayment={() => setIsPaymentModalOpen(true)}
+                onOpenSafety={() => setIsSafetyModalOpen(true)}
+                onQuizClick={() => setIsMatchQuizModalOpen(true)}
+                onVerifyClick={() => setIsVerificationModalOpen(true)}
+              />
+            )}
+
             {/* FEATURED SINGLES SPOTLIGHT: Horizontal Scroll Section at the Top */}
             <FeaturedSingles
               profiles={profiles}
@@ -1298,6 +1347,12 @@ export default function App() {
               }}
               onAddToCart={handleAddToCart}
               cartProfileIds={cartItems.map((item) => item.profileId)}
+              likedProfileIds={myLikedProfileIds}
+              onLikeProfile={(id) => handleLikeProfile(id, 'toggle')}
+              onOpenAuth={() => {
+                setAuthModalInitialMode('user_login');
+                setIsAuthModalOpen(true);
+              }}
               currentUser={currentUser}
             />
 
@@ -1388,6 +1443,12 @@ export default function App() {
                           profile={profile}
                           currentUser={currentUser}
                           isInCart={cartItems.some((item) => item.profileId === profile.id)}
+                          isLiked={myLikedProfileIds.includes(profile.id)}
+                          onLike={(id) => handleLikeProfile(id, 'toggle')}
+                          onOpenAuth={() => {
+                            setAuthModalInitialMode('user_login');
+                            setIsAuthModalOpen(true);
+                          }}
                           onAddToCart={handleAddToCart}
                           onViewDetails={(p) => {
                             setSelectedProfileModal(p);
@@ -1807,6 +1868,8 @@ export default function App() {
         isOpen={!!selectedProfileModal}
         currentUser={currentUser}
         isInCart={selectedProfileModal ? cartItems.some((item) => item.profileId === selectedProfileModal.id) : false}
+        isLiked={selectedProfileModal ? myLikedProfileIds.includes(selectedProfileModal.id) : false}
+        onLikeProfile={(id) => handleLikeProfile(id, 'toggle')}
         onAddToCart={handleAddToCart}
         onClose={() => setSelectedProfileModal(null)}
         onOpenAuth={() => {
@@ -1821,6 +1884,8 @@ export default function App() {
         isOpen={!!photoGalleryProfile}
         initialPhotoIdx={photoGalleryInitialIdx}
         isInCart={photoGalleryProfile ? cartItems.some((item) => item.profileId === photoGalleryProfile.id) : false}
+        isLiked={photoGalleryProfile ? myLikedProfileIds.includes(photoGalleryProfile.id) : false}
+        onLike={(id) => handleLikeProfile(id, 'toggle')}
         onAddToCart={handleAddToCart}
         onClose={() => setPhotoGalleryProfile(null)}
         onViewFullProfile={(p) => setSelectedProfileModal(p)}

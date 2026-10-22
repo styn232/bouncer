@@ -9,6 +9,8 @@ interface ProfileDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   isInCart?: boolean;
+  isLiked?: boolean;
+  onLikeProfile?: (profileId: string) => void;
   onAddToCart?: (profile: SingleProfile) => void;
   currentUser?: User | null;
   onOpenAuth?: () => void;
@@ -19,10 +21,14 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
   isOpen,
   onClose,
   isInCart,
+  isLiked: isLikedProp,
+  onLikeProfile,
   onAddToCart,
   currentUser,
   onOpenAuth
 }) => {
+  const [localLiked, setLocalLiked] = useState(false);
+  const isLiked = isLikedProp !== undefined ? isLikedProp : localLiked;
   const [selectedPhotoIdx, setSelectedPhotoIdx] = useState(0);
 
   // Reviews state
@@ -205,6 +211,30 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Top Right: Like Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!currentUser) {
+                    onClose();
+                    if (onOpenAuth) onOpenAuth();
+                    return;
+                  }
+                  setLocalLiked(!isLiked);
+                  if (onLikeProfile && profile) {
+                    onLikeProfile(profile.id);
+                  }
+                }}
+                className={`absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all z-20 cursor-pointer shadow-lg active:scale-90 ${
+                  isLiked
+                    ? 'bg-rose-600 text-white shadow-rose-900/60 scale-105 ring-2 ring-white/60'
+                    : 'bg-black/50 hover:bg-black/75 text-white border border-white/25'
+                }`}
+                title={isLiked ? 'You liked this profile ❤️' : 'Like this profile'}
+              >
+                <Heart className={`w-4 h-4 transition-transform ${isLiked ? 'fill-white text-white scale-110' : 'fill-transparent text-white'}`} />
+              </button>
 
               {/* Photo indicator badge */}
               {(profile.photos?.length || 0) > 1 && (
@@ -390,7 +420,7 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
 
                     {/* Upgrade prompt explanation */}
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      Upgrade to a <strong>VIP Plan</strong> or unlock this single with the <strong>$3 Starter Pack</strong> to access private WhatsApp numbers & initiate direct chat.
+                      Select this profile in your match cart to unlock their direct WhatsApp number via Paynow (<strong>USD $6 for 3–4 singles</strong>, <strong>USD $10 for more than 10 singles</strong>, or <strong>USD $30 for unlimited access</strong>).
                     </p>
 
                     {/* Blurred / Disabled WhatsApp Action Button */}
@@ -418,7 +448,7 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                           className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95"
                         >
                           <Crown className="w-4 h-4 text-slate-950" />
-                          Unlock WhatsApp for $3 or Upgrade to VIP
+                          {isInCart ? 'Single Selected in Cart' : 'Unlock Contact / Add to Match Cart'}
                         </button>
                       ) : (
                         <button
@@ -437,6 +467,15 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Explicit Contact Sharing Consent Notice */}
+              <div className="p-3 bg-purple-950/40 border border-purple-800/60 rounded-xl mb-6 flex items-start gap-2.5 text-[11px] text-purple-200">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <strong className="text-white block font-sans">Voluntary Contact Sharing Consent:</strong>
+                  This single member has explicitly consented to share their WhatsApp contact number for genuine relationship connections through DATING WITH BOUNCER. Consent can be revoked at any time in account settings.
+                </div>
+              </div>
 
               {/* Bio Section */}
               <div className="mb-6">
@@ -576,6 +615,31 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
 
             {/* Bottom Direct Contact & Choose Single CTA Bar */}
             <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row gap-2">
+              {/* Like Profile Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!currentUser) {
+                    onClose();
+                    if (onOpenAuth) onOpenAuth();
+                    return;
+                  }
+                  setLocalLiked(!isLiked);
+                  if (onLikeProfile && profile) {
+                    onLikeProfile(profile.id);
+                  }
+                }}
+                className={`py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md active:scale-95 cursor-pointer shrink-0 ${
+                  isLiked
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white ring-2 ring-rose-400 shadow-rose-900/50'
+                    : 'bg-slate-900 hover:bg-rose-950/60 text-rose-300 border border-rose-500/40'
+                }`}
+                title={isLiked ? 'Liked ❤️ (Click to unlike)' : 'Like this Profile'}
+              >
+                <Heart className={`w-4 h-4 ${isLiked ? 'fill-white text-white scale-110 animate-pulse' : 'text-rose-400'}`} />
+                <span>{isLiked ? 'Liked ❤️' : 'Like'}</span>
+              </button>
+
               {onAddToCart && (
                 <button
                   type="button"

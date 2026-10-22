@@ -136,8 +136,8 @@ async function startServer() {
   const DEFAULT_OG_IMAGE_URL = 'https://datingwithbouncer.com/og-default-1200x630.jpg';
 
   const DEFAULT_OPEN_GRAPH: OpenGraphSettings = {
-    ogTitle: 'Dating With Bouncer | Choose Singles & Connect',
-    ogDescription: 'See photos. Choose your match. Get their WhatsApp and start connecting today.',
+    ogTitle: 'DATING WITH BOUNCER | Find Singles in Zimbabwe',
+    ogDescription: 'Discover singles in Zimbabwe with DATING WITH BOUNCER. Browse photos, find compatible partners, and connect through our secure matchmaking platform.',
     ogImage: DEFAULT_OG_IMAGE_URL,
     siteName: 'DATING WITH BOUNCER',
     canonicalUrl: DEFAULT_CANONICAL_URL,
@@ -145,8 +145,8 @@ async function startServer() {
     ogImageWidth: 1200,
     ogImageHeight: 630,
     twitterCard: 'summary_large_image',
-    twitterTitle: 'Dating With Bouncer | Find Your Match',
-    twitterDescription: 'Browse singles, view photos and connect directly on WhatsApp. Sign up today.',
+    twitterTitle: 'DATING WITH BOUNCER | Find Singles in Zimbabwe',
+    twitterDescription: 'Discover singles in Zimbabwe with DATING WITH BOUNCER. Browse photos, find compatible partners, and connect through our secure matchmaking platform.',
     twitterImage: DEFAULT_OG_IMAGE_URL,
     defaultOgImage: DEFAULT_OG_IMAGE_URL,
     isCustomImage: false,
@@ -783,9 +783,9 @@ async function startServer() {
 
     return {
       id: adminUser.id || 'usr_admin',
-      name: adminUser.name || 'Super Admin',
+      name: adminUser.name || 'Bouncer Admin',
       email: adminUser.email || 'jobsatespace@gmail.com',
-      role: 'Super Admin & Head Bouncer',
+      role: 'Bouncer Admin & Chief Moderator',
       location: adminUser.location || 'Harare HQ, Zimbabwe',
       city: adminUser.city || 'Harare',
       avatar: avatarUrl,
@@ -793,7 +793,7 @@ async function startServer() {
       bio: adminUser.bio || 'Head Bouncer and Dating Platform Administrator for DATING WITH BOUNCER Zimbabwe.',
       summaryTitle: 'Summary of DATING WITH BOUNCER',
       summaryText:
-        "DATING WITH BOUNCER is Zimbabwe's #1 Bouncer-vetted singles & matchmaking platform across all 10 provinces (Harare, Bulawayo, Mutare, Gweru, Victoria Falls & 60+ centres). Every profile is verified for identity, honest HIV disclosure (HIV- / HIV+), and dating intent (Seeking Marriage or Funny & Good Vibe). Men exclusively see Single Ladies, and Ladies exclusively see Single Gentlemen. Add your chosen singles to your Cart ($3 for 1 Single, $6 for 2–3 Singles, $10 for 4–10 Singles, or $15 VIP 30+ Singles), pay via Paynow, and unlock direct private WhatsApp contact numbers."
+        "DATING WITH BOUNCER is Zimbabwe's #1 Bouncer-vetted singles & matchmaking platform across all 10 provinces (Harare, Bulawayo, Mutare, Gweru, Victoria Falls & 60+ centres). Every profile is verified for identity, honest HIV disclosure (HIV- / HIV+), and dating intent (Seeking Marriage or Funny & Good Vibe). Men exclusively see Single Ladies, and Ladies exclusively see Single Gentlemen. Choose your match ($6 for 3–4 Singles, $10 for more than 10 Singles, or $30 for Unlimited VIP Access), pay securely via Paynow, and unlock direct private WhatsApp contact numbers."
     };
   }
 
@@ -852,16 +852,16 @@ async function startServer() {
         }
       }
 
-      // Update unlocked singles count
+      // Update unlocked singles count based on business packages
       const unlockedCount = targetUser.purchasedProfileIds.length;
       if (tx.planId === 'test_1_single' || tx.planId === 'starter_1_single' || tx.amount === 3) {
         targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, Math.max(1, unlockedCount));
       } else if (tx.planId === 'starter_3_or_4' || tx.amount === 6) {
-        targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, Math.max(3, unlockedCount));
+        targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, Math.max(4, unlockedCount));
       } else if (tx.planId === 'starter_10_singles' || tx.amount === 10) {
-        targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, Math.max(10, unlockedCount));
-      } else if (tx.planId === 'vip_30_singles' || tx.amount >= 15) {
-        targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, Math.max(30, unlockedCount));
+        targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, Math.max(15, unlockedCount));
+      } else if (tx.planId === 'vip_30_singles' || tx.planId === 'ultimate_access' || tx.amount >= 15) {
+        targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, Math.max(999, unlockedCount));
       } else {
         targetUser.unlockedSinglesCount = Math.max(targetUser.unlockedSinglesCount || 0, unlockedCount);
       }
@@ -1084,6 +1084,7 @@ async function startServer() {
         ? matchOrders.filter(o => o.userId === reqUserId).slice(0, 25)
         : [],
       notifications: userPersonalNotifications,
+      likedProfileIds: reqUserId ? (userLikes[reqUserId] || []) : [],
       affiliateWithdrawals: isAdminReq ? affiliateWithdrawals : [],
       platformGenderBalance: {
         menCount: platformMenCount,
@@ -1536,7 +1537,7 @@ async function startServer() {
       const newUser: User = {
         id: newUserId,
         email: normalizedEmail,
-        name: name || (isAdminAccount ? 'Super Admin' : normalizedEmail.split('@')[0] || 'Member'),
+        name: name || (isAdminAccount ? 'Bouncer Admin' : normalizedEmail.split('@')[0] || 'Member'),
         age: 28,
         role: effectiveRole,
         isFeatured: effectiveRole === 'featured',
@@ -1579,7 +1580,7 @@ async function startServer() {
     const { email, password } = req.body;
     const normalizedEmail = (email || '').toLowerCase().trim();
 
-    // Standard Sign In path (supports regular users, featured users, and Super Admin / upgraded admins signing in)
+    // Standard Sign In path (supports regular users, featured users, and Bouncer Admin / upgraded admins signing in)
     if (!normalizedEmail) {
       return res.status(400).json({ error: 'Email address is required to sign in.' });
     }
@@ -1596,7 +1597,7 @@ async function startServer() {
       return res.json({ success: true, user: currentUser, token: 'user_session_token' });
     }
 
-    // Check if signing in with the pre-registered Super Admin email
+    // Check if signing in with the pre-registered Bouncer Admin email
     if (normalizedEmail === MOCK_ADMIN_USER.email.toLowerCase() || normalizedEmail === 'admin@bouncer.date') {
       if (!password) {
         return res.status(401).json({ error: 'Password is required to sign in.' });
@@ -1803,7 +1804,7 @@ async function startServer() {
       id: `notif_welcome_${registeredUser.id}`,
       userId: registeredUser.id,
       title: `🎉 Welcome to DATING WITH BOUNCER, ${registeredUser.name}!`,
-      message: `Your account is active. Upload your profile photo in Settings so you can choose other singles and connect on WhatsApp.`,
+      message: `Your account is active. Upload your profile photo so you can choose other singles and connect on WhatsApp.`,
       type: 'system',
       read: false,
       createdAt: new Date().toISOString()
@@ -1811,6 +1812,33 @@ async function startServer() {
     if (!notifications.some(n => n.id === welcomeNotif.id)) {
       notifications.unshift(welcomeNotif);
     }
+
+    // Push notifications to all users who signed up
+    const regGender = (registeredUser.gender || 'female').toLowerCase();
+    const isLady = regGender === 'female';
+    const oppositeTitle = isLady ? '❤️ New Single Lady Joined!' : '❤️ New Single Gentleman Joined!';
+    const oppositeMsg = `${registeredUser.name}, ${computeDynamicAge(registeredUser)} from ${registeredUser.city || 'Zimbabwe'} just signed up! View their profile now.`;
+
+    users.forEach(u => {
+      if (!u.id || u.id === registeredUser.id) return;
+      const uGender = (u.gender || '').toLowerCase();
+      const isOpposite = u.role === 'admin' || !uGender || (isLady ? uGender === 'male' : uGender === 'female');
+      const title = isOpposite 
+        ? oppositeTitle 
+        : `❤️ New Single Joined: ${registeredUser.name} (${computeDynamicAge(registeredUser)}, ${registeredUser.city || 'Zimbabwe'})`;
+
+      notifications.unshift({
+        id: `notif_signup_${registeredUser.id}_${u.id}_${Date.now()}`,
+        userId: u.id,
+        profileId: newProfile.id,
+        photo: isRealUploadedPhoto(registeredUser.avatar) ? registeredUser.avatar : undefined,
+        title,
+        message: oppositeMsg,
+        type: 'match',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    });
 
     res.json({ success: true, user: currentUser, profile: newProfile });
     setImmediate(() => saveAppData());
@@ -2517,7 +2545,7 @@ async function startServer() {
     res.json({ success: true, message: 'Profile deleted successfully' });
   });
 
-  // Admin: Update Bouncer Status
+  // Admin: Update Bouncer Status (with 1-click verified sync)
   app.put('/api/admin/profiles/:id/bouncer-status', (req, res) => {
     if (!isAuthorizedAdmin(req)) {
       return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
@@ -2529,12 +2557,81 @@ async function startServer() {
     }
 
     profiles[idx].bouncerStatus = status as BouncerStatus;
+    const isVerifiedNow = status === 'verified' || status === 'vip_approved';
+    profiles[idx].bouncerVerified = isVerifiedNow;
     if (notes) {
       profiles[idx].bouncerNotes = notes;
     }
-    saveAppData();
 
+    // Sync to user account
+    const matchingUser = users.find(u => u.id === profiles[idx].id || `p_${u.id}` === profiles[idx].id || (u.name && profiles[idx].name && u.name.toLowerCase() === profiles[idx].name.toLowerCase()));
+    if (matchingUser) {
+      matchingUser.bouncerVerified = isVerifiedNow;
+      if (isVerifiedNow) {
+        notifications.unshift({
+          id: `notif_bstatus_${Date.now()}_${matchingUser.id}`,
+          userId: matchingUser.id,
+          title: status === 'vip_approved' ? '✨ VIP Single Status Approved!' : '✅ Bouncer Identity Verified!',
+          message: status === 'vip_approved' ? 'Congratulations! You have been granted the VIP Approved badge by Bouncer Admin.' : 'Your identity has been verified with the official Bouncer badge.',
+          type: 'verification',
+          read: false,
+          createdAt: new Date().toISOString()
+        });
+      }
+    }
+
+    saveAppData();
     res.json({ success: true, profile: profiles[idx] });
+  });
+
+  // Admin: 1-Click Activate / Verify User & Sync Profile
+  app.put('/api/admin/users/:id/verify', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const userId = req.params.id;
+    const { bouncerVerified } = req.body;
+    const uIdx = users.findIndex(u => u.id === userId || (u.email && u.email.toLowerCase() === userId.toLowerCase()));
+    if (uIdx === -1) {
+      return res.status(404).json({ error: 'User account not found' });
+    }
+
+    const newVerified = bouncerVerified !== undefined ? Boolean(bouncerVerified) : !users[uIdx].bouncerVerified;
+    users[uIdx].bouncerVerified = newVerified;
+
+    // Sync to SingleProfile
+    const pIdx = profiles.findIndex(p => p.id === users[uIdx].id || p.id === `p_${users[uIdx].id}` || (p.name && users[uIdx].name && p.name.toLowerCase() === users[uIdx].name.toLowerCase()));
+    if (pIdx !== -1) {
+      profiles[pIdx].bouncerVerified = newVerified;
+      if (newVerified) {
+        if (profiles[pIdx].bouncerStatus !== 'vip_approved') {
+          profiles[pIdx].bouncerStatus = 'verified';
+          profiles[pIdx].bouncerNotes = 'ID & live photo officially verified by Bouncer Admin.';
+        }
+      } else {
+        profiles[pIdx].bouncerStatus = 'pending_check';
+      }
+    }
+
+    // Send instant notification to user
+    if (newVerified) {
+      notifications.unshift({
+        id: `notif_verify_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        userId: users[uIdx].id,
+        title: '🎉 You are Officially Bouncer-Verified!',
+        message: 'Your profile has been reviewed and verified by Bouncer Admin. You now have the verified badge and priority trust across Zimbabwe.',
+        type: 'verification',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    if (currentUser && currentUser.id === users[uIdx].id) {
+      currentUser.bouncerVerified = newVerified;
+    }
+
+    saveAppData();
+    res.json({ success: true, bouncerVerified: newVerified, user: users[uIdx] });
   });
 
   // Admin: List all Users
@@ -2543,6 +2640,56 @@ async function startServer() {
       return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
     }
     res.json(users);
+  });
+
+  // Admin: Push Notifications to All Users Who Signed Up
+  app.post('/api/admin/push-broadcast', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const { title, message, targetGender } = req.body;
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required.' });
+    }
+
+    let recipientCount = 0;
+    const nowIso = new Date().toISOString();
+
+    users.forEach(u => {
+      if (!u.id) return;
+      if (targetGender && targetGender !== 'all') {
+        const uGen = (u.gender || '').toLowerCase();
+        if (uGen !== targetGender.toLowerCase()) return;
+      }
+      notifications.unshift({
+        id: `notif_broadcast_${Date.now()}_${u.id}_${Math.random().toString(36).substring(2, 6)}`,
+        userId: u.id,
+        title: String(title).trim(),
+        message: String(message).trim(),
+        type: 'system',
+        read: false,
+        createdAt: nowIso
+      });
+      recipientCount++;
+    });
+
+    // Also add broadcast marker
+    notifications.unshift({
+      id: `notif_broadcast_global_${Date.now()}`,
+      userId: 'all',
+      title: String(title).trim(),
+      message: String(message).trim(),
+      type: 'system',
+      read: false,
+      createdAt: nowIso
+    });
+
+    saveAppData();
+    res.json({
+      success: true,
+      recipientCount,
+      message: `Push notification successfully dispatched to ${recipientCount} signed-up users!`
+    });
   });
 
   // Admin: Add or Deduct Account Funds from User Balance
@@ -3665,38 +3812,85 @@ async function startServer() {
   // ==========================================
   // DISCOVER LIKES & SWIPE MATCHING ENDPOINTS
   // ==========================================
+  app.get('/api/likes/my-likes', (_req, res) => {
+    if (!currentUser) return res.json({ likedProfileIds: [] });
+    const liked = userLikes[currentUser.id] || [];
+    res.json({ likedProfileIds: liked });
+  });
+
   app.post('/api/likes', (req, res) => {
-    const { targetProfileId, type } = req.body; // type: 'like' | 'pass' | 'superlike'
-    if (!currentUser) return res.status(401).json({ error: 'Not authenticated' });
+    const { targetProfileId, type } = req.body; // type: 'like' | 'pass' | 'superlike' | 'toggle'
+    if (!currentUser) return res.status(401).json({ error: 'Please sign in to like profiles.' });
     if (!targetProfileId) return res.status(400).json({ error: 'Target profile ID required' });
 
     const uId = currentUser.id;
     if (!userLikes[uId]) userLikes[uId] = [];
     if (!userMatches[uId]) userMatches[uId] = [];
 
+    const isCurrentlyLiked = userLikes[uId].includes(targetProfileId);
+
+    // If type is toggle and already liked, unlike
+    if (type === 'toggle' && isCurrentlyLiked) {
+      userLikes[uId] = userLikes[uId].filter(id => id !== targetProfileId);
+      saveAppData();
+      return res.json({
+        success: true,
+        isLiked: false,
+        isMatch: false,
+        likedProfileIds: userLikes[uId]
+      });
+    }
+
     let isMatch = false;
-    if (type === 'like' || type === 'superlike') {
+    let isLikedNow = true;
+
+    if (type === 'pass') {
+      userLikes[uId] = userLikes[uId].filter(id => id !== targetProfileId);
+      isLikedNow = false;
+    } else {
+      // Like / Superlike / Toggle to like
       if (!userLikes[uId].includes(targetProfileId)) {
         userLikes[uId].push(targetProfileId);
       }
 
-      // Check for mutual match or auto-match logic for high compatibility profiles
       const targetProf = profiles.find(p => p.id === targetProfileId);
-      const otherUserLikes = userLikes[targetProfileId] || [];
-      const hasMutual = otherUserLikes.includes(uId) || (targetProf && targetProf.compatibilityScore >= 90);
+      const targetUser = users.find(u => u.id === targetProfileId || `p_${u.id}` === targetProfileId || (targetProf && u.name.toLowerCase() === targetProf.name.toLowerCase()));
+      const targetUserId = targetUser ? targetUser.id : (targetProf ? targetProf.id : targetProfileId);
+
+      // Check for mutual match or auto-match logic for high compatibility profiles
+      const otherUserLikes = userLikes[targetUserId] || userLikes[targetProfileId] || [];
+      const hasMutual = otherUserLikes.includes(uId) || otherUserLikes.includes(`p_${uId}`) || (targetProf && targetProf.compatibilityScore >= 90);
+
+      // 1. Notify the user being liked that someone liked them!
+      const userDynAge = computeDynamicAge(currentUser);
+      const userGenderLabel = (currentUser.gender || 'male') === 'male' ? 'Gentleman' : 'Lady';
+
+      notifications.unshift({
+        id: `notif_like_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        userId: targetUserId,
+        profileId: `p_${uId}`,
+        photo: isRealUploadedPhoto(currentUser.avatar) ? currentUser.avatar : undefined,
+        title: '❤️ Someone Liked Your Profile!',
+        message: `${currentUser.name} (${userGenderLabel}, ${userDynAge} from ${currentUser.city || 'Zimbabwe'}) liked your profile! Open Who Liked You to see.`,
+        type: 'match',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
 
       if (hasMutual) {
         isMatch = true;
         if (!userMatches[uId].includes(targetProfileId)) userMatches[uId].push(targetProfileId);
-        if (!userMatches[targetProfileId]) userMatches[targetProfileId] = [];
-        if (!userMatches[targetProfileId].includes(uId)) userMatches[targetProfileId].push(uId);
+        if (!userMatches[targetUserId]) userMatches[targetUserId] = [];
+        if (!userMatches[targetUserId].includes(uId)) userMatches[targetUserId].push(uId);
 
-        // Auto-create notification for both
+        // Auto-create mutual match notification for both
         notifications.unshift({
-          id: `notif_${Date.now()}`,
+          id: `notif_match_${Date.now()}_${uId}`,
           userId: uId,
-          title: 'IT\'S A MATCH! ❤️',
-          message: `You and ${targetProf?.name || 'a single'} liked each other! Start chatting now.`,
+          profileId: targetProfileId,
+          photo: targetProf && isRealUploadedPhoto(targetProf.photos?.[0]) ? targetProf.photos[0] : undefined,
+          title: "IT'S A MUTUAL MATCH! ❤️",
+          message: `You and ${targetProf?.name || 'your match'} both liked each other! Start chatting now.`,
           type: 'match',
           read: false,
           createdAt: new Date().toISOString()
@@ -3721,7 +3915,9 @@ async function startServer() {
 
     res.json({
       success: true,
+      isLiked: isLikedNow,
       isMatch,
+      likedProfileIds: userLikes[uId],
       targetProfile: profiles.find(p => p.id === targetProfileId)
     });
   });
@@ -3731,8 +3927,8 @@ async function startServer() {
     const myId = currentUser.id;
 
     // Profiles that liked myId
-    const likerIds = Object.keys(userLikes).filter(uId => userLikes[uId]?.includes(myId) || userLikes[uId]?.includes('p1'));
-    const likers = profiles.filter(p => likerIds.includes(p.id) || p.isFeatured);
+    const likerIds = Object.keys(userLikes).filter(uId => userLikes[uId]?.includes(myId) || userLikes[uId]?.includes(`p_${myId}`) || userLikes[uId]?.includes('p1'));
+    const likers = profiles.filter(p => likerIds.includes(p.id) || likerIds.includes(p.id.replace('p_', '')) || p.isFeatured);
 
     res.json(likers);
   });
@@ -4362,6 +4558,50 @@ async function startServer() {
     );
     return html;
   }
+
+  // SEO: Dynamic robots.txt
+  app.get('/robots.txt', (_req, res) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(`User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Sitemap: https://datingwithbouncer.com/sitemap.xml
+`);
+  });
+
+  // SEO: Dynamic XML Sitemap
+  app.get('/sitemap.xml', (_req, res) => {
+    res.setHeader('Content-Type', 'application/xml');
+    const now = new Date().toISOString().split('T')[0];
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://datingwithbouncer.com/</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://datingwithbouncer.com/?tab=discover</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://datingwithbouncer.com/?tab=pricing</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://datingwithbouncer.com/?tab=safety</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+</urlset>`);
+  });
 
   // Vite middleware for development vs static serve for production
   if (process.env.NODE_ENV !== 'production') {

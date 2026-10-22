@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image as ImageIcon, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database, Wallet, ArrowUpRight, ArrowDownLeft, X, UserCheck, Gift, ImageOff, CreditCard } from 'lucide-react';
+import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image as ImageIcon, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database, Wallet, ArrowUpRight, ArrowDownLeft, X, UserCheck, Gift, ImageOff, CreditCard, Bell, Send, Radio } from 'lucide-react';
 import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings, DatingIntent, AffiliateWithdrawalRequest } from '../types';
 import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getCitiesByProvince, getSubLocationsForCity, getProvinceForCity } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -41,8 +41,72 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRejectPayment,
   onRefreshData
 }) => {
-  const [activeTab, setActiveTab] = useState<'profiles' | 'queue' | 'subscriptions' | 'audit' | 'orders' | 'branding' | 'views' | 'admins' | 'affiliate' | 'gateways'>('profiles');
+  const [activeTab, setActiveTab] = useState<'profiles' | 'queue' | 'subscriptions' | 'audit' | 'orders' | 'branding' | 'views' | 'admins' | 'affiliate' | 'gateways' | 'push'>('profiles');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // 1-Click Verification Action State
+  const [verifyingUserId, setVerifyingUserId] = useState<string | null>(null);
+
+  const handleOneClickVerifyUser = async (userId: string, targetVerified: boolean) => {
+    try {
+      setVerifyingUserId(userId);
+      const res = await fetch(`/api/admin/users/${userId}/verify`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': 'admin',
+          'x-user-email': 'jobsatespace@gmail.com'
+        },
+        body: JSON.stringify({ bouncerVerified: targetVerified })
+      });
+      if (res.ok) {
+        onRefreshData();
+      }
+    } catch (err) {
+      console.error('Failed to 1-click verify user:', err);
+    } finally {
+      setVerifyingUserId(null);
+    }
+  };
+
+  // Push Notifications Broadcast State
+  const [broadcastTitle, setBroadcastTitle] = useState('❤️ Weekend Dating Rush: New Singles Joined!');
+  const [broadcastMessage, setBroadcastMessage] = useState('Browse newly verified singles in Zimbabwe vetted by Bouncer Security. Choose your match and connect on WhatsApp!');
+  const [broadcastGender, setBroadcastGender] = useState<'all' | 'male' | 'female'>('all');
+  const [isSendingBroadcast, setIsSendingBroadcast] = useState(false);
+  const [broadcastResultMsg, setBroadcastResultMsg] = useState<string | null>(null);
+
+  const handleSendPushBroadcast = async () => {
+    if (!broadcastTitle.trim() || !broadcastMessage.trim()) return;
+    setIsSendingBroadcast(true);
+    setBroadcastResultMsg(null);
+    try {
+      const res = await fetch('/api/admin/push-broadcast', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': 'admin',
+          'x-user-email': 'jobsatespace@gmail.com'
+        },
+        body: JSON.stringify({
+          title: broadcastTitle.trim(),
+          message: broadcastMessage.trim(),
+          targetGender: broadcastGender
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setBroadcastResultMsg(`✅ Success! ${data.message || 'Push notification sent to all signed-up users!'}`);
+        onRefreshData();
+      } else {
+        setBroadcastResultMsg(`❌ Error: ${data.error || 'Failed to dispatch push notification.'}`);
+      }
+    } catch (err) {
+      setBroadcastResultMsg('❌ Network error sending push notification.');
+    } finally {
+      setIsSendingBroadcast(false);
+    }
+  };
 
   // Payment Gateways Admin State (PayPal "Use Visa Card Here" & Paynow Integration ID & Key Slots)
   const [paypalIntegrationId, setPaypalIntegrationId] = useState<string>(siteSettings?.paymentGateways?.paypalIntegrationId || '');
@@ -902,6 +966,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <Key className="w-4 h-4" />
           Admin & Featured Roles
         </button>
+
+        <button
+          onClick={() => setActiveTab('push')}
+          className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all flex items-center gap-2 ${
+            activeTab === 'push'
+              ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
+              : 'bg-slate-900 text-rose-300 hover:bg-slate-800 border border-rose-500/30'
+          }`}
+        >
+          <Bell className="w-4 h-4 text-rose-400" />
+          Push Notifications ({userSubscriptions.length} Users)
+        </button>
       </div>
 
       {/* TAB 1: MANAGE PROFILES */}
@@ -983,17 +1059,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </td>
                     <td className="p-3">
                       {p.bouncerStatus === 'vip_approved' ? (
-                        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 rounded-full font-bold text-[10px]">
-                          ✨ VIP Approved
-                        </span>
-                      ) : p.bouncerStatus === 'verified' ? (
-                        <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-bold text-[10px]">
-                          ✅ Verified
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onUpdateBouncerStatus(p.id, 'verified', 'Toggled to Verified')}
+                          className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-full font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                          title="VIP Approved - Click to toggle to Verified"
+                        >
+                          <Sparkles className="w-3 h-3 text-amber-400" />
+                          <span>✨ VIP Approved</span>
+                        </button>
+                      ) : (p.bouncerStatus === 'verified' || p.bouncerVerified) ? (
+                        <button
+                          type="button"
+                          onClick={() => onUpdateBouncerStatus(p.id, 'pending_check', 'Toggled to Pending')}
+                          className="bg-emerald-500/20 hover:bg-rose-500/20 text-emerald-400 hover:text-rose-300 border border-emerald-500/40 hover:border-rose-500/40 px-2.5 py-1 rounded-full font-extrabold text-[10px] flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                          title="Verified - Click to toggle status"
+                        >
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          <span>✅ Verified ✓</span>
+                        </button>
                       ) : (
-                        <span className="bg-slate-800 text-slate-400 px-2.5 py-0.5 rounded-full text-[10px]">
-                          ⏳ Pending
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onUpdateBouncerStatus(p.id, 'verified', 'ID & photo verified by Bouncer Admin')}
+                          className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black rounded-full flex items-center gap-1 text-[10px] shadow-sm active:scale-95 cursor-pointer whitespace-nowrap animate-pulse"
+                          title="1-Click to Activate & Verify this Single"
+                        >
+                          <ShieldCheck className="w-3 h-3" />
+                          <span>1-Click Verify</span>
+                        </button>
                       )}
                     </td>
                     <td className="p-3">
@@ -1458,13 +1552,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </td>
                         <td className="p-3">
                           {u.bouncerVerified ? (
-                            <span className="text-emerald-700 font-bold flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Verified
-                            </span>
+                            <button
+                              type="button"
+                              disabled={verifyingUserId === u.id}
+                              onClick={() => handleOneClickVerifyUser(u.id, false)}
+                              className="px-2.5 py-1 bg-emerald-100 hover:bg-rose-100 text-emerald-800 hover:text-rose-800 font-bold rounded-full border border-emerald-300 hover:border-rose-300 flex items-center gap-1 transition-all text-xs cursor-pointer shadow-xs active:scale-95 whitespace-nowrap"
+                              title="Verified - Click to toggle unverify"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Verified ✓</span>
+                            </button>
                           ) : (
-                            <span className="text-amber-700 font-bold flex items-center gap-1">
-                              ⏳ Pending
-                            </span>
+                            <button
+                              type="button"
+                              disabled={verifyingUserId === u.id}
+                              onClick={() => handleOneClickVerifyUser(u.id, true)}
+                              className="px-3 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black rounded-full flex items-center gap-1 shadow-sm transition-all text-xs active:scale-95 cursor-pointer whitespace-nowrap animate-pulse"
+                              title="1-Click to Activate & Verify this User"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>{verifyingUserId === u.id ? 'Verifying...' : '1-Click Verify'}</span>
+                            </button>
                           )}
                         </td>
                         {/* Admin Add / Remove Funds Column */}
@@ -2866,6 +2974,165 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: PUSH NOTIFICATIONS TO ALL USERS WHO SIGNED UP */}
+      {activeTab === 'push' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <h3 className="text-xl font-extrabold text-white font-serif flex items-center gap-2">
+                <Bell className="w-5 h-5 text-rose-500 animate-bounce" />
+                Push Notifications to All Users Who Signed Up
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Dispatches instant browser notifications and private account alerts to every registered single ({userSubscriptions.length} registered members).
+              </p>
+            </div>
+            <div className="bg-rose-500/10 border border-rose-500/30 px-3.5 py-1.5 rounded-xl text-rose-300 font-bold text-xs flex items-center gap-2">
+              <Users className="w-4 h-4 text-rose-400" />
+              <span>{userSubscriptions.length} Signed-Up Users</span>
+            </div>
+          </div>
+
+          {broadcastResultMsg && (
+            <div className={`p-4 rounded-2xl border text-xs font-bold flex items-center justify-between ${
+              broadcastResultMsg.includes('Success')
+                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                : 'bg-rose-950/60 border-rose-500/40 text-rose-300'
+            }`}>
+              <span>{broadcastResultMsg}</span>
+              <button
+                type="button"
+                onClick={() => setBroadcastResultMsg(null)}
+                className="text-slate-400 hover:text-white text-xs font-bold ml-4"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div>
+              <label className="block text-xs font-extrabold uppercase text-slate-400 mb-2">
+                Target Audience
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBroadcastGender('all')}
+                  className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    broadcastGender === 'all'
+                      ? 'bg-gradient-to-r from-rose-600 to-amber-500 text-white border-transparent shadow-md'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>All Signed Up ({userSubscriptions.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBroadcastGender('male')}
+                  className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    broadcastGender === 'male'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-md'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span>👨 Single Gentlemen Only</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBroadcastGender('female')}
+                  className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    broadcastGender === 'female'
+                      ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white border-transparent shadow-md'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span>👩 Single Ladies Only</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-extrabold uppercase text-slate-400 mb-1">
+                Push Notification Title
+              </label>
+              <input
+                type="text"
+                value={broadcastTitle}
+                onChange={(e) => setBroadcastTitle(e.target.value)}
+                placeholder="e.g. ❤️ Weekend Dating Rush: New Singles Joined!"
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-extrabold uppercase text-slate-400 mb-1">
+                Notification Message
+              </label>
+              <textarea
+                rows={3}
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                placeholder="Write your push notification message to all users..."
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500 resize-none"
+              />
+            </div>
+
+            {/* Quick Templates */}
+            <div>
+              <span className="text-[11px] text-slate-400 font-semibold block mb-1.5">
+                Quick Push Templates:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBroadcastTitle('❤️ New Singles Alert!');
+                    setBroadcastMessage('Fresh verified singles in Harare, Bulawayo & Mutare just registered! Choose your match & get WhatsApp contact numbers.');
+                  }}
+                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-rose-300 border border-slate-700/60 rounded-lg text-[10px] font-bold cursor-pointer"
+                >
+                  ✨ New Singles Alert
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBroadcastTitle('🔥 Special Dating Discount!');
+                    setBroadcastMessage('Starter passes now available at $3 and $6! Unlock verified WhatsApp contacts with 1 click.');
+                  }}
+                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700/60 rounded-lg text-[10px] font-bold cursor-pointer"
+                >
+                  💰 Pricing Promo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBroadcastTitle('🛡️ Free ID Verification Event!');
+                    setBroadcastMessage('Get your profile Bouncer-Verified for free today. Verified singles receive 4x more WhatsApp connections!');
+                  }}
+                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-700/60 rounded-lg text-[10px] font-bold cursor-pointer"
+                >
+                  🛡️ Verification Drive
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                disabled={isSendingBroadcast || !broadcastTitle.trim() || !broadcastMessage.trim()}
+                onClick={handleSendPushBroadcast}
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-500 hover:to-amber-400 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-rose-950/50 cursor-pointer disabled:opacity-50 transition-all active:scale-95"
+              >
+                <Send className="w-4 h-4" />
+                <span>{isSendingBroadcast ? 'Sending Push Notifications...' : 'Send Push Notification to All Users Who Signed Up'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

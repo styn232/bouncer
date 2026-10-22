@@ -268,7 +268,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 >
                   {plan.popular && (
                     <span className="absolute -top-2.5 right-3 bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 font-black text-[9px] uppercase px-2.5 py-0.5 rounded-full shadow-md">
-                      {plan.badge || '$15 VIP UNLIMITED'}
+                      {plan.badge || 'POPULAR'}
                     </span>
                   )}
 

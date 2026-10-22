@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { motion } from 'motion/react';
-import { Crown, Sparkles, ChevronLeft, ChevronRight, MapPin, Star, Eye, UserCheck, Check, Lock, ShieldCheck, Camera, ImageOff, MailCheck } from 'lucide-react';
+import { Crown, Sparkles, ChevronLeft, ChevronRight, MapPin, Star, Eye, UserCheck, Check, Lock, ShieldCheck, Camera, ImageOff, MailCheck, Heart } from 'lucide-react';
 import { SingleProfile, User } from '../types';
 import { formatDisplayName, capitalizeName, getValidProfilePhotos, calculateDynamicAge, formatRegistrationDate } from '../utils/format';
 
@@ -10,6 +10,9 @@ interface FeaturedSinglesProps {
   onViewPhotos?: (profile: SingleProfile, initialIdx?: number) => void;
   onAddToCart?: (profile: SingleProfile) => void;
   cartProfileIds?: string[];
+  likedProfileIds?: string[];
+  onLikeProfile?: (id: string) => void;
+  onOpenAuth?: () => void;
   currentUser?: User | null;
 }
 
@@ -19,6 +22,9 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
   onViewPhotos,
   onAddToCart,
   cartProfileIds = [],
+  likedProfileIds = [],
+  onLikeProfile,
+  onOpenAuth,
   currentUser
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -190,7 +196,26 @@ export const FeaturedSingles: React.FC<FeaturedSinglesProps> = ({
                   )}
                 </div>
 
-                <div className="absolute top-2 right-2 flex items-center gap-1">
+                <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!currentUser) {
+                        if (onOpenAuth) onOpenAuth();
+                        return;
+                      }
+                      if (onLikeProfile) onLikeProfile(profile.id);
+                    }}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer ${
+                      likedProfileIds.includes(profile.id)
+                        ? 'bg-rose-600 text-white shadow-rose-900/60 scale-105'
+                        : 'bg-black/60 hover:bg-black/80 text-white border border-white/20'
+                    }`}
+                    title={likedProfileIds.includes(profile.id) ? 'Liked ❤️' : 'Like Profile'}
+                  >
+                    <Heart className={`w-3 h-3 ${likedProfileIds.includes(profile.id) ? 'fill-white text-white' : 'fill-transparent text-white'}`} />
+                  </button>
                   {(profile.photos?.length || 0) > 1 && (
                     <span className="bg-slate-950/85 backdrop-blur-md text-slate-200 border border-slate-700 font-bold text-[9px] px-1.5 py-0.5 rounded-lg flex items-center gap-0.5">
                       <Camera className="w-2.5 h-2.5 text-rose-400" />

@@ -45,8 +45,8 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
 
   const visibleNotifs = currentUser
     ? notifications.filter(n => {
-        if (!n || !n.userId || n.userId === 'all' || n.userId === 'usr_guest') return false;
-        const isMine = n.userId === currentUser.id || myOwnedProfileIds.has(n.userId);
+        if (!n || !n.userId || n.userId === 'usr_guest') return false;
+        const isMine = n.userId === currentUser.id || n.userId === 'all' || myOwnedProfileIds.has(n.userId);
         if (!isMine) return false;
 
         const keys = getNotificationDedupeKeys(n);

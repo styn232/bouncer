@@ -23,6 +23,8 @@ interface PhotoGalleryModalProps {
   onClose: () => void;
   initialPhotoIdx?: number;
   isInCart?: boolean;
+  isLiked?: boolean;
+  onLike?: (profileId: string) => void;
   onAddToCart?: (profile: SingleProfile) => void;
   onViewFullProfile?: (profile: SingleProfile) => void;
 }
@@ -33,9 +35,13 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
   onClose,
   initialPhotoIdx = 0,
   isInCart = false,
+  isLiked: isLikedProp,
+  onLike,
   onAddToCart,
   onViewFullProfile
 }) => {
+  const [localLiked, setLocalLiked] = useState(false);
+  const isLiked = isLikedProp !== undefined ? isLikedProp : localLiked;
   const [activeIdx, setActiveIdx] = useState(initialPhotoIdx);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
@@ -158,6 +164,24 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
 
             <div className="flex items-center gap-2">
               <button
+                type="button"
+                onClick={() => {
+                  setLocalLiked(!isLiked);
+                  if (onLike && profile) {
+                    onLike(profile.id);
+                  }
+                }}
+                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+                  isLiked
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-2 ring-rose-400'
+                    : 'bg-slate-800 hover:bg-slate-700 text-rose-400 hover:text-rose-300'
+                }`}
+                title={isLiked ? 'Liked ❤️ (Click to unlike)' : 'Like this Single'}
+                aria-label="Like profile"
+              >
+                <Heart className={`w-4 h-4 transition-transform ${isLiked ? 'fill-white text-white scale-110' : 'fill-transparent text-rose-400'}`} />
+              </button>
+              <button
                 id="close-gallery-btn"
                 onClick={onClose}
                 className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
@@ -258,6 +282,26 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
             </div>
 
             <div className="w-full sm:w-auto flex items-center gap-2">
+              <button
+                type="button"
+                id="gallery-like-btn"
+                onClick={() => {
+                  setLocalLiked(!isLiked);
+                  if (onLike && profile) {
+                    onLike(profile.id);
+                  }
+                }}
+                className={`px-3.5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 ${
+                  isLiked
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-1 ring-rose-400'
+                    : 'bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30'
+                }`}
+                title={isLiked ? 'Liked ❤️ (Click to unlike)' : 'Like this Single'}
+              >
+                <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-white text-white scale-110 animate-pulse' : 'text-rose-400'}`} />
+                <span>{isLiked ? 'Liked' : 'Like'}</span>
+              </button>
+
               {onViewFullProfile && (
                 <button
                   id="gallery-view-bio-btn"
@@ -268,7 +312,7 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                   className="flex-1 sm:flex-initial px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
                 >
                   <Eye className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Full Profile & Bio</span>
+                  <span>Full Profile</span>
                 </button>
               )}
 

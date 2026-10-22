@@ -44,6 +44,8 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
   const [photo3, setPhoto3] = useState('');
   const [interestsText, setInterestsText] = useState((currentUser?.interests || []).join(', '));
   const [bouncerVerified, setBouncerVerified] = useState(currentUser?.bouncerVerified || false);
+  const [locationPrivacy, setLocationPrivacy] = useState<'full' | 'city_only'>((currentUser as any)?.locationPrivacy || 'full');
+  const [consentToShare, setConsentToShare] = useState<boolean>((currentUser as any)?.consentToShare !== false);
 
   // Wallet & Add Funds state
   const [userWalletBalance, setUserWalletBalance] = useState<number>(currentUser?.walletBalance ?? 0);
@@ -295,7 +297,9 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
       photos,
       interests,
       bouncerVerified,
-      walletBalance: userWalletBalance
+      walletBalance: userWalletBalance,
+      locationPrivacy,
+      consentToShare
     });
     setIsSaved(true);
     setTimeout(() => {
@@ -1111,6 +1115,39 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                     </select>
                   </div>
                 </div>
+
+                {/* Location Privacy Mode Toggle */}
+                <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                  <label className="block font-bold text-slate-300 text-[10px] uppercase tracking-wider">
+                    🛡️ Location Privacy on Profile Cards
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setLocationPrivacy('full')}
+                      className={`p-2.5 rounded-xl text-left border transition-all ${
+                        locationPrivacy === 'full'
+                          ? 'bg-amber-500/20 border-amber-400 text-white font-bold ring-1 ring-amber-400/40'
+                          : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="font-extrabold text-white">Full: City & Suburb</div>
+                      <div className="text-[9px] text-slate-400 truncate">{city} ({subLocation})</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLocationPrivacy('city_only')}
+                      className={`p-2.5 rounded-xl text-left border transition-all ${
+                        locationPrivacy === 'city_only'
+                          ? 'bg-amber-500/20 border-amber-400 text-white font-bold ring-1 ring-amber-400/40'
+                          : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="font-extrabold text-white">Privacy: City Only</div>
+                      <div className="text-[9px] text-slate-400 truncate">{city} only (hide suburb)</div>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Dating Intent: Marriage or Funny */}
@@ -1171,6 +1208,21 @@ export const UserProfileEditorModal: React.FC<UserProfileEditorModalProps> = ({
                 placeholder="Coffee, Safari, Music, Cooking"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-amber-500"
               />
+            </div>
+
+            {/* Voluntary Consent Agreement */}
+            <div className="p-3.5 rounded-2xl bg-purple-950/40 border border-purple-800/60 flex items-start gap-2.5 text-xs text-purple-200">
+              <input
+                type="checkbox"
+                id="consent-checkbox"
+                checked={consentToShare}
+                onChange={(e) => setConsentToShare(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-purple-600 text-rose-600 focus:ring-rose-500 cursor-pointer"
+              />
+              <label htmlFor="consent-checkbox" className="text-[11px] leading-relaxed cursor-pointer select-none">
+                <strong className="text-white block">Voluntary Profile & Contact Sharing Consent:</strong>
+                I voluntarily consent to having my profile displayed to registered adult members (18+) on DATING WITH BOUNCER and to having my WhatsApp number unlocked only upon verified payment confirmation. I can revoke this consent or request profile removal anytime.
+              </label>
             </div>
 
             {/* Submit */}

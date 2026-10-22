@@ -120,6 +120,19 @@ export interface PaymentGatewayConfig {
   updatedAt?: string;
 }
 
+export interface Testimonial {
+  id: string;
+  names: string;
+  location: string;
+  quote: string;
+  badge: string;
+  image: string;
+  isApproved?: boolean;
+  order?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface SiteSettings {
   siteName: string;
   logoUrl: string;
@@ -145,6 +158,7 @@ export interface SiteSettings {
   ogVersion?: number;
   openGraph?: OpenGraphSettings;
   paymentGateways?: PaymentGatewayConfig;
+  testimonials?: Testimonial[];
 }
 
 export interface User {

@@ -11,64 +11,66 @@ export const INITIAL_PROFILES: SingleProfile[] = [];
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
-    id: 'test_1_single',
-    name: '$3 Starter Pack',
-    price: 3,
-    billingPeriod: 'monthly',
-    tagline: 'Starter Pack: Unlock & view exactly 1 Single Profile & private WhatsApp contact number',
-    badge: '$3 STARTER PACK',
-    popular: false,
-    features: [
-      'Unlock & view exactly 1 Single Profile',
-      'Unlock Direct WhatsApp Phone Number',
-      'Instant Direct WhatsApp Connection',
-      'Bouncer Security Vetting & ID Verification'
-    ]
-  },
-  {
     id: 'starter_3_or_4',
-    name: '2 to 3 Singles Pass',
+    name: '3–4 Singles Pass',
     price: 6,
     billingPeriod: 'monthly',
-    tagline: 'Unlock direct WhatsApp contact numbers & dates for 2 to 3 Singles',
-    badge: '$6 PASS',
+    tagline: 'USD $6 — Unlock direct WhatsApp contacts for 3 to 4 verified singles',
+    badge: 'USD $6 — 3–4 SINGLES',
     popular: false,
     features: [
-      'Select 2 to 3 Singles for $6',
-      'Unlock Direct WhatsApp Phone Numbers',
-      'Fast Identity Verification',
-      'Send Direct Date Requests'
+      'Unlock 3 to 4 Singles for $6',
+      'Direct WhatsApp Contact Numbers',
+      'Verified Zimbabwean Singles Only',
+      'Fast Identity Clearance & Safety Check'
     ]
   },
   {
     id: 'starter_10_singles',
-    name: '4 to 10 Singles Bundle',
+    name: 'More Than 10 Singles Bundle',
     price: 10,
     billingPeriod: 'monthly',
-    tagline: 'Unlock direct WhatsApp numbers for 4 to 10 Singles — Bundle Deal!',
-    badge: '$10 BUNDLE',
-    popular: false,
+    tagline: 'USD $10 — Unlock direct WhatsApp numbers for more than 10 singles',
+    badge: 'USD $10 — BEST VALUE',
+    popular: true,
     features: [
-      'Select 4 to 10 Singles for $10',
-      'Unlock Direct WhatsApp Phone Numbers',
+      'Unlock more than 10 Singles for $10',
+      'Direct WhatsApp Contact Numbers',
       'Priority Bouncer Clearance',
-      'Direct WhatsApp Order List'
+      'Direct WhatsApp Match Delivery',
+      'Ideal for active dating in Zimbabwe & Diaspora'
     ]
   },
   {
     id: 'vip_30_singles',
-    name: 'VIP Access (30+ Singles)',
-    price: 15,
+    name: 'Unlimited Access Pass',
+    price: 30,
     billingPeriod: 'monthly',
-    tagline: 'Request and pay $15 for VIP Access to unlock MORE THAN 30 Singles!',
-    badge: '$15 VIP UNLIMITED',
-    popular: true,
+    tagline: 'USD $30 — Unlimited Access to unlock singles across all provinces',
+    badge: 'USD $30 — UNLIMITED',
+    popular: false,
     features: [
-      'Unlock MORE THAN 30 Singles for $15',
+      'Unlimited Singles Contact Unlocks',
       'Direct WhatsApp Contact Numbers',
       'VIP Gold Access Badge',
-      'Priority Concierge Service',
-      'Full Bouncer Verification Guarantee'
+      'Priority Concierge Matchmaker Support',
+      'Full Bouncer Verification Guarantee',
+      'Exclusive Access to Newly Joined Singles'
+    ]
+  },
+  {
+    id: 'test_1_single',
+    name: 'Single Profile Unlock',
+    price: 3,
+    billingPeriod: 'monthly',
+    tagline: 'Unlock exactly 1 Single Profile & private WhatsApp contact number',
+    badge: 'USD $3 — 1 SINGLE',
+    popular: false,
+    features: [
+      'Unlock 1 Single Profile',
+      'Unlock Direct WhatsApp Phone Number',
+      'Instant Direct WhatsApp Connection',
+      'Bouncer Security Vetting & ID Verification'
     ]
   }
 ];
@@ -76,7 +78,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
 export const MOCK_ADMIN_USER: User = {
   id: 'usr_admin',
   email: 'jobsatespace@gmail.com',
-  name: 'Super Admin',
+  name: 'Bouncer Admin',
   age: 35,
   location: 'Harare HQ, Zimbabwe',
   city: 'Harare',
@@ -84,7 +86,7 @@ export const MOCK_ADMIN_USER: User = {
   subscriptionPlan: 'vip_30_singles',
   subscriptionStatus: 'active',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-  bio: 'Super Admin and Dating Platform Administrator.',
+  bio: 'Bouncer Admin and Dating Platform Administrator.',
   bouncerVerified: true,
   createdAt: '2026-01-01T00:00:00Z'
 };

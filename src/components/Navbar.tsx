@@ -497,6 +497,31 @@ export const Navbar: React.FC<NavbarProps> = ({
                           </button>
                         )}
 
+                        {/* Who Liked Me */}
+                        <button
+                          onClick={() => {
+                            setIsDropdownOpen(false);
+                            handleNavigate('wholikedme');
+                          }}
+                          className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800/80 text-left transition-colors group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-pink-500/15 border border-pink-500/30 flex items-center justify-center text-pink-400 group-hover:bg-pink-600 group-hover:text-white transition-colors">
+                              <Heart className="w-4 h-4 fill-pink-500" />
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-slate-100 group-hover:text-white flex items-center gap-1.5">
+                                <span>Who Liked Me</span>
+                                <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full">
+                                  ❤️
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-slate-400">See singles who liked your profile</div>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
+                        </button>
+
                         {/* Safety Center */}
                         {onOpenSafety && (
                           <button

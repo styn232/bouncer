@@ -385,5 +385,40 @@
   "userMatches": {
     "usr_demo": []
   },
+  "testimonials": [
+    {
+      "id": "testim_1",
+      "names": "Tinashe & Ruvimbo",
+      "location": "Harare & Johannesburg",
+      "quote": "We connected through DATING WITH BOUNCER when Ruvimbo was visiting family in Borrowdale. Six months later, we got engaged in Victoria Falls! Truly grateful for the verified process.",
+      "badge": "Married 2025",
+      "image": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400",
+      "isApproved": true,
+      "order": 1,
+      "createdAt": "2026-06-01T10:00:00Z"
+    },
+    {
+      "id": "testim_2",
+      "names": "Farai & Chipo",
+      "location": "Bulawayo (Khumalo)",
+      "quote": "Finding someone with serious marriage intentions was so difficult until Bouncer verified profiles gave us peace of mind. Both of us knew exactly what we were looking for from day one.",
+      "badge": "Together 1 Year",
+      "image": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400",
+      "isApproved": true,
+      "order": 2,
+      "createdAt": "2026-06-15T12:00:00Z"
+    },
+    {
+      "id": "testim_3",
+      "names": "Kudakwashe & Nomsa",
+      "location": "Mutare & London (Diaspora)",
+      "quote": "Being in the diaspora makes it hard to meet genuine Zimbabwean singles. DATING WITH BOUNCER made it effortless, honest, and safe. We talk on WhatsApp every single evening.",
+      "badge": "Engaged",
+      "image": "https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?auto=format&fit=crop&q=80&w=400",
+      "isApproved": true,
+      "order": 3,
+      "createdAt": "2026-07-02T14:30:00Z"
+    }
+  ],
   "lastUpdated": "2026-09-09T07:06:01.183Z"
 }

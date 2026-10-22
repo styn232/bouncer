@@ -32,7 +32,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onLoginSuccess,
   initialMode = 'user_login'
 }) => {
-  const resolveMode = (m: AuthModalMode): 'user_login' | 'user_register' => {
+  const resolveMode = (m?: string | AuthModalMode): 'user_login' | 'user_register' => {
     if (m === 'user_register') return 'user_register';
     return 'user_login';
   };
@@ -224,7 +224,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               id: fbUser.uid,
               uid: fbUser.uid,
               email: fbUser.email,
-              name: fbUser.displayName || (userRole === 'admin' ? 'Super Admin' : 'Member'),
+              name: fbUser.displayName || (userRole === 'admin' ? 'Bouncer Admin' : 'Member'),
               role: userRole,
               avatar: fbUser.photoURL || avatar,
               hivStatus: 'HIV-',
@@ -310,7 +310,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       if (mode === 'user_login') {
-        // 1. Check backend immediately for fast Sign In (works for Super Admin, Admins, Featured, and Registered Users)
+        // 1. Check backend immediately for fast Sign In (works for Bouncer Admin, Admins, Featured, and Registered Users)
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -57,29 +57,29 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   if (!isOpen) return null;
 
   // Dynamic Tiered Pricing Calculation
-  // 1 single = $3 Starter Pack (1 single profile) | 2 to 3 singles = $6 | 4 to 10 singles = $10 | More than 10 or 30+ Singles VIP = $15
+  // 1-2 singles = $3 Starter | 3 to 4 singles = USD $6 | More than 10 singles = USD $10 | Unlimited = USD $30
   const calculateSinglesFee = (count: number) => {
     if (count === 0) return 0;
-    if (count === 1) return 3;
-    if (count <= 3) return 6;
-    if (count <= 10) return 10;
-    return 15;
+    if (count <= 2) return 3;
+    if (count <= 4) return 6;
+    if (count <= 15) return 10;
+    return 30;
   };
 
   const calculatedFee = calculateSinglesFee(cartItems.length);
 
   // Map cart count to subscription plan for Paynow backend
   const getPlanId = (count: number): string => {
-    if (count === 1) return 'starter_1_single';
-    if (count <= 3) return 'starter_3_or_4';
-    if (count <= 10) return 'starter_10_singles';
+    if (count <= 2) return 'test_1_single';
+    if (count <= 4) return 'starter_3_or_4';
+    if (count <= 15) return 'starter_10_singles';
     return 'vip_30_singles';
   };
 
   // Format exact user WhatsApp checkout message:
   const validCartItems = cartItems.filter(i => !!i && !!i.profile);
   const chosenSinglesNames = validCartItems.map(i => `${i.profile.name || 'Single'} (${i.profile.age || ''}, ${i.profile.city || i.profile.location || ''})`).join(', ');
-  const whatsappTextMessage = `Hi Auntie I need these Singles: ${chosenSinglesNames || 'Selected Singles'}. My name is ${currentUser?.name || guestPhone || 'a Member'}.`;
+  const whatsappTextMessage = `Hi Bouncer I need these Singles: ${chosenSinglesNames || 'Selected Singles'}. My name is ${currentUser?.name || guestPhone || 'a Member'}.`;
   const whatsappDirectUrl = `https://wa.me/263715786859?text=${encodeURIComponent(whatsappTextMessage)}`;
 
   const verifyPaymentStatus = async (ref: string, autoApprove: boolean = false) => {
@@ -458,7 +458,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               {/* Concierge Link */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center space-y-3">
                 <p className="text-xs text-slate-700">
-                  Need concierge date setup? Send your list to Auntie on WhatsApp at <strong>+263 71 578 6859</strong>
+                  Need concierge date setup? Send your list to Bouncer on WhatsApp at <strong>+263 71 578 6859</strong>
                 </p>
                 <a
                   href={whatsappDirectUrl}
@@ -467,7 +467,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider"
                 >
                   <MessageCircle className="w-4 h-4 text-emerald-400" />
-                  Send List to Auntie on WhatsApp (+263 71 578 6859)
+                  Send List to Bouncer on WhatsApp (+263 71 578 6859)
                 </a>
               </div>
 
@@ -680,7 +680,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       ${calculatedFee}.00 Flat
                     </div>
                     <div className="text-[10px] text-slate-600 font-semibold mt-0.5">
-                      {cartItems.length <= 3 ? '3 Singles Rate ($6)' : cartItems.length <= 10 ? '4 to 10 Singles Rate ($10)' : 'VIP Rate ($15)'}
+                      {cartItems.length <= 2 ? 'Single Rate ($3)' : cartItems.length <= 4 ? '3–4 Singles Rate ($6)' : cartItems.length <= 15 ? 'More Than 10 Singles ($10)' : 'Unlimited Access ($30)'}
                     </div>
                   </div>
                 </div>
@@ -1021,7 +1021,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       className="flex-1 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 border border-emerald-200 transition-colors"
                     >
                       <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Chat with Auntie</span>
+                      <span>Chat with Bouncer</span>
                     </a>
                   </div>
                 </div>
