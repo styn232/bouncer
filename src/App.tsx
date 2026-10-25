@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, Sparkles, Heart, Crown, ShoppingBag, ArrowRight, Shield, Flame, UserCheck, Search, Filter, MessageSquare, AlertTriangle, Eye, RefreshCw, Bell, ImageOff, ShieldAlert, Gift, Upload, MailCheck } from 'lucide-react';
-import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, NotificationItem, CentralizedLoadingState } from './types';
+import { SingleProfile, User, CartItem, DateType, SubscriptionPlan, PaymentTransaction, AdminStats, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, NotificationItem, CentralizedLoadingState, Testimonial } from './types';
 import { hasValidProfilePhoto, getValidProfilePhotos, calculateDynamicAge, formatRegistrationDate } from './utils/format';
 import { Navbar, MainTabType } from './components/Navbar';
 import { SinglesFilterBar } from './components/SinglesFilterBar';
@@ -156,6 +156,7 @@ export default function App() {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [likers, setLikers] = useState<SingleProfile[]>([]);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
 
   // Centralized Loading State Management
   const [loadingState, setLoadingState] = useState<CentralizedLoadingState>(INITIAL_LOADING_STATE);
@@ -604,6 +605,9 @@ export default function App() {
             }
             if (Array.isArray(boot.likedProfileIds)) {
               setMyLikedProfileIds(boot.likedProfileIds);
+            }
+            if (Array.isArray(boot.testimonials)) {
+              setTestimonials(boot.testimonials);
             }
             if (!sessionUserId) {
               setNotifications([]);
@@ -1322,6 +1326,7 @@ export default function App() {
               <HeroSection
                 profiles={profiles}
                 plans={subscriptionPlans}
+                testimonials={testimonials}
                 onFindMatch={() => setActiveTab('discover')}
                 onExploreClick={() => setActiveTab('discover')}
                 onOpenRegister={() => {
@@ -1400,7 +1405,7 @@ export default function App() {
                 viewerGender={activeViewerGender}
               />
 
-              <div className="flex-1 w-full space-y-4">
+              <div id="singles-catalog" className="flex-1 w-full space-y-4">
                 {/* Non-blocking filter update indicator */}
                 {loadingState.isFilterUpdating && (
                   <div className="w-full bg-slate-900/90 backdrop-blur rounded-2xl p-2.5 px-4 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300 animate-pulse shadow-sm">
@@ -1556,6 +1561,35 @@ export default function App() {
                 <p className="text-xs text-slate-400">
                   Get full velvet rope privileges, unlimited Singles Cart checkouts, and priority Bouncer clearance.
                 </p>
+              </div>
+
+              {/* Guidance: Pay first or choose singles first */}
+              <div className="bg-gradient-to-r from-purple-950/80 via-slate-950 to-pink-950/80 border-2 border-amber-400/50 rounded-2xl p-4 sm:p-5 mb-8 shadow-xl">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-center sm:text-left space-y-1">
+                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] uppercase">
+                      Two Ways to Match
+                    </span>
+                    <h3 className="text-sm font-extrabold text-white">
+                      Pay First, then Choose — Or First Choose Singles, then Pay!
+                    </h3>
+                    <p className="text-xs text-slate-300">
+                      You can pay for your membership package now and come back to select your singles anytime, OR browse and choose your singles into your Cart first and pay at checkout.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setActiveTab('home');
+                      setTimeout(() => {
+                        const el = document.getElementById('singles-catalog');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }, 100);
+                    }}
+                    className="shrink-0 px-4 py-2 rounded-xl bg-purple-800 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider border border-purple-500/50 shadow-md transition-all active:scale-95"
+                  >
+                    ❤️ First Choose Singles
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -1803,6 +1837,7 @@ export default function App() {
             userSubscriptions={userSubscriptions}
             matchOrders={matchOrders}
             siteSettings={siteSettings}
+            testimonials={testimonials}
             onAddProfile={handleAdminAddProfile}
             onEditProfile={handleAdminEditProfile}
             onDeleteProfile={handleAdminDeleteProfile}
@@ -1897,9 +1932,18 @@ export default function App() {
         onClose={() => setIsPaymentModalOpen(false)}
         plans={subscriptionPlans}
         currentUser={currentUser}
+        cartCount={cartItems.length}
+        onBrowseSingles={() => {
+          setIsPaymentModalOpen(false);
+          setActiveTab('home');
+          setTimeout(() => {
+            const el = document.getElementById('singles-catalog');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 150);
+        }}
         onPaymentSuccess={() => {
           fetchInitialData();
-          addToast('Payment Submitted! 🥂', 'Your payment is recorded and awaiting Bouncer Admin verification.', 'bouncer');
+          addToast('Payment Succeeded! 🥂', 'Your Membership is active! Come back to choose your Singles to unlock their direct WhatsApp numbers.', 'bouncer');
         }}
       />
 

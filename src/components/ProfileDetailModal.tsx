@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, ShieldCheck, ShoppingBag, X, Sparkles, Heart, CheckCircle2, Lock, Award, MessageCircle, UserCheck, Eye, Crown, Zap, HeartPulse, ChevronLeft, ChevronRight, Camera, ImageOff, MailCheck } from 'lucide-react';
 import { SingleProfile, User } from '../types';
-import { capitalizeName, formatDisplayName, maskPhoneNumber, formatHivStatus, getValidProfilePhotos, calculateDynamicAge, formatRegistrationDate } from '../utils/format';
+import { capitalizeName, formatDisplayName, maskPhoneNumber, formatHivStatus, getValidProfilePhotos, calculateDynamicAge, formatRegistrationDate, formatLastActive } from '../utils/format';
 
 interface ProfileDetailModalProps {
   profile: SingleProfile | null;
@@ -57,6 +57,10 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
 
   const formattedName = profile ? capitalizeName(profile.name) : '';
   const firstName = formattedName.split(' ')[0] || 'Single';
+  const lastActiveInfo = formatLastActive(
+    profile?.lastActive || profile?.lastLogin || (profile as any)?.lastLoginDate,
+    profile?.isOnline
+  );
 
   React.useEffect(() => {
     if (profile && isOpen) {
@@ -273,10 +277,35 @@ export const ProfileDetailModal: React.FC<ProfileDetailModalProps> = ({
             <div>
               {/* Header: Name, Age, Location */}
               <div className="mb-4">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-xs text-slate-400 font-medium">
-                    {profile.compatibilityScore}% Compatibility
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 font-medium">
+                      {profile.compatibilityScore}% Compatibility
+                    </span>
+                    {/* Last Active Timestamp based on login */}
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-xs ${
+                        lastActiveInfo.isOnline
+                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                          : lastActiveInfo.isRecent
+                          ? 'bg-teal-500/20 border-teal-500/40 text-teal-300'
+                          : 'bg-slate-800 border-slate-700 text-slate-300'
+                      }`}
+                      title={`Last active status based on user login date: ${lastActiveInfo.label}`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          lastActiveInfo.isOnline
+                            ? 'bg-emerald-400 animate-pulse'
+                            : lastActiveInfo.isRecent
+                            ? 'bg-teal-400'
+                            : 'bg-slate-500'
+                        }`}
+                      />
+                      <span>{lastActiveInfo.label}</span>
+                    </span>
+                  </div>
+
                   <span className="text-[11px] font-bold text-amber-300/90 bg-slate-950/90 border border-slate-800 px-2.5 py-0.5 rounded-full">
                     📅 {formatRegistrationDate(profile.createdAt)}
                   </span>

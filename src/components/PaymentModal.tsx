@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Crown, ShieldCheck, Check, Sparkles, X, AlertCircle, ArrowRight, ExternalLink, RefreshCw, Phone, Mail, CreditCard, Lock } from 'lucide-react';
+import { Crown, ShieldCheck, Check, Sparkles, X, AlertCircle, ArrowRight, ExternalLink, RefreshCw, Phone, Mail, CreditCard, Lock, ShoppingBag, Heart } from 'lucide-react';
 import { SubscriptionPlan, SubscriptionPlanId, User } from '../types';
 
 interface PaymentModalProps {
@@ -9,6 +9,9 @@ interface PaymentModalProps {
   plans: SubscriptionPlan[];
   currentUser?: User | null;
   onPaymentSuccess: (planId: SubscriptionPlanId, transactionData: any) => void;
+  onBrowseSingles?: () => void;
+  cartCount?: number;
+  initialPlanId?: SubscriptionPlanId;
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
@@ -16,9 +19,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onClose,
   plans,
   currentUser,
-  onPaymentSuccess
+  onPaymentSuccess,
+  onBrowseSingles,
+  cartCount = 0,
+  initialPlanId
 }) => {
-  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>('starter_3_or_4');
+  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>(initialPlanId || 'starter_3_or_4');
+
+  useEffect(() => {
+    if (initialPlanId) {
+      setSelectedPlanId(initialPlanId);
+    }
+  }, [initialPlanId]);
+
   const [paymentMethod, setPaymentMethod] = useState<'web' | 'ecocash' | 'onemoney' | 'paypal_visa'>('web');
   const [mobileNumber, setMobileNumber] = useState(currentUser?.whatsappNumber || '0771490167');
   const [guestEmail, setGuestEmail] = useState(currentUser?.email || '');
@@ -234,6 +247,43 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <p className="text-xs text-slate-400 mt-1">
                 Unlock Singles Cart checkouts, direct DMs, and priority Bouncer profile approval.
               </p>
+            </div>
+
+            {/* Crucial Instruction: Come back to choose OR First choose then pay */}
+            <div className="bg-gradient-to-r from-purple-950/90 via-slate-950 to-pink-950/90 border-2 border-amber-400/60 rounded-2xl p-4 sm:p-5 mb-5 shadow-xl">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+                      Membership Flow
+                    </span>
+                    <span className="text-xs font-black text-white uppercase tracking-wide">
+                      Two Flexible Ways to Connect
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-200 space-y-1 leading-relaxed">
+                    <p>
+                      💳 <strong className="text-amber-300">Option 1 (Pay First):</strong> Complete your Membership payment below, then <span className="underline decoration-amber-400 decoration-2 font-bold text-white">come back to choose your Single matches</span> to instantly reveal their WhatsApp numbers!
+                    </p>
+                    <p>
+                      ❤️ <strong className="text-rose-300">Option 2 (First Choose, Then Pay):</strong> You can also <span className="underline decoration-pink-400 decoration-2 font-bold text-white">first choose your Singles</span> into your Cart, and then proceed to Pay at Cart checkout!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full md:w-auto shrink-0">
+                  {onBrowseSingles && (
+                    <button
+                      type="button"
+                      onClick={onBrowseSingles}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+                    >
+                      <ShoppingBag className="w-4 h-4" />
+                      <span>{cartCount > 0 ? `View Cart (${cartCount}) & Pay` : 'First Choose Singles in Cart'}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Crucial Instruction Notice: WhatsApp Number Revelation */}

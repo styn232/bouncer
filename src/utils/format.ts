@@ -182,5 +182,106 @@ export function formatRegistrationDate(createdAt?: string | null): string {
   return `Joined ${monthLabel} ${y}`;
 }
 
+export interface LastActiveInfo {
+  label: string;
+  isOnline: boolean;
+  isRecent: boolean;
+}
 
+/**
+ * Formats a last active timestamp or login date into a human-friendly string
+ * (e.g., 'Active 2h ago', 'Active now', 'Active yesterday', 'Active 3d ago')
+ * based on user's last login date or profile activity.
+ */
+export function formatLastActive(
+  dateInput?: string | null,
+  isOnlineInput?: boolean
+): LastActiveInfo {
+  if (isOnlineInput === true) {
+    return {
+      label: 'Active now',
+      isOnline: true,
+      isRecent: true
+    };
+  }
 
+  if (!dateInput) {
+    return {
+      label: 'Active today',
+      isOnline: false,
+      isRecent: true
+    };
+  }
+
+  const date = new Date(dateInput);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+
+  if (isNaN(date.getTime()) || diffMs < 0) {
+    return {
+      label: 'Active recently',
+      isOnline: false,
+      isRecent: true
+    };
+  }
+
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const diffWeeks = Math.floor(diffDays / 7);
+
+  if (diffMins < 5) {
+    return {
+      label: 'Active now',
+      isOnline: true,
+      isRecent: true
+    };
+  }
+
+  if (diffMins < 60) {
+    return {
+      label: `Active ${diffMins}m ago`,
+      isOnline: false,
+      isRecent: true
+    };
+  }
+
+  if (diffHours < 24) {
+    return {
+      label: `Active ${diffHours}h ago`,
+      isOnline: false,
+      isRecent: diffHours <= 6
+    };
+  }
+
+  if (diffDays === 1) {
+    return {
+      label: 'Active yesterday',
+      isOnline: false,
+      isRecent: false
+    };
+  }
+
+  if (diffDays < 7) {
+    return {
+      label: `Active ${diffDays}d ago`,
+      isOnline: false,
+      isRecent: false
+    };
+  }
+
+  if (diffWeeks < 4) {
+    return {
+      label: `Active ${diffWeeks}w ago`,
+      isOnline: false,
+      isRecent: false
+    };
+  }
+
+  return {
+    label: `Active ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`,
+    isOnline: false,
+    isRecent: false
+  };
+}

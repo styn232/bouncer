@@ -175,6 +175,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Singles</span>
             </button>
 
+            {onOpenPayment && (
+              <button
+                onClick={() => onOpenPayment()}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 text-amber-300 hover:text-white hover:bg-amber-500/20 border border-amber-500/40 shadow-xs"
+                title="Membership Packages ($6, $10, $30) - Pay via EcoCash, OneMoney & Cards"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <span>Membership Packages</span>
+              </button>
+            )}
+
             {currentUser && (
               <button
                 onClick={() => handleNavigate('profile')}
@@ -643,6 +654,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
             <span>Alerts</span>
+          </button>
+        )}
+
+        {onOpenPayment && (
+          <button
+            onClick={onOpenPayment}
+            className="flex flex-col items-center gap-1 text-[10px] font-bold text-amber-300 hover:text-amber-200 transition-all active:scale-105"
+            title="Membership Packages ($6, $10, $30)"
+          >
+            <Crown className="w-5 h-5 text-amber-400" />
+            <span>Packages</span>
           </button>
         )}
 

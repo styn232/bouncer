@@ -22,12 +22,13 @@ import {
   Zap,
   Award
 } from 'lucide-react';
-import { SingleProfile, ReelItem, SubscriptionPlan } from '../types';
+import { SingleProfile, ReelItem, SubscriptionPlan, Testimonial } from '../types';
 
 interface HeroSectionProps {
   profiles?: SingleProfile[];
   reels?: ReelItem[];
   plans?: SubscriptionPlan[];
+  testimonials?: Testimonial[];
   onFindMatch?: () => void;
   onCreateProfile?: () => void;
   onSelectProfile?: (profile: SingleProfile) => void;
@@ -45,6 +46,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   profiles = [],
   reels = [],
   plans = [],
+  testimonials = [],
   onFindMatch,
   onCreateProfile,
   onSelectProfile,
@@ -115,6 +117,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       image: 'https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?auto=format&fit=crop&q=80&w=400'
     }
   ];
+
+  const activeStories = testimonials && testimonials.length > 0
+    ? testimonials.filter(t => t.isApproved !== false)
+    : successStories;
 
   return (
     <div className="space-y-20 pb-16">
@@ -376,6 +382,51 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           </p>
         </div>
 
+        {/* Two-Way Choice Guidance Banner: Pay First & Choose Later OR Choose First & Pay */}
+        <div className="max-w-4xl mx-auto bg-purple-900/60 border-2 border-amber-400/50 rounded-2xl p-4 sm:p-6 shadow-xl">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="space-y-1.5 text-center md:text-left">
+              <div className="flex items-center justify-center md:justify-start gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider">
+                  Two Flexible Options
+                </span>
+                <span className="text-xs font-black text-amber-300 uppercase">
+                  Pay First, or Choose First!
+                </span>
+              </div>
+              <p className="text-xs text-purple-100 leading-relaxed">
+                <strong>Option 1 (Pay First):</strong> Select a package below and pay now. Then <strong>come back to choose your Single matches</strong> to immediately unlock their private WhatsApp numbers!
+              </p>
+              <p className="text-xs text-purple-200 leading-relaxed">
+                <strong>Option 2 (Choose First, Then Pay):</strong> You can also <strong>first choose your Singles</strong> into your Cart, and then pay at Cart checkout!
+              </p>
+            </div>
+            <div className="flex flex-col xs:flex-row gap-2 shrink-0 w-full md:w-auto">
+              <button
+                type="button"
+                onClick={() => handlePayment('starter_10_singles')}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-rose-500 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 transition-all shadow-md flex items-center justify-center gap-1.5"
+              >
+                <span>💳 Pay Package Now</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onExploreClick) {
+                    onExploreClick();
+                  } else {
+                    const el = document.getElementById('singles-catalog');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="px-4 py-2.5 rounded-xl bg-purple-800/90 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider border border-purple-500/50 transition-all flex items-center justify-center gap-1.5"
+              >
+                <span>❤️ First Choose Singles</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {/* Package 1: USD $6 */}
           <div className="rounded-3xl bg-purple-900/40 border border-purple-700/50 p-6 flex flex-col justify-between space-y-6 hover:border-pink-400/60 transition-all">
@@ -569,9 +620,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {successStories.map((story, idx) => (
+          {activeStories.map((story, idx) => (
             <div
-              key={idx}
+              key={(story as any).id || idx}
               className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-purple-100 dark:border-purple-950 shadow-md space-y-4 flex flex-col justify-between"
             >
               <div className="space-y-3">
@@ -579,7 +630,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   <img
                     src={story.image}
                     alt={story.names}
-                    className="w-12 h-12 rounded-full object-cover ring-2 ring-pink-500/40"
+                    referrerPolicy="no-referrer"
+                    className="w-14 h-14 rounded-full object-cover ring-2 ring-pink-500/50 shadow-md shrink-0"
                   />
                   <div>
                     <h3 className="font-black text-sm text-slate-900 dark:text-white font-serif">{story.names}</h3>

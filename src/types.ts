@@ -43,6 +43,7 @@ export interface SingleProfile {
   viewsCount?: number;
   isOnline?: boolean;
   lastActive?: string;
+  lastLogin?: string;
   isBoosted?: boolean;
   boostExpiresAt?: string;
   createdAt: string;
@@ -116,7 +117,6 @@ export interface PaymentGatewayConfig {
   paynowIntegrationId: string;
   paynowIntegrationKey: string;
   paynowMerchantEmail: string;
-  paynowTestMode?: boolean;
   updatedAt?: string;
 }
 
@@ -203,6 +203,8 @@ export interface User {
   registeredIp?: string;
   deviceFingerprint?: string;
   isOnline?: boolean;
+  lastLogin?: string;
+  lastActive?: string;
   superLikesCount?: number;
   boostsCount?: number;
   blockedUserIds?: string[];

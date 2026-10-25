@@ -18,7 +18,7 @@ import {
   MailCheck
 } from 'lucide-react';
 import { SingleProfile, User } from '../types';
-import { formatDisplayName, capitalizeName, formatHivStatus, getValidProfilePhotos, calculateDynamicAge, formatRegistrationDate } from '../utils/format';
+import { formatDisplayName, capitalizeName, formatHivStatus, getValidProfilePhotos, calculateDynamicAge, formatRegistrationDate, formatLastActive } from '../utils/format';
 
 interface SingleCardProps {
   profile: SingleProfile;
@@ -51,6 +51,10 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
   const formattedDisplayName = formatDisplayName(profile.name, 15);
   const dynamicAge = calculateDynamicAge(profile);
   const joinedLabel = formatRegistrationDate(profile.createdAt);
+  const lastActiveInfo = formatLastActive(
+    profile.lastActive || profile.lastLogin || (profile as any).lastLoginDate,
+    profile.isOnline
+  );
   const photos = getValidProfilePhotos(profile.photos);
   const totalPhotos = photos.length;
   const hasPhoto = totalPhotos > 0;
@@ -292,7 +296,7 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
           </div>
 
           {/* Location with Privacy Control & Registration Date */}
-          <div className="flex items-center justify-between gap-1 text-[10px] sm:text-xs text-slate-600 font-medium truncate mb-1.5">
+          <div className="flex items-center justify-between gap-1 text-[10px] sm:text-xs text-slate-600 font-medium truncate mb-1">
             <div className="flex items-center gap-1 truncate min-w-0" title={(profile as any).locationPrivacy === 'city_only' ? `${profile.city || 'City'} (Approximate location)` : (profile.location || profile.city)}>
               <MapPin className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-rose-500 shrink-0" />
               <span className="truncate">
@@ -301,8 +305,33 @@ export const SingleCard: React.FC<SingleCardProps> = React.memo(({
                   : (profile.location || profile.city || 'Zimbabwe')}
               </span>
             </div>
-            <span className="text-[8px] sm:text-[10px] text-slate-400 font-semibold shrink-0">
+            <span className="text-[8px] sm:text-[9.5px] text-slate-400 font-medium shrink-0">
               {joinedLabel}
+            </span>
+          </div>
+
+          {/* Last Active Timestamp (e.g. 'Active 2h ago') based on login date */}
+          <div className="flex items-center gap-1 mb-1.5">
+            <span
+              className={`inline-flex items-center gap-1 text-[8px] sm:text-[9.5px] font-bold px-1.5 py-0.5 rounded-md border ${
+                lastActiveInfo.isOnline
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : lastActiveInfo.isRecent
+                  ? 'bg-teal-50 border-teal-200 text-teal-800'
+                  : 'bg-slate-100 border-slate-200 text-slate-600'
+              }`}
+              title={`Last active status based on login date: ${lastActiveInfo.label}`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  lastActiveInfo.isOnline
+                    ? 'bg-emerald-500 animate-pulse'
+                    : lastActiveInfo.isRecent
+                    ? 'bg-teal-500'
+                    : 'bg-slate-400'
+                }`}
+              />
+              <span className="truncate">{lastActiveInfo.label}</span>
             </span>
           </div>
 

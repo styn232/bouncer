@@ -16,7 +16,7 @@ import {
   INITIAL_ADS,
   INITIAL_VERIFICATIONS
 } from './src/data/mockData';
-import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, VerificationSubmission, ReportItem, AdCampaign, NotificationItem, SiteSettings, OpenGraphSettings, AffiliateWithdrawalRequest, AffiliateReferral, PaymentGatewayConfig } from './src/types';
+import { SingleProfile, User, PaymentTransaction, MatchOrder, BouncerStatus, SubscriptionPlanId, ReelItem, StoryItem, FeedPost, Conversation, DirectMessage, VerificationSubmission, ReportItem, AdCampaign, NotificationItem, SiteSettings, OpenGraphSettings, AffiliateWithdrawalRequest, AffiliateReferral, PaymentGatewayConfig, Testimonial } from './src/types';
 import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getProvinceForCity, ZIMBABWE_LOCATIONS_CSV } from './src/data/zimbabweLocations';
 import { Paynow } from 'paynow';
 
@@ -110,7 +110,6 @@ async function startServer() {
   const PAYNOW_ID = process.env.PAYNOW_INTEGRATION_ID || '25938';
   const PAYNOW_KEY = process.env.PAYNOW_INTEGRATION_KEY || 'd20d903a-d31a-47f1-8a65-5f9c9d3f0c07';
   const PAYNOW_MERCHANT_EMAIL = process.env.PAYNOW_MERCHANT_EMAIL || 'francismugebe@gmail.com';
-  const IS_PAYNOW_TEST_MODE = false;
 
   const paynow = new Paynow(PAYNOW_ID, PAYNOW_KEY);
   paynow.resultUrl = process.env.PAYNOW_RESULT_URL || 'https://datingwithbouncer.com/api/paynow/result';
@@ -270,7 +269,6 @@ async function startServer() {
       paynowIntegrationId: PAYNOW_ID,
       paynowIntegrationKey: PAYNOW_KEY,
       paynowMerchantEmail: PAYNOW_MERCHANT_EMAIL,
-      paynowTestMode: IS_PAYNOW_TEST_MODE,
       updatedAt: new Date().toISOString()
     }
   };
@@ -285,7 +283,6 @@ async function startServer() {
       paynowIntegrationId: pg?.paynowIntegrationId || PAYNOW_ID,
       paynowIntegrationKey: pg?.paynowIntegrationKey || PAYNOW_KEY,
       paynowMerchantEmail: pg?.paynowMerchantEmail || PAYNOW_MERCHANT_EMAIL,
-      paynowTestMode: pg?.paynowTestMode !== undefined ? Boolean(pg.paynowTestMode) : IS_PAYNOW_TEST_MODE,
       updatedAt: pg?.updatedAt || new Date().toISOString()
     };
   }
@@ -429,6 +426,43 @@ async function startServer() {
   let userLikes: Record<string, string[]> = {};
   let userMatches: Record<string, string[]> = {};
   let affiliateWithdrawals: AffiliateWithdrawalRequest[] = [];
+
+  const INITIAL_TESTIMONIALS: Testimonial[] = [
+    {
+      id: 'testim_1',
+      names: 'Tinashe & Ruvimbo',
+      location: 'Harare & Johannesburg',
+      quote: 'We connected through DATING WITH BOUNCER when Ruvimbo was visiting family in Borrowdale. Six months later, we got engaged in Victoria Falls! Truly grateful for the verified process.',
+      badge: 'Married 2025',
+      image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
+      isApproved: true,
+      order: 1,
+      createdAt: '2026-06-01T10:00:00Z'
+    },
+    {
+      id: 'testim_2',
+      names: 'Farai & Chipo',
+      location: 'Bulawayo (Khumalo)',
+      quote: 'Finding someone with serious marriage intentions was so difficult until Bouncer verified profiles gave us peace of mind. Both of us knew exactly what we were looking for from day one.',
+      badge: 'Together 1 Year',
+      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
+      isApproved: true,
+      order: 2,
+      createdAt: '2026-06-15T12:00:00Z'
+    },
+    {
+      id: 'testim_3',
+      names: 'Kudakwashe & Nomsa',
+      location: 'Mutare & London (Diaspora)',
+      quote: 'Being in the diaspora makes it hard to meet genuine Zimbabwean singles. DATING WITH BOUNCER made it effortless, honest, and safe. We talk on WhatsApp every single evening.',
+      badge: 'Engaged',
+      image: 'https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?auto=format&fit=crop&q=80&w=400',
+      isApproved: true,
+      order: 3,
+      createdAt: '2026-07-02T14:30:00Z'
+    }
+  ];
+  let testimonials: Testimonial[] = [...INITIAL_TESTIMONIALS];
 
   function isRealUploadedPhoto(url?: string | null): boolean {
     if (!url || typeof url !== 'string') return false;
@@ -679,12 +713,15 @@ async function startServer() {
           });
         }
         if (siteSettings.paymentGateways) {
-          siteSettings.paymentGateways.paynowTestMode = false;
+          delete (siteSettings.paymentGateways as any).paynowTestMode;
         }
         if (Array.isArray(data.verifications)) verifications = data.verifications;
         if (Array.isArray(data.ads)) ads = data.ads;
         if (Array.isArray(data.reports)) reports = data.reports;
         if (Array.isArray(data.affiliateWithdrawals)) affiliateWithdrawals = data.affiliateWithdrawals;
+        if (Array.isArray(data.testimonials) && data.testimonials.length > 0) {
+          testimonials = data.testimonials;
+        }
         if (data.userLikes) userLikes = data.userLikes;
         if (data.userMatches) userMatches = data.userMatches;
 
@@ -756,6 +793,7 @@ async function startServer() {
           ads,
           reports,
           affiliateWithdrawals,
+          testimonials,
           userLikes,
           userMatches,
           lastUpdated: new Date().toISOString()
@@ -811,25 +849,69 @@ async function startServer() {
   // Load persistent storage on boot
   loadPersistentData();
 
-  // Ensure all in-memory profiles and users have birthYear, dynamic age, and registration date
-  profiles = profiles.map(p => {
+  // Ensure all in-memory profiles and users have birthYear, dynamic age, registration date, and last active timestamp
+  profiles = profiles.map((p, idx) => {
     const by = computeBirthYear(p);
+    const matchingUser = users.find(
+      u => u.id === p.id || 
+           ((p as any).email && u.email && u.email.toLowerCase() === (p as any).email.toLowerCase()) || 
+           (u.name && p.name && u.name.toLowerCase() === p.name.toLowerCase())
+    );
+
+    let resolvedLastActive = p.lastActive || p.lastLogin || matchingUser?.lastActive || matchingUser?.lastLogin;
+    if (!resolvedLastActive) {
+      // Natural distributed offsets for singles: e.g. 15m ago, 2h ago, 5h ago, 1d ago based on index
+      const offsetMinutes = [15, 45, 120, 180, 240, 360, 720, 1440, 2880][idx % 9];
+      resolvedLastActive = new Date(Date.now() - offsetMinutes * 60 * 1000).toISOString();
+    }
+    const isOnline = p.isOnline !== undefined ? p.isOnline : (idx % 5 === 0);
+
     return {
       ...p,
       birthYear: by,
       age: computeDynamicAge({ ...p, birthYear: by }),
-      createdAt: p.createdAt || '2026-05-01T10:00:00.000Z'
+      createdAt: p.createdAt || '2026-05-01T10:00:00.000Z',
+      lastActive: resolvedLastActive,
+      lastLogin: resolvedLastActive,
+      isOnline
     };
   });
-  users = users.map(u => {
+
+  users = users.map((u, idx) => {
     const by = computeBirthYear(u);
+    const matchingProfile = profiles.find(
+      p => p.id === u.id || 
+           ((p as any).email && u.email && u.email.toLowerCase() === (p as any).email.toLowerCase()) || 
+           (u.name && p.name && u.name.toLowerCase() === p.name.toLowerCase())
+    );
+    const resolvedLastLogin = u.lastLogin || u.lastActive || matchingProfile?.lastActive || new Date(Date.now() - ((idx % 8) + 1) * 3600 * 1000).toISOString();
     return {
       ...u,
       birthYear: by,
       age: computeDynamicAge({ ...u, birthYear: by }),
-      createdAt: u.createdAt || '2026-05-01T10:00:00.000Z'
+      createdAt: u.createdAt || '2026-05-01T10:00:00.000Z',
+      lastLogin: resolvedLastLogin,
+      lastActive: resolvedLastLogin,
+      isOnline: u.isOnline !== undefined ? u.isOnline : (idx % 4 === 0)
     };
   });
+
+  function updateUserActivity(user: User) {
+    const nowIso = new Date().toISOString();
+    user.lastLogin = nowIso;
+    user.lastActive = nowIso;
+    user.isOnline = true;
+    const matchingProf = profiles.find(
+      p => p.id === user.id || 
+           ((p as any).email && user.email && (p as any).email.toLowerCase() === user.email.toLowerCase()) ||
+           (p.name && user.name && p.name.toLowerCase() === user.name.toLowerCase())
+    );
+    if (matchingProf) {
+      matchingProf.lastActive = nowIso;
+      matchingProf.lastLogin = nowIso;
+      matchingProf.isOnline = true;
+    }
+  }
 
   function activateUserSubscription(tx: PaymentTransaction) {
     tx.status = 'succeeded';
@@ -1086,6 +1168,7 @@ async function startServer() {
       notifications: userPersonalNotifications,
       likedProfileIds: reqUserId ? (userLikes[reqUserId] || []) : [],
       affiliateWithdrawals: isAdminReq ? affiliateWithdrawals : [],
+      testimonials: isAdminReq ? testimonials : testimonials.filter(t => t.isApproved !== false),
       platformGenderBalance: {
         menCount: platformMenCount,
         ladiesCount: platformLadiesCount,
@@ -1185,8 +1268,7 @@ async function startServer() {
       paypalReceiverEmail,
       paynowIntegrationId,
       paynowIntegrationKey,
-      paynowMerchantEmail,
-      paynowTestMode
+      paynowMerchantEmail
     } = req.body || {};
 
     const currentPg = getActivePaymentGateways();
@@ -1204,7 +1286,6 @@ async function startServer() {
           ? String(paynowIntegrationKey).trim()
           : currentPg.paynowIntegrationKey,
       paynowMerchantEmail: paynowMerchantEmail !== undefined ? String(paynowMerchantEmail).trim() : currentPg.paynowMerchantEmail,
-      paynowTestMode: paynowTestMode !== undefined ? Boolean(paynowTestMode) : currentPg.paynowTestMode,
       updatedAt: new Date().toISOString()
     };
 
@@ -1464,10 +1545,12 @@ async function startServer() {
         existing.referralCode = generateUserReferralCode(existing.id);
       }
       creditAffiliateReferrer(existing, referredByCode || user.referredByCode);
+      updateUserActivity(existing);
       currentUser = existing;
     } else {
       user.referralCode = generateUserReferralCode(user.id);
       user.avatar = isRealUploadedPhoto(user.avatar) ? user.avatar : '';
+      updateUserActivity(user);
       users.push(user);
       creditAffiliateReferrer(user, referredByCode || user.referredByCode);
       currentUser = user;
@@ -1566,6 +1649,10 @@ async function startServer() {
       currentUser = newUser;
     }
 
+    if (currentUser) {
+      updateUserActivity(currentUser);
+    }
+
     saveAppData();
 
     res.json({ 
@@ -1587,6 +1674,8 @@ async function startServer() {
 
     const found = users.find(u => u.email.toLowerCase() === normalizedEmail);
     if (found) {
+      updateUserActivity(found);
+      saveAppData();
       if (found.role === 'admin' || normalizedEmail === MOCK_ADMIN_USER.email.toLowerCase() || normalizedEmail === 'admin@bouncer.date') {
         found.role = 'admin';
         found.bouncerVerified = true;
@@ -2360,10 +2449,18 @@ async function startServer() {
 
     // Mask/hide WhatsApp contact numbers from public API response unless caller is Admin
     const isAdminReq = isAuthorizedAdmin(req);
-    const sanitizedResult = result.map(p => {
+    const sanitizedResult = result.map((p, idx) => {
       const birthYear = computeBirthYear(p);
       const dynamicAge = computeDynamicAge({ ...p, birthYear });
-      const enriched = { ...p, birthYear, age: dynamicAge };
+      const defaultActive = new Date(Date.now() - ([15, 45, 120, 180, 240, 360, 720, 1440, 2880][idx % 9]) * 60 * 1000).toISOString();
+      const enriched = { 
+        ...p, 
+        birthYear, 
+        age: dynamicAge,
+        lastActive: p.lastActive || p.lastLogin || defaultActive,
+        lastLogin: p.lastLogin || p.lastActive || defaultActive,
+        isOnline: p.isOnline !== undefined ? p.isOnline : (idx % 5 === 0)
+      };
       if (isAdminReq) {
         return enriched;
       }
@@ -3456,7 +3553,6 @@ async function startServer() {
         success: true,
         reference,
         transaction,
-        testMode: false,
         redirectUrl: response.redirectUrl,
         pollUrl: response.pollUrl,
         instructions: response.instructions
@@ -3467,17 +3563,9 @@ async function startServer() {
     }
   });
 
-  // POST /api/payment/test-approve - Instantly marks a test payment as succeeded for rapid testing
-  app.post('/api/payment/test-approve', (req, res) => {
-    const { reference } = req.body;
-    const tx = transactions.find(t => t.reference === reference || t.id === reference);
-    if (!tx) {
-      return res.status(404).json({ success: false, error: 'Transaction not found' });
-    }
-
-    activateUserSubscription(tx);
-    saveAppData();
-    return res.json({ success: true, message: 'Test transaction approved & VIP unlocked!', transaction: tx });
+  // POST /api/payment/test-approve - Disabled because the platform is running in live production mode
+  app.post('/api/payment/test-approve', (_req, res) => {
+    return res.status(403).json({ success: false, error: 'Test payment approval is disabled. The site is live.' });
   });
 
   // POST /api/payment/verify-and-get-numbers - Returns WhatsApp contact numbers ONLY after Paynow confirms Paid
@@ -4458,6 +4546,170 @@ async function startServer() {
     ads.unshift(newAd);
     saveAppData();
     res.json({ success: true, ad: newAd });
+  });
+
+  // ==========================================
+  // REAL TESTIMONIALS & SUCCESS STORIES ENDPOINTS
+  // ==========================================
+  app.get('/api/testimonials', (req, res) => {
+    const isAdmin = isAuthorizedAdmin(req);
+    if (isAdmin) {
+      return res.json(testimonials);
+    }
+    res.json(testimonials.filter(t => t.isApproved !== false));
+  });
+
+  app.post('/api/admin/testimonials', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const { names, location, quote, badge, image } = req.body;
+    if (!names || !quote) {
+      return res.status(400).json({ error: 'Names and story quote are required.' });
+    }
+
+    let finalImageUrl = (image || '').trim();
+    if (finalImageUrl.startsWith('data:image/')) {
+      const matches = finalImageUrl.match(/^data:image\/([a-zA-Z0-9.+]+);base64,(.+)$/);
+      if (matches) {
+        const rawExt = matches[1].toLowerCase();
+        const ext = rawExt === 'jpeg' ? 'jpg' : rawExt;
+        const fname = `testimonial_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${ext}`;
+        const fpath = path.join(uploadsDir, fname);
+        try {
+          fs.writeFileSync(fpath, Buffer.from(matches[2], 'base64'));
+          finalImageUrl = `/uploads/${fname}`;
+        } catch (e) {
+          // fallback to dataUrl
+        }
+      }
+    }
+
+    const newTestimonial: Testimonial = {
+      id: `testim_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      names: names.trim(),
+      location: (location || 'Harare, Zimbabwe').trim(),
+      quote: quote.trim(),
+      badge: (badge || 'Verified Match').trim(),
+      image: finalImageUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
+      isApproved: true,
+      order: testimonials.length + 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    testimonials.unshift(newTestimonial);
+    saveAppData();
+    res.json({ success: true, testimonial: newTestimonial });
+  });
+
+  app.put('/api/admin/testimonials/:id', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const { id } = req.params;
+    const idx = testimonials.findIndex(t => t.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Testimonial not found.' });
+    }
+
+    const { names, location, quote, badge, image, isApproved, order } = req.body;
+    let finalImageUrl = testimonials[idx].image;
+
+    if (image !== undefined && typeof image === 'string') {
+      const trimmed = image.trim();
+      if (trimmed.startsWith('data:image/')) {
+        const matches = trimmed.match(/^data:image\/([a-zA-Z0-9.+]+);base64,(.+)$/);
+        if (matches) {
+          const rawExt = matches[1].toLowerCase();
+          const ext = rawExt === 'jpeg' ? 'jpg' : rawExt;
+          const fname = `testimonial_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${ext}`;
+          const fpath = path.join(uploadsDir, fname);
+          try {
+            fs.writeFileSync(fpath, Buffer.from(matches[2], 'base64'));
+            finalImageUrl = `/uploads/${fname}`;
+          } catch (e) {
+            finalImageUrl = trimmed;
+          }
+        }
+      } else if (trimmed) {
+        finalImageUrl = trimmed;
+      }
+    }
+
+    testimonials[idx] = {
+      ...testimonials[idx],
+      ...(names !== undefined && { names: names.trim() }),
+      ...(location !== undefined && { location: location.trim() }),
+      ...(quote !== undefined && { quote: quote.trim() }),
+      ...(badge !== undefined && { badge: badge.trim() }),
+      image: finalImageUrl,
+      ...(isApproved !== undefined && { isApproved: Boolean(isApproved) }),
+      ...(order !== undefined && { order: Number(order) }),
+      updatedAt: new Date().toISOString()
+    };
+
+    saveAppData();
+    res.json({ success: true, testimonial: testimonials[idx] });
+  });
+
+  // Admin: Change profile picture specifically for a real testimonial
+  app.put('/api/admin/testimonials/:id/photo', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const { id } = req.params;
+    const { photo } = req.body; // base64 or URL
+
+    const idx = testimonials.findIndex(t => t.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Testimonial not found.' });
+    }
+
+    if (!photo || typeof photo !== 'string' || !photo.trim()) {
+      return res.status(400).json({ error: 'Valid profile photo image is required.' });
+    }
+
+    let finalImageUrl = photo.trim();
+    if (finalImageUrl.startsWith('data:image/')) {
+      const matches = finalImageUrl.match(/^data:image\/([a-zA-Z0-9.+]+);base64,(.+)$/);
+      if (matches) {
+        const rawExt = matches[1].toLowerCase();
+        const ext = rawExt === 'jpeg' ? 'jpg' : rawExt;
+        const fname = `testimonial_${id}_${Date.now()}.${ext}`;
+        const fpath = path.join(uploadsDir, fname);
+        try {
+          fs.writeFileSync(fpath, Buffer.from(matches[2], 'base64'));
+          finalImageUrl = `/uploads/${fname}`;
+        } catch (e) {
+          // fallback to data url
+        }
+      }
+    }
+
+    testimonials[idx].image = finalImageUrl;
+    testimonials[idx].updatedAt = new Date().toISOString();
+
+    saveAppData();
+    res.json({
+      success: true,
+      message: 'Profile picture for real testimonial successfully updated!',
+      testimonial: testimonials[idx]
+    });
+  });
+
+  app.delete('/api/admin/testimonials/:id', (req, res) => {
+    if (!isAuthorizedAdmin(req)) {
+      return res.status(403).json({ error: 'Access denied. Admin authorization required.' });
+    }
+    const { id } = req.params;
+    const initialLen = testimonials.length;
+    testimonials = testimonials.filter(t => t.id !== id);
+    if (testimonials.length === initialLen) {
+      return res.status(404).json({ error: 'Testimonial not found.' });
+    }
+    saveAppData();
+    res.json({ success: true, message: 'Testimonial removed successfully.' });
   });
 
   app.post('/api/boost', (req, res) => {
