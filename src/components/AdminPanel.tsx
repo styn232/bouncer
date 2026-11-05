@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image as ImageIcon, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database, Wallet, ArrowUpRight, ArrowDownLeft, X, UserCheck, Gift, ImageOff, CreditCard, Bell, Send, Radio, Heart } from 'lucide-react';
+import { ShieldCheck, Users, Crown, DollarSign, ShoppingBag, Plus, Search, Edit3, Trash2, CheckCircle2, XCircle, AlertCircle, RefreshCw, Sparkles, Filter, Image as ImageIcon, Upload, Settings, Phone, UserPlus, Eye, BarChart3, TrendingUp, Key, Server, Lock, Mail, Database, Wallet, ArrowUpRight, ArrowDownLeft, X, UserCheck, Gift, ImageOff, CreditCard, Bell, Send, Radio, Heart, Camera, Contact, UploadCloud, FileSpreadsheet } from 'lucide-react';
 import { SingleProfile, PaymentTransaction, AdminStats, BouncerStatus, SubscriptionPlanId, SiteSettings, DatingIntent, AffiliateWithdrawalRequest, Testimonial } from '../types';
 import { ZIMBABWE_PROVINCES, ZIMBABWE_LOCATIONS, getCitiesByProvince, getSubLocationsForCity, getProvinceForCity } from '../data/zimbabweLocations';
 import { compressImageFile } from '../utils/imageCompressor';
 import { capitalizeName, hasValidProfilePhoto } from '../utils/format';
+import { parseGoogleContactData, ParsedContact } from '../utils/googleContactParser';
 import { auth, db, createUserWithEmailAndPassword, doc, setDoc } from '../lib/firebase';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -442,6 +443,113 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editRelationshipGoal, setEditRelationshipGoal] = useState('Marriage / Long-term');
   const [editRole, setEditRole] = useState<'user' | 'featured' | 'admin'>('user');
   const [editIsFeatured, setEditIsFeatured] = useState<boolean>(false);
+
+  // Google Saved Contacts Auto-Profile Creation State
+  const [isGoogleContactModalOpen, setIsGoogleContactModalOpen] = useState(false);
+  const [googleContactInput, setGoogleContactInput] = useState('');
+  const [parsedContacts, setParsedContacts] = useState<ParsedContact[]>([]);
+  const [isImportingContacts, setIsImportingContacts] = useState(false);
+  const [importStatusMsg, setImportStatusMsg] = useState<string | null>(null);
+  const [quickUploadingPhotoId, setQuickUploadingPhotoId] = useState<string | null>(null);
+
+  const handleGoogleContactTextChange = (text: string) => {
+    setGoogleContactInput(text);
+    if (text.trim().length > 5) {
+      try {
+        const parsed = parseGoogleContactData(text);
+        setParsedContacts(parsed);
+      } catch (e) {
+        console.warn('Parsing warning:', e);
+      }
+    } else {
+      setParsedContacts([]);
+    }
+  };
+
+  const handleGoogleContactFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        setGoogleContactInput(content);
+        try {
+          const parsed = parseGoogleContactData(content);
+          setParsedContacts(parsed);
+          setImportStatusMsg(`📁 Loaded file "${file.name}": Detected ${parsed.length} contact(s).`);
+        } catch (err) {
+          setImportStatusMsg(`⚠️ Error parsing "${file.name}".`);
+        }
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImportContactsSubmit = async () => {
+    if (parsedContacts.length === 0) {
+      alert('No contacts detected. Please paste contacts or upload a Google contacts file (.vcf or .csv).');
+      return;
+    }
+    try {
+      setIsImportingContacts(true);
+      setImportStatusMsg(null);
+      const res = await fetch('/api/admin/profiles/import-contacts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': 'admin',
+          'x-user-email': 'jobsatespace@gmail.com'
+        },
+        body: JSON.stringify({ contacts: parsedContacts })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setImportStatusMsg(`✅ Success! Created ${data.profiles?.length || parsedContacts.length} single profile(s). You can now upload pictures anytime!`);
+        setTimeout(() => {
+          setIsGoogleContactModalOpen(false);
+          setGoogleContactInput('');
+          setParsedContacts([]);
+          setImportStatusMsg(null);
+          onRefreshData();
+        }, 1600);
+      } else {
+        setImportStatusMsg(`❌ Error: ${data.error || 'Failed to import contacts.'}`);
+      }
+    } catch {
+      setImportStatusMsg('❌ Network error importing contacts.');
+    } finally {
+      setIsImportingContacts(false);
+    }
+  };
+
+  const handleQuickPhotoUpload = async (profileId: string, file: File) => {
+    try {
+      setQuickUploadingPhotoId(profileId);
+      const compressed = await compressImageFile(file, 1000, 0.85);
+      if (!compressed) return;
+
+      const res = await fetch(`/api/admin/profiles/${profileId}/photo`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': 'admin',
+          'x-user-email': 'jobsatespace@gmail.com'
+        },
+        body: JSON.stringify({ photo: compressed })
+      });
+      if (res.ok) {
+        onRefreshData();
+      } else {
+        const d = await res.json();
+        alert(d.error || 'Failed to update photo.');
+      }
+    } catch (err) {
+      alert('Error uploading photo.');
+    } finally {
+      setQuickUploadingPhotoId(null);
+    }
+  };
 
   // Admin User Profile & Wallet Editor Modal state
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<any | null>(null);
@@ -1174,13 +1282,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               />
             </div>
 
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg"
-            >
-              <Plus className="w-4 h-4" />
-              Add New Single Profile
-            </button>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+              <button
+                onClick={() => setIsGoogleContactModalOpen(true)}
+                className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/20 cursor-pointer transition-all active:scale-95"
+                title="Upload or paste Google Contacts (.vcf / .csv) to auto-create profiles"
+              >
+                <UploadCloud className="w-4 h-4 text-slate-950" />
+                <span>Upload Google Contact</span>
+              </button>
+
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Single Profile</span>
+              </button>
+            </div>
           </div>
 
           {/* Profiles Table */}
@@ -1188,7 +1307,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
                 <tr>
-                  <th className="p-3">Profile</th>
+                  <th className="p-3">Profile Photo</th>
                   <th className="p-3">Name, Age & Location</th>
                   <th className="p-3">Views</th>
                   <th className="p-3">Bouncer Badge</th>
@@ -1203,19 +1322,65 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   return (
                   <tr key={p.id} className="hover:bg-slate-800/40 transition-colors">
                     <td className="p-3">
-                      {hasValidProfilePhoto(p.photos?.[0]) ? (
-                        <img
-                          src={p.photos[0]}
-                          alt={p.name}
-                          referrerPolicy="no-referrer"
-                          className="w-12 h-12 rounded-xl object-cover ring-1 ring-slate-700"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-xl bg-slate-950 border border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-500">
-                          <ImageOff className="w-4 h-4 text-slate-500" />
-                          <span className="text-[7px] font-bold uppercase">No Pic</span>
-                        </div>
-                      )}
+                      <div className="relative group/pic inline-block">
+                        {hasValidProfilePhoto(p.photos?.[0]) ? (
+                          <img
+                            src={p.photos[0]}
+                            alt={p.name}
+                            referrerPolicy="no-referrer"
+                            className="w-12 h-12 rounded-xl object-cover ring-1 ring-slate-700"
+                          />
+                        ) : (
+                          <label
+                            className="w-12 h-12 rounded-xl bg-slate-950 border border-dashed border-rose-500/70 hover:border-amber-400 flex flex-col items-center justify-center text-rose-400 hover:text-amber-300 cursor-pointer transition-colors shadow-inner"
+                            title="No picture yet — Click to upload photo now"
+                          >
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={quickUploadingPhotoId === p.id}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleQuickPhotoUpload(p.id, f);
+                              }}
+                            />
+                            {quickUploadingPhotoId === p.id ? (
+                              <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+                            ) : (
+                              <>
+                                <Camera className="w-4 h-4" />
+                                <span className="text-[7px] font-black uppercase mt-0.5">+ Photo</span>
+                              </>
+                            )}
+                          </label>
+                        )}
+
+                        {/* Replace/Update on hover if photo exists */}
+                        {hasValidProfilePhoto(p.photos?.[0]) && (
+                          <label
+                            className="absolute inset-0 bg-slate-950/80 rounded-xl opacity-0 group-hover/pic:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity text-amber-400"
+                            title="Replace / Update Photo"
+                          >
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={quickUploadingPhotoId === p.id}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleQuickPhotoUpload(p.id, f);
+                              }}
+                            />
+                            {quickUploadingPhotoId === p.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Camera className="w-3.5 h-3.5" />
+                            )}
+                            <span className="text-[7px] font-black uppercase">Change</span>
+                          </label>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3 font-semibold text-white">
                       <div className="text-sm flex items-center gap-1.5 flex-wrap">
@@ -1299,7 +1464,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </button>
                       </div>
                     </td>
-                    <td className="p-3 text-right space-x-1">
+                    <td className="p-3 text-right space-x-1 whitespace-nowrap">
+                      <label
+                        className="p-2 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                        title="Upload / Change Photo for this Single"
+                      >
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={quickUploadingPhotoId === p.id}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleQuickPhotoUpload(p.id, f);
+                          }}
+                        />
+                        {quickUploadingPhotoId === p.id ? (
+                          <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+                        ) : (
+                          <Camera className="w-4 h-4" />
+                        )}
+                      </label>
                       <button
                         onClick={() => handleOpenEditModal(p)}
                         className="p-2 text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
@@ -5004,6 +5189,186 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* GOOGLE SAVED CONTACTS AUTO-PROFILE CREATION MODAL */}
+      {isGoogleContactModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+          <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-7 max-w-2xl w-full shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                  <UploadCloud className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl font-black text-white font-serif">
+                      Upload Google Saved Contacts
+                    </h3>
+                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
+                      Auto-Profile Engine
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Upload a Google Contacts file (.vcf / .csv) or paste contacts. Profiles are created automatically with location & age, and pictures can be uploaded anytime!
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsGoogleContactModalOpen(false);
+                  setImportStatusMsg(null);
+                }}
+                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="space-y-5 pt-4">
+              {/* File Upload Zone */}
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                  1. Select Google Contacts File (.vcf / .csv / .txt)
+                </label>
+                <label className="border-2 border-dashed border-emerald-500/40 hover:border-emerald-400 bg-slate-950 hover:bg-emerald-950/20 rounded-2xl p-5 flex flex-col items-center justify-center cursor-pointer transition-colors text-center group">
+                  <input
+                    type="file"
+                    accept=".vcf,.vcard,.csv,.txt"
+                    onChange={handleGoogleContactFileUpload}
+                    className="hidden"
+                  />
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-2 group-hover:scale-105 transition-transform">
+                    <FileSpreadsheet className="w-6 h-6" />
+                  </div>
+                  <span className="text-xs font-bold text-white">
+                    Click to browse or drop Google Contacts file here
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1">
+                    Supports Google Contacts vCard (.vcf), Google CSV, or contact exports
+                  </span>
+                </label>
+              </div>
+
+              {/* Direct Paste Box */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    2. Or Paste Contact(s) Text
+                  </label>
+                  <span className="text-[10px] text-slate-400">
+                    Paste raw vCard, CSV lines, or name & phone
+                  </span>
+                </div>
+                <textarea
+                  rows={4}
+                  value={googleContactInput}
+                  onChange={(e) => handleGoogleContactTextChange(e.target.value)}
+                  placeholder="Paste Google vCard text, or rows like:&#10;Tendai Chiwenga, +263772123456, 27, Female, Harare, Marriage&#10;Rudo Moyo, 0712345678, 24, Bulawayo, Dating"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-2xl p-3 text-xs text-white placeholder-slate-500 font-mono focus:outline-none transition-colors"
+                />
+              </div>
+
+              {/* Status Message */}
+              {importStatusMsg && (
+                <div className={`p-3 rounded-2xl text-xs font-bold ${
+                  importStatusMsg.startsWith('✅')
+                    ? 'bg-emerald-950/80 border border-emerald-500/50 text-emerald-300'
+                    : importStatusMsg.startsWith('📁')
+                    ? 'bg-sky-950/80 border border-sky-500/50 text-sky-300'
+                    : 'bg-rose-950/80 border border-rose-500/50 text-rose-300'
+                }`}>
+                  {importStatusMsg}
+                </div>
+              )}
+
+              {/* Parsed Contacts Preview */}
+              {parsedContacts.length > 0 && (
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-bold text-white uppercase tracking-wider">
+                        Detected Contacts Preview ({parsedContacts.length})
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                      Ready for 1-Click Profile Creation
+                    </span>
+                  </div>
+
+                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-800/60">
+                    {parsedContacts.map((contact, idx) => (
+                      <div key={idx} className="pt-2 first:pt-0 flex items-center justify-between text-xs">
+                        <div>
+                          <div className="font-bold text-white flex items-center gap-1.5">
+                            <span>{contact.name}</span>
+                            <span className="text-amber-400 font-mono text-[11px]">({contact.age} yrs, {contact.gender})</span>
+                            <span className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                              {contact.intent}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-2">
+                            <span>📱 {contact.phone}</span>
+                            <span>📍 {contact.city}, {contact.province}</span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] text-slate-400 bg-slate-900 border border-slate-800 px-2 py-1 rounded-xl inline-block">
+                            📷 Picture pending
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                <p className="text-[11px] text-slate-400">
+                  💡 Tip: Once created, click <Camera className="w-3.5 h-3.5 inline text-emerald-400" /> on any profile row to upload photos immediately or later.
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsGoogleContactModalOpen(false);
+                      setGoogleContactInput('');
+                      setParsedContacts([]);
+                      setImportStatusMsg(null);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs uppercase"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isImportingContacts || parsedContacts.length === 0}
+                    onClick={handleImportContactsSubmit}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg disabled:opacity-40 cursor-pointer transition-all"
+                  >
+                    {isImportingContacts ? (
+                      <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-slate-950" />
+                    )}
+                    <span>
+                      {isImportingContacts
+                        ? 'Creating Profiles...'
+                        : `Create ${parsedContacts.length > 0 ? `${parsedContacts.length} ` : ''}Profile(s) Now`}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

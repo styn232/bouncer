@@ -2364,7 +2364,7 @@ async function startServer() {
 
   // API ROUTE 3: Profiles Endpoint (Name, Age, Location, Intent, Children, Bouncer Filters)
   app.get('/api/profiles', (req, res) => {
-    let result = profiles.filter(p => hasValidProfilePicture(p));
+    let result = [...profiles];
     const { search, gender, bouncerStatus, location, province, city, subLocation, minAge, maxAge, childrenCount, intent, hivStatus } = req.query;
 
     if (search) {
@@ -2552,7 +2552,7 @@ async function startServer() {
       reviews: [],
       averageRating: 5.0,
       bio: bio || 'Fresh profile on Dating with Bouncer.',
-      photos: Array.isArray(photos) && photos.length > 0 ? photos : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800'],
+      photos: Array.isArray(photos) ? photos : [],
       interests: Array.isArray(interests) ? interests : ['Fine Dining', 'Travel', 'Art'],
       gender: gender || 'female',
       seeking: seeking || 'male',
@@ -2640,6 +2640,88 @@ async function startServer() {
     profiles = profiles.filter(p => p.id !== req.params.id);
     saveAppData();
     res.json({ success: true, message: 'Profile deleted successfully' });
+  });
+
+  // Admin: Quick Photo Upload / Update for any profile (Upload picture later)
+  app.put('/api/admin/profiles/:id/photo', (req, res) => {
+    const idx = profiles.findIndex(p => p.id === req.params.id);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+    const { photo, photos } = req.body;
+    if (Array.isArray(photos)) {
+      profiles[idx].photos = photos.filter(Boolean);
+    } else if (photo && typeof photo === 'string') {
+      const existing = (profiles[idx].photos || []).filter(ph => ph && ph !== 'no-picture' && ph !== 'none');
+      profiles[idx].photos = [photo, ...existing];
+    }
+    saveAppData();
+    res.json({ success: true, profile: profiles[idx] });
+  });
+
+  // Admin: Batch / Single Google Saved Contacts Import
+  app.post('/api/admin/profiles/import-contacts', (req, res) => {
+    const { contacts } = req.body;
+    if (!Array.isArray(contacts) || contacts.length === 0) {
+      return res.status(400).json({ error: 'No contacts provided for import.' });
+    }
+
+    const createdProfiles: SingleProfile[] = [];
+    const timestamp = Date.now();
+
+    contacts.forEach((c: any, index: number) => {
+      if (!c.name || !c.name.trim()) return;
+      const cleanName = c.name.trim();
+      const cleanCity = c.city?.trim() || 'Harare';
+      const cleanProvince = c.province?.trim() || getProvinceForCity(cleanCity) || 'Harare Metropolitan';
+      const cleanSubLoc = c.subLocation?.trim() || 'CBD';
+      const cleanLocation = `${cleanCity} (${cleanSubLoc}), ${cleanProvince}, Zimbabwe`;
+      const cleanPhone = c.phone?.trim() || c.whatsappNumber?.trim() || '+263 77 123 4567';
+      const cleanAge = Number(c.age) >= 18 && Number(c.age) <= 90 ? Number(c.age) : 26;
+      const cleanGender = c.gender === 'male' ? 'male' : 'female';
+      const cleanSeeking = cleanGender === 'male' ? 'female' : 'male';
+      const cleanIntent = c.intent || 'Marriage';
+      const cleanBio = c.bio || c.notes || `Hi! I joined Dating with Bouncer to meet a serious and genuine partner for ${cleanIntent.toLowerCase()}.`;
+
+      const newProf: SingleProfile = {
+        id: `p_google_${timestamp}_${index}_${Math.random().toString(36).substring(2, 6)}`,
+        name: cleanName,
+        age: cleanAge,
+        location: cleanLocation,
+        province: cleanProvince,
+        city: cleanCity,
+        subLocation: cleanSubLoc,
+        childrenCount: c.childrenCount !== undefined ? Number(c.childrenCount) : 0,
+        intent: cleanIntent,
+        hivStatus: c.hivStatus || 'HIV-',
+        reviews: [],
+        averageRating: 5.0,
+        bio: cleanBio,
+        photos: Array.isArray(c.photos) && c.photos.length > 0 ? c.photos : [],
+        interests: Array.isArray(c.interests) && c.interests.length > 0 ? c.interests : ['Travel', 'Music', 'Family'],
+        gender: cleanGender,
+        seeking: cleanSeeking,
+        whatsappNumber: cleanPhone,
+        bouncerStatus: (c.bouncerStatus as BouncerStatus) || 'verified',
+        bouncerNotes: 'Imported from Google Saved Contacts. Ready for photo upload.',
+        compatibilityScore: 92,
+        height: c.height || "5'7\"",
+        relationshipGoal: c.relationshipGoal || 'Marriage / Long-term',
+        isNew: true,
+        viewsCount: 1,
+        createdAt: new Date().toISOString()
+      };
+
+      profiles.unshift(newProf);
+      createdProfiles.push(newProf);
+    });
+
+    saveAppData();
+    res.json({
+      success: true,
+      message: `Successfully imported ${createdProfiles.length} single profile(s) from Google Contacts!`,
+      profiles: createdProfiles
+    });
   });
 
   // Admin: Update Bouncer Status (with 1-click verified sync)

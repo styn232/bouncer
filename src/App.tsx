@@ -1318,29 +1318,9 @@ export default function App() {
           </div>
         )}
 
-        {/* DISCOVER & HOME TAB: DIRECT SINGLES DIRECTORY */}
+        {/* DISCOVER & HOME TAB: DIRECT SINGLES DIRECTORY (PROFILES FIRST) */}
         {(activeTab === 'discover' || activeTab === 'home') && (
           <div className="space-y-6">
-            {/* 1. MODERN HOMEPAGE HERO SECTION */}
-            {activeTab === 'home' && (
-              <HeroSection
-                profiles={profiles}
-                plans={subscriptionPlans}
-                testimonials={testimonials}
-                onFindMatch={() => setActiveTab('discover')}
-                onExploreClick={() => setActiveTab('discover')}
-                onOpenRegister={() => {
-                  setAuthModalInitialMode('user_register');
-                  setIsAuthModalOpen(true);
-                }}
-                onSelectProfile={(prof) => setSelectedProfileModal(prof)}
-                onLikeProfile={(prof) => handleLikeProfile(prof.id, 'toggle')}
-                onOpenPayment={() => setIsPaymentModalOpen(true)}
-                onOpenSafety={() => setIsSafetyModalOpen(true)}
-                onQuizClick={() => setIsMatchQuizModalOpen(true)}
-                onVerifyClick={() => setIsVerificationModalOpen(true)}
-              />
-            )}
 
             {/* FEATURED SINGLES SPOTLIGHT: Horizontal Scroll Section at the Top */}
             <FeaturedSingles
@@ -1481,6 +1461,37 @@ export default function App() {
                 )}
               </div>
             </div>
+
+            {/* HOMEPAGE INFORMATION & MEMBERSHIP PACKAGES (Rendered below profiles so singles are seen first!) */}
+            {activeTab === 'home' && (
+              <div className="pt-10 border-t border-rose-900/40">
+                <HeroSection
+                  profiles={profiles}
+                  plans={subscriptionPlans}
+                  testimonials={testimonials}
+                  onFindMatch={() => {
+                    const el = document.getElementById('singles-catalog');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    else setActiveTab('discover');
+                  }}
+                  onExploreClick={() => {
+                    const el = document.getElementById('singles-catalog');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    else setActiveTab('discover');
+                  }}
+                  onOpenRegister={() => {
+                    setAuthModalInitialMode('user_register');
+                    setIsAuthModalOpen(true);
+                  }}
+                  onSelectProfile={(prof) => setSelectedProfileModal(prof)}
+                  onLikeProfile={(prof) => handleLikeProfile(prof.id, 'toggle')}
+                  onOpenPayment={() => setIsPaymentModalOpen(true)}
+                  onOpenSafety={() => setIsSafetyModalOpen(true)}
+                  onQuizClick={() => setIsMatchQuizModalOpen(true)}
+                  onVerifyClick={() => setIsVerificationModalOpen(true)}
+                />
+              </div>
+            )}
           </div>
         )}
 
